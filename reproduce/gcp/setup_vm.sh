@@ -200,7 +200,11 @@ else
     printf 'Remote path exists and is not a Git checkout: %s\n' "$REMOTE_CODE_DIR" >&2
     exit 1
 fi
-git -C "$REMOTE_CODE_DIR" checkout --detach "$SOURCE_SHA"
+# Force the checkout: an earlier sync may have overlaid working-tree files.
+# Keep results/ and cargo build caches; remove other untracked files.
+git -C "$REMOTE_CODE_DIR" checkout --force --detach "$SOURCE_SHA"
+git -C "$REMOTE_CODE_DIR" clean -fdq -e results/ -e target/ -e 'target-*/'
+
 tar -xzf "$SOURCE_ARCHIVE" --no-same-owner -C "$REMOTE_CODE_DIR"
 
 FIRST_BOOT_DIR=$REMOTE_CODE_DIR/results/$HOST_PROFILE_NAME
