@@ -24,10 +24,12 @@ edges `(l, w)` are gathered, `out[r][row] = sum_l w * in[l][row]` for
 This replaces the left-to-right scatter of `sprs`'s CSC matrix-vector product.
 
 Field arithmetic uses lazy reduction via [`LazyField`]: for each output column,
-unreduced products are accumulated in [`LazyField::Acc`] across the incoming
+unreduced products are accumulated in [`LazyField::Acc`] across incoming
 edges, respecting [`LazyField::MAX_ACCUMULATIONS`] with intermediate folding, and
-reduced once per output column into the destination. Each inner iteration
-processes one edge across the batch (`step/05-lazy`).
+reduced once per output column into the destination. Multi-edge blocking
+(`step/06-blocking`) processes `BLOCK_FACTOR = 4` edges simultaneously in the
+inner loop, keeping the row accumulator in registers and reducing scratch memory
+traffic by 4x.
 
 The code itself ([`ExpanderCode`]) is a list of precode/postcode graph pairs
 plus a base case. It can be sampled by [`crate::matgen`] for either
@@ -39,6 +41,12 @@ use crate::graph::R2lGraph;
 
 use ff::Field;
 use lcpc_fields::LazyField;
+
+/// Compile-time multi-edge blocking factor B (Plan 01 §3.5, Plan 03 §2.2, Decision D8).
+///
+/// B edges are processed simultaneously per inner iteration, keeping the row accumulator
+/// in scalar registers across B edges and reducing memory traffic to the scratch accumulator buffer by Bx.
+pub const BLOCK_FACTOR: usize = 4;
 
 /// How the innermost level's precode output is encoded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -258,7 +266,7 @@ where
 }
 
 /// Evaluate one expander graph on a column block, right to left (gather) with
-/// unreduced lazy accumulation (Plan 01 §3.4, Plan 02 §3-4).
+/// unreduced lazy accumulation and multi-edge register blocking (Plan 01 §3.4-§3.5, Plan 03).
 ///
 /// `input` holds `graph.n_left()` columns and `output` holds `graph.n_right()`
 /// columns, each of `n_rows` contiguous elements. Output column `r` is
@@ -272,6 +280,16 @@ pub fn encode_column_block<F>(graph: &R2lGraph<F>, input: &[F], output: &mut [F]
 where
     F: LazyField,
 {
+    encode_column_block_blocked::<F, BLOCK_FACTOR>(graph, input, output, n_rows);
+}
+
+#[inline(always)]
+fn encode_column_block_blocked<F: LazyField, const B: usize>(
+    graph: &R2lGraph<F>,
+    input: &[F],
+    output: &mut [F],
+    n_rows: usize,
+) {
     assert!(n_rows > 0);
     assert_eq!(input.len(), graph.n_left() * n_rows);
     assert_eq!(output.len(), graph.n_right() * n_rows);
@@ -286,9 +304,77 @@ where
             continue;
         }
 
+        let mut e = 0;
         let mut since_fold = 0;
 
-        for e in 0..num_edges {
+        if B == 4 {
+            while e + 4 <= num_edges {
+                if since_fold + 4 > F::MAX_ACCUMULATIONS {
+                    for acc in scratch.iter_mut() {
+                        F::fold(acc);
+                    }
+                    since_fold = 1;
+                }
+
+                let w0 = F::prepare_weight(&weights[e]);
+                let w1 = F::prepare_weight(&weights[e + 1]);
+                let w2 = F::prepare_weight(&weights[e + 2]);
+                let w3 = F::prepare_weight(&weights[e + 3]);
+
+                let l0 = lefts[e] as usize * n_rows;
+                let l1 = lefts[e + 1] as usize * n_rows;
+                let l2 = lefts[e + 2] as usize * n_rows;
+                let l3 = lefts[e + 3] as usize * n_rows;
+
+                let src0 = &input[l0..l0 + n_rows];
+                let src1 = &input[l1..l1 + n_rows];
+                let src2 = &input[l2..l2 + n_rows];
+                let src3 = &input[l3..l3 + n_rows];
+
+                for row in 0..n_rows {
+                    let mut acc = scratch[row];
+                    F::mac(&mut acc, &w0, &src0[row]);
+                    F::mac(&mut acc, &w1, &src1[row]);
+                    F::mac(&mut acc, &w2, &src2[row]);
+                    F::mac(&mut acc, &w3, &src3[row]);
+                    scratch[row] = acc;
+                }
+
+                e += 4;
+                since_fold += 4;
+            }
+        } else if B == 2 {
+            while e + 2 <= num_edges {
+                if since_fold + 2 > F::MAX_ACCUMULATIONS {
+                    for acc in scratch.iter_mut() {
+                        F::fold(acc);
+                    }
+                    since_fold = 1;
+                }
+
+                let w0 = F::prepare_weight(&weights[e]);
+                let w1 = F::prepare_weight(&weights[e + 1]);
+
+                let l0 = lefts[e] as usize * n_rows;
+                let l1 = lefts[e + 1] as usize * n_rows;
+
+                let src0 = &input[l0..l0 + n_rows];
+                let src1 = &input[l1..l1 + n_rows];
+
+                for row in 0..n_rows {
+                    let mut acc = scratch[row];
+                    F::mac(&mut acc, &w0, &src0[row]);
+                    F::mac(&mut acc, &w1, &src1[row]);
+                    scratch[row] = acc;
+                }
+
+                e += 2;
+                since_fold += 2;
+            }
+        }
+
+        // Remainder loop (or B == 1)
+        while e < num_edges {
             if since_fold >= F::MAX_ACCUMULATIONS {
                 for acc in scratch.iter_mut() {
                     F::fold(acc);
@@ -300,10 +386,13 @@ where
             let l = lefts[e] as usize * n_rows;
             let src = &input[l..l + n_rows];
 
-            for (acc, s) in scratch.iter_mut().zip(src) {
-                F::mac(acc, &w, s);
+            for row in 0..n_rows {
+                let mut acc = scratch[row];
+                F::mac(&mut acc, &w, &src[row]);
+                scratch[row] = acc;
             }
 
+            e += 1;
             since_fold += 1;
         }
 
