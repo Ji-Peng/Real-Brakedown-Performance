@@ -10,7 +10,8 @@
 use super::codespec::{CodeParams, LcpcParams};
 use super::graph::R2lGraph;
 use super::{
-    BrakedownCommit, Fp2M61, Mers127, Mont127, SdigEncoding, SdigEncodingS, SpielmanEncoding,
+    BrakedownCommit, Fp2M61, LazyField, Mers127, Mont127, SdigEncoding, SdigEncodingS,
+    SpielmanEncoding,
 };
 
 use ff::{Field, PrimeField};
@@ -470,7 +471,8 @@ where
         + Num
         + SizedField
         + serde::Serialize
-        + serde::de::DeserializeOwned,
+        + serde::de::DeserializeOwned
+        + LazyField,
     S: super::codespec::SdigSpecification + std::fmt::Debug + Clone + Sync,
 {
     let n_per_row = case.n_per_row;
@@ -770,7 +772,8 @@ fn test_end_to_end_lazy_fields() {
             + Num
             + SizedField
             + serde::Serialize
-            + serde::de::DeserializeOwned,
+            + serde::de::DeserializeOwned
+            + LazyField,
     {
         let mut rng = ChaCha20Rng::seed_from_u64(seed);
         let lgl = 10usize;
@@ -978,7 +981,7 @@ fn batched_col_major_encode_matches_per_row_reference() {
 
     fn check<F, S>(n_per_row: usize, seed: u64)
     where
-        F: Field + FieldHash + MulAcc + Num + SizedField + std::fmt::Debug,
+        F: Field + FieldHash + MulAcc + Num + SizedField + std::fmt::Debug + LazyField,
         S: SdigSpecification + std::fmt::Debug + Clone + Sync,
     {
         let enc = SdigEncodingS::<F, S>::new_from_dims(
@@ -1084,7 +1087,13 @@ fn simd_spielman_mode_encodes_and_commits() {
 
     fn check<F>(k: usize, seed: u64)
     where
-        F: Field + FieldHash + Num + SizedField + serde::Serialize + serde::de::DeserializeOwned,
+        F: Field
+            + FieldHash
+            + Num
+            + SizedField
+            + serde::Serialize
+            + serde::de::DeserializeOwned
+            + LazyField,
     {
         let enc = SpielmanEncoding::<F>::with_params(CodeParams::SimdSpielman, k, seed);
         let code = enc.code();
@@ -1191,4 +1200,49 @@ fn simd_spielman_mode_encodes_and_commits() {
     check::<Mers127>(256, 2);
     check::<Fp2M61>(300, 3);
     check::<Ft63>(13, 4);
+}
+
+#[test]
+fn test_worst_case_accumulation_and_fold() {
+    use super::encode::encode_column_block;
+
+    fn run_worst_case<F: LazyField>(w_val: F, in_val: F) {
+        let degree = 100usize; // > MAX_ACCUMULATIONS (32 for Fp2M61) to force multiple folds
+        let n_left = degree;
+        let n_right = 1;
+        let right_idx = vec![0u32; degree];
+        let weights = vec![w_val; degree];
+        let graph = R2lGraph::from_left_edges_fixed_degree(n_left, n_right, 1, &right_idx, &weights);
+
+        for &n_rows in &[1usize, 8usize] {
+            let input = vec![in_val; n_left * n_rows];
+            let mut output = vec![F::ZERO; n_right * n_rows];
+
+            encode_column_block(&graph, &input, &mut output, n_rows);
+
+            let mut expected = F::ZERO;
+            for _ in 0..degree {
+                expected += w_val * in_val;
+            }
+
+            for row in 0..n_rows {
+                assert_eq!(
+                    output[row], expected,
+                    "row {row} worst case degree {degree} (n_rows={n_rows})"
+                );
+            }
+        }
+    }
+
+    // Mont127: q - 1
+    let q_minus_1 = -Mont127::ONE;
+    run_worst_case::<Mont127>(q_minus_1, q_minus_1);
+
+    // Mers127: p - 1
+    let p_minus_1 = -Mers127::ONE;
+    run_worst_case::<Mers127>(p_minus_1, p_minus_1);
+
+    // Fp2M61: (p - 1) + (p - 1)i
+    let fp2_max = Fp2M61::from_parts(Fp2M61::MODULUS_P - 1, Fp2M61::MODULUS_P - 1);
+    run_worst_case::<Fp2M61>(fp2_max, fp2_max);
 }

@@ -23,10 +23,11 @@ edges `(l, w)` are gathered, `out[r][row] = sum_l w * in[l][row]` for
 `row in 0..n_rows`, and `out[r]` is written once. Input columns are only read.
 This replaces the left-to-right scatter of `sprs`'s CSC matrix-vector product.
 
-Field arithmetic is still eager (one modular multiply and add per edge and
-row). Field addition is associative and commutative, so the gather order does
-not change the result: the output is bit-exact with the `sprs` products of
-`step/03-column-major` and with upstream LCPC.
+Field arithmetic uses lazy reduction via [`LazyField`]: for each output column,
+unreduced products are accumulated in [`LazyField::Acc`] across the incoming
+edges, respecting [`LazyField::MAX_ACCUMULATIONS`] with intermediate folding, and
+reduced once per output column into the destination. Each inner iteration
+processes one edge across the batch (`step/05-lazy`).
 
 The code itself ([`ExpanderCode`]) is a list of precode/postcode graph pairs
 plus a base case. It can be sampled by [`crate::matgen`] for either
@@ -37,6 +38,7 @@ code-parameter mode or assembled from externally sampled graphs with
 use crate::graph::R2lGraph;
 
 use ff::Field;
+use lcpc_fields::LazyField;
 
 /// How the innermost level's precode output is encoded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -161,7 +163,7 @@ impl<F> ExpanderCode<F> {
 /// This is [`encode_col_major`] with a batch of one row.
 pub fn encode<F, T>(mut xi: T, code: &ExpanderCode<F>)
 where
-    F: Field,
+    F: LazyField,
     T: AsMut<[F]>,
 {
     encode_col_major(xi.as_mut(), 1, code);
@@ -180,7 +182,7 @@ where
 /// Panics if `n_rows == 0` or `buf.len() != n_cols * n_rows`.
 pub fn encode_col_major<F>(buf: &mut [F], n_rows: usize, code: &ExpanderCode<F>)
 where
-    F: Field,
+    F: LazyField,
 {
     let (precodes, postcodes) = (code.precodes(), code.postcodes());
     let levels = precodes.len();
@@ -255,42 +257,59 @@ where
     assert_eq!(out_start, n_cols);
 }
 
-/// Evaluate one expander graph on a column block, right to left (gather).
+/// Evaluate one expander graph on a column block, right to left (gather) with
+/// unreduced lazy accumulation (Plan 01 §3.4, Plan 02 §3-4).
 ///
 /// `input` holds `graph.n_left()` columns and `output` holds `graph.n_right()`
 /// columns, each of `n_rows` contiguous elements. Output column `r` is
 /// overwritten with `sum w * input[l]` over the incoming edges `(l, w)` of `r`,
-/// element-wise across the column, with eager field arithmetic; a right node
-/// without edges gets zeros.
+/// element-wise across the column; a right node without edges gets zeros.
 ///
 /// Kept out of line so that `scripts/check_codegen.py` can find and disassemble
 /// it (one symbol per field, e.g. `encode_column_block::<Mont127>`).
 #[inline(never)]
 pub fn encode_column_block<F>(graph: &R2lGraph<F>, input: &[F], output: &mut [F], n_rows: usize)
 where
-    F: Field,
+    F: LazyField,
 {
     assert!(n_rows > 0);
     assert_eq!(input.len(), graph.n_left() * n_rows);
     assert_eq!(output.len(), graph.n_right() * n_rows);
 
+    let mut scratch = vec![F::Acc::default(); n_rows];
+
     for (r, dst) in output.chunks_exact_mut(n_rows).enumerate() {
         let (lefts, weights) = graph.incoming(r);
-        let mut edges = lefts.iter().zip(weights);
-        let Some((&l, w)) = edges.next() else {
+        let num_edges = lefts.len();
+        if num_edges == 0 {
             dst.fill(F::ZERO);
             continue;
-        };
-        // first edge initializes the column, the rest accumulate into it
-        let src = &input[l as usize * n_rows..][..n_rows];
-        for (d, s) in dst.iter_mut().zip(src) {
-            *d = *s * w;
         }
-        for (&l, w) in edges {
-            let src = &input[l as usize * n_rows..][..n_rows];
-            for (d, s) in dst.iter_mut().zip(src) {
-                *d += *s * w;
+
+        let mut since_fold = 0;
+
+        for e in 0..num_edges {
+            if since_fold >= F::MAX_ACCUMULATIONS {
+                for acc in scratch.iter_mut() {
+                    F::fold(acc);
+                }
+                since_fold = 1;
             }
+
+            let w = F::prepare_weight(&weights[e]);
+            let l = lefts[e] as usize * n_rows;
+            let src = &input[l..l + n_rows];
+
+            for (acc, s) in scratch.iter_mut().zip(src) {
+                F::mac(acc, &w, s);
+            }
+
+            since_fold += 1;
+        }
+
+        for (d, acc) in dst.iter_mut().zip(scratch.iter_mut()) {
+            *d = F::reduce(*acc);
+            *acc = F::Acc::default();
         }
     }
 }

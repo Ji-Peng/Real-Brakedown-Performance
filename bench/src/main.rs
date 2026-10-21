@@ -345,6 +345,7 @@ where
         + Clone
         + Send
         + Sync
+        + lcpc_fields::LazyField
         + 'static,
 {
     let coefficient_count = 1usize
@@ -660,7 +661,7 @@ fn codeword_length<S: SdigSpecification>(n_per_row: usize) -> usize {
 // of a level has the same degree in both code-parameter modes).
 fn level_parameters<F>(enc: &SpielmanEncoding<F>) -> Vec<LevelParameters>
 where
-    F: Field + Num + SizedField,
+    F: lcpc_fields::LazyField,
 {
     let code = enc.code();
     code.precodes()
@@ -817,6 +818,7 @@ where
         + Clone
         + Send
         + Sync
+        + lcpc_fields::LazyField
         + 'static,
     S: SdigSpecification + Debug + Clone + Sync,
     SdigEncodingS<F, S>: LcEncoding<F = F>,

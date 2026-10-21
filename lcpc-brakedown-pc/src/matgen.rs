@@ -36,6 +36,7 @@ use crate::graph::R2lGraph;
 use ff::Field;
 use itertools::iterate;
 use lcpc_2d::{LegacyUniformUsize, SizedField};
+use lcpc_fields::LazyField;
 use num_traits::Num;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
@@ -82,7 +83,7 @@ where
 /// Sample the expander code for `params` and message length `n` from `seed`.
 pub fn generate_code<F>(params: &CodeParams, n: usize, seed: u64) -> ExpanderCode<F>
 where
-    F: Field + Num + SizedField,
+    F: LazyField,
 {
     match params {
         CodeParams::Lcpc(p) => {

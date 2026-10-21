@@ -207,6 +207,26 @@ pub mod ft63 {
     #[PrimeFieldReprEndianness = "little"]
     pub struct Ft63([u64; 1]);
     crate::impl_num!(Ft63);
+
+    impl lcpc_fields::LazyField for Ft63 {
+        type Acc = Self;
+        const MAX_ACCUMULATIONS: usize = usize::MAX;
+
+        #[inline(always)]
+        fn mac(acc: &mut Self::Acc, w: &Self, x: &Self) {
+            *acc += *w * *x;
+        }
+
+        #[inline(always)]
+        fn add(acc: &mut Self::Acc, other: &Self::Acc) {
+            *acc += *other;
+        }
+
+        #[inline(always)]
+        fn reduce(acc: Self::Acc) -> Self {
+            acc
+        }
+    }
 }
 
 pub mod ft127 {
@@ -219,6 +239,41 @@ pub mod ft127 {
     #[PrimeFieldReprEndianness = "little"]
     pub struct Ft127([u64; 2]);
     crate::impl_num!(Ft127);
+
+    impl lcpc_fields::LazyField for Ft127 {
+        type Acc = lcpc_fields::Mont127Acc;
+        const MAX_ACCUMULATIONS: usize = lcpc_fields::Mont127::MAX_ACCUMULATIONS;
+
+        #[inline(always)]
+        fn prepare_weight(w: &Self) -> Self {
+            let m = unsafe { core::mem::transmute::<Self, lcpc_fields::Mont127>(*w) };
+            let prep = <lcpc_fields::Mont127 as lcpc_fields::LazyField>::prepare_weight(&m);
+            unsafe { core::mem::transmute::<lcpc_fields::Mont127, Self>(prep) }
+        }
+
+        #[inline(always)]
+        fn mac(acc: &mut Self::Acc, w: &Self, x: &Self) {
+            let mw = unsafe { core::mem::transmute::<Self, lcpc_fields::Mont127>(*w) };
+            let mx = unsafe { core::mem::transmute::<Self, lcpc_fields::Mont127>(*x) };
+            <lcpc_fields::Mont127 as lcpc_fields::LazyField>::mac(acc, &mw, &mx);
+        }
+
+        #[inline(always)]
+        fn add(acc: &mut Self::Acc, other: &Self::Acc) {
+            <lcpc_fields::Mont127 as lcpc_fields::LazyField>::add(acc, other);
+        }
+
+        #[inline(always)]
+        fn reduce(acc: Self::Acc) -> Self {
+            let res = <lcpc_fields::Mont127 as lcpc_fields::LazyField>::reduce(acc);
+            unsafe { core::mem::transmute::<lcpc_fields::Mont127, Self>(res) }
+        }
+
+        #[inline(always)]
+        fn fold(acc: &mut Self::Acc) {
+            <lcpc_fields::Mont127 as lcpc_fields::LazyField>::fold(acc);
+        }
+    }
 }
 
 pub mod ft191 {
@@ -231,6 +286,23 @@ pub mod ft191 {
     #[PrimeFieldReprEndianness = "little"]
     pub struct Ft191([u64; 3]);
     crate::impl_num!(Ft191);
+
+    impl lcpc_fields::LazyField for Ft191 {
+        type Acc = Self;
+        const MAX_ACCUMULATIONS: usize = usize::MAX;
+        #[inline(always)]
+        fn mac(acc: &mut Self::Acc, w: &Self, x: &Self) {
+            *acc += *w * *x;
+        }
+        #[inline(always)]
+        fn add(acc: &mut Self::Acc, other: &Self::Acc) {
+            *acc += *other;
+        }
+        #[inline(always)]
+        fn reduce(acc: Self::Acc) -> Self {
+            acc
+        }
+    }
 }
 
 pub mod ft255 {
@@ -243,6 +315,23 @@ pub mod ft255 {
     #[PrimeFieldReprEndianness = "little"]
     pub struct Ft255([u64; 4]);
     crate::impl_num!(Ft255);
+
+    impl lcpc_fields::LazyField for Ft255 {
+        type Acc = Self;
+        const MAX_ACCUMULATIONS: usize = usize::MAX;
+        #[inline(always)]
+        fn mac(acc: &mut Self::Acc, w: &Self, x: &Self) {
+            *acc += *w * *x;
+        }
+        #[inline(always)]
+        fn add(acc: &mut Self::Acc, other: &Self::Acc) {
+            *acc += *other;
+        }
+        #[inline(always)]
+        fn reduce(acc: Self::Acc) -> Self {
+            acc
+        }
+    }
 }
 
 /// generate random coeffs of length 2^`log_len`

@@ -17,10 +17,7 @@ use encode::{encode, encode_col_major, transpose_into, ExpanderCode};
 use matgen::generate_code;
 
 use ff::Field;
-use lcpc_2d::{
-    def_labels, n_degree_tests, FieldHash, LcCommit, LcEncoding, LcEvalProof, SizedField,
-};
-use num_traits::Num;
+use lcpc_2d::{def_labels, n_degree_tests, LcCommit, LcEncoding, LcEvalProof};
 
 pub mod codespec;
 pub mod encode;
@@ -54,7 +51,7 @@ pub struct SdigEncodingS<Ft, S> {
 
 impl<Ft, S> SdigEncodingS<Ft, S>
 where
-    Ft: Field + Num + SizedField,
+    Ft: LazyField,
 {
     const LAMBDA: usize = 128;
 
@@ -158,7 +155,7 @@ where
 
 impl<Ft, S> SdigEncodingS<Ft, S>
 where
-    Ft: Field + Num + SizedField,
+    Ft: LazyField,
     S: SdigSpecification,
 {
     // number of column openings required for soundness
@@ -192,7 +189,7 @@ where
 
 impl<Ft, S> LcEncoding for SdigEncodingS<Ft, S>
 where
-    Ft: Field + FieldHash + Num + SizedField,
+    Ft: LazyField,
     S: std::fmt::Debug + std::clone::Clone + std::marker::Sync,
 {
     type F = Ft;

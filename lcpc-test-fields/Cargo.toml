@@ -23,6 +23,7 @@ digest = "0.10"
 err-derive = "0.3"
 ff = { version = "0.14", features = ["derive"] }
 itertools = "0.14"
+lcpc-fields = { path = "../lcpc-fields", version = "0.1.1" }
 num-traits = "0.2"
 ppv-lite86 = { version = "0.2", default-features = false, features = ["no_simd"] }
 rand = "0.10"

@@ -235,6 +235,7 @@ where
         + Clone
         + Send
         + Sync
+        + lcpc_fields::LazyField
         + 'static,
     OriginalSpec: lcpc_orig_brakedown_pc::codespec::SdigSpecification + Debug + Clone + Sync,
     ForkSpec: codespec::SdigSpecification + Debug + Clone + Sync,
