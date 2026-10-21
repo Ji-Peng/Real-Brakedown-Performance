@@ -27,6 +27,11 @@ pub mod codespec;
 pub mod encode;
 pub mod matgen;
 
+// Re-export portable lazy-reduction fields for Brakedown PCS callers.
+pub use lcpc_fields::{
+    self, Fp2M61, Fp2M61Acc, LazyField, Mers127, Mers127Acc, Mont127, Mont127Acc,
+};
+
 #[cfg(test)]
 mod tests;
 

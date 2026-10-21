@@ -5,6 +5,7 @@ members = [
     "lcpc-ligero-pc",
     "lcpc-brakedown-pc",
     "lcpc-test-fields",
+    "lcpc-fields",
     "bench",
 ]
 exclude = ["external/lcpc-orig"]

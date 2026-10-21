@@ -13,6 +13,8 @@ use ff::{Field, PrimeField};
 use lcpc_2d::{FieldHash, LcCommit, LcEncoding, SizedField};
 use lcpc_brakedown_pc::codespec::{SdigCode3, SdigCode6, SdigSpecification};
 use lcpc_brakedown_pc::SdigEncodingS;
+// NOTE (step/02-fields part 2): Also import `Fp2M61` from `lcpc_fields` here once implemented.
+use lcpc_fields::{Mers127, Mont127};
 use lcpc_test_fields::{ft127::Ft127, ft63::Ft63, Blake3};
 use merlin::Transcript;
 use num_traits::Num;
@@ -28,6 +30,7 @@ const HASH_MODE: &str = "portable-only";
 
 #[derive(Debug)]
 struct Args {
+    field: String,
     params: String,
     logn: Vec<u32>,
     runs: usize,
@@ -132,7 +135,7 @@ struct GoldenFile {
     cases: Vec<GoldenCase>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, PartialEq, Eq)]
 struct GoldenCase {
     case_id: String,
     params: &'static str,
@@ -159,6 +162,16 @@ fn main() {
 }
 
 fn run() -> Result<(), String> {
+    // Ensure non-inlined field kernel symbols are retained in the binary for `scripts/check_codegen.py --strict`
+    // even before `step/05-lazy-reduce` wires lazy column reduction into the encoder.
+    // NOTE (step/02-fields part 2): Also include `mac_column_fp2m61` and `reduce_column_fp2m61` here.
+    std::hint::black_box((
+        lcpc_fields::mont127::mac_column_mont127 as *const (),
+        lcpc_fields::mont127::reduce_column_mont127 as *const (),
+        lcpc_fields::mers127::mac_column_mers127 as *const (),
+        lcpc_fields::mers127::reduce_column_mers127 as *const (),
+    ));
+
     let args = parse_args()?;
     std::env::set_var("RAYON_NUM_THREADS", args.threads.to_string());
 
@@ -183,14 +196,38 @@ fn run() -> Result<(), String> {
 
     let mut reports = Vec::with_capacity(args.logn.len());
     for &log_n in &args.logn {
-        let report = match args.params.as_str() {
-            "lcpc-sdig6" => benchmark::<Ft127, SdigCode6>(
-                &args, log_n, "Ft127", "lcpc-sdig6", 6,
-            )?,
-            "lcpc-sdig3" => benchmark::<Ft127, SdigCode3>(
-                &args, log_n, "Ft127", "lcpc-sdig3", 3,
-            )?,
-            _ => return Err(format!("unsupported parameter set {}", args.params)),
+        let report = match (args.field.as_str(), args.params.as_str()) {
+            ("mont127", "lcpc-sdig6") => {
+                benchmark::<Mont127, SdigCode6>(&args, log_n, "Mont127", "lcpc-sdig6", 6)?
+            }
+            ("mont127", "lcpc-sdig3") => {
+                benchmark::<Mont127, SdigCode3>(&args, log_n, "Mont127", "lcpc-sdig3", 3)?
+            }
+            ("mers127", "lcpc-sdig6") => {
+                benchmark::<Mers127, SdigCode6>(&args, log_n, "Mers127", "lcpc-sdig6", 6)?
+            }
+            ("mers127", "lcpc-sdig3") => {
+                benchmark::<Mers127, SdigCode3>(&args, log_n, "Mers127", "lcpc-sdig3", 3)?
+            }
+            // NOTE (step/02-fields part 2): Add ("fp2m61", "lcpc-sdig6") and ("fp2m61", "lcpc-sdig3") arms here.
+            ("ft127", "lcpc-sdig6") => {
+                benchmark::<Ft127, SdigCode6>(&args, log_n, "Ft127", "lcpc-sdig6", 6)?
+            }
+            ("ft127", "lcpc-sdig3") => {
+                benchmark::<Ft127, SdigCode3>(&args, log_n, "Ft127", "lcpc-sdig3", 3)?
+            }
+            ("ft63", "lcpc-sdig6") => {
+                benchmark::<Ft63, SdigCode6>(&args, log_n, "Ft63", "lcpc-sdig6", 6)?
+            }
+            ("ft63", "lcpc-sdig3") => {
+                benchmark::<Ft63, SdigCode3>(&args, log_n, "Ft63", "lcpc-sdig3", 3)?
+            }
+            _ => {
+                return Err(format!(
+                    "unsupported (field, params) combination: ({}, {})",
+                    args.field, args.params
+                ))
+            }
         };
         reports.push(report);
     }
@@ -205,6 +242,7 @@ fn run() -> Result<(), String> {
 
 fn parse_args() -> Result<Args, String> {
     let mut args = Args {
+        field: "mont127".to_owned(),
         params: "lcpc-sdig6".to_owned(),
         logn: vec![16, 18, 20, 22, 24, 26],
         runs: 30,
@@ -221,6 +259,13 @@ fn parse_args() -> Result<Args, String> {
             it.next().ok_or_else(|| format!("{name} requires a value"))
         };
         match arg.as_str() {
+            "--field" => {
+                args.field = value(&mut it, "--field")?.to_ascii_lowercase();
+                // NOTE (step/02-fields part 2): Add "fp2m61" to this match once implemented.
+                if !matches!(args.field.as_str(), "mont127" | "mers127" | "ft127" | "ft63") {
+                    return Err("--field must be mont127, mers127, ft127, or ft63".to_owned());
+                }
+            }
             "--params" => {
                 args.params = value(&mut it, "--params")?;
                 if !matches!(args.params.as_str(), "lcpc-sdig6" | "lcpc-sdig3") {
@@ -266,8 +311,8 @@ fn parse_args() -> Result<Args, String> {
 
 fn print_help() {
     println!(
-        "Usage: lcpc-bench [--params lcpc-sdig6|lcpc-sdig3] [--logN 16,18,...] \\\n\
-         [--runs N] [--warmup N] [--threads N] [--cores LIST] [--output PATH] \\\n\
+        "Usage: lcpc-bench [--field mont127|mers127|ft127|ft63] [--params lcpc-sdig6|lcpc-sdig3] \\\n\
+         [--logN 16,18,...] [--runs N] [--warmup N] [--threads N] [--cores LIST] [--output PATH] \\\n\
          [--generate-golden PATH | --check-golden PATH]"
     );
 }
@@ -300,7 +345,8 @@ fn benchmark<F, S>(
     params_tag: u64,
 ) -> Result<BenchReport, String>
 where
-    F: PrimeField
+    F: Field
+        + FieldReprHex
         + FieldHash
         + MulAcc
         + Num
@@ -655,8 +701,38 @@ fn level_parameters<F: SizedField, S: SdigSpecification>(n: usize) -> Vec<LevelP
     result
 }
 
-fn field_hex<F: PrimeField>(value: &F) -> String {
-    bytes_hex(value.to_repr().as_ref())
+trait FieldReprHex {
+    fn to_repr_hex(&self) -> String;
+}
+
+impl FieldReprHex for Mont127 {
+    fn to_repr_hex(&self) -> String {
+        bytes_hex(self.to_repr().as_ref())
+    }
+}
+
+impl FieldReprHex for Mers127 {
+    fn to_repr_hex(&self) -> String {
+        bytes_hex(self.to_repr().as_ref())
+    }
+}
+
+impl FieldReprHex for Ft127 {
+    fn to_repr_hex(&self) -> String {
+        bytes_hex(self.to_repr().as_ref())
+    }
+}
+
+impl FieldReprHex for Ft63 {
+    fn to_repr_hex(&self) -> String {
+        bytes_hex(self.to_repr().as_ref())
+    }
+}
+
+// NOTE (step/02-fields part 2): Implement `FieldReprHex` for `Fp2M61` here once added.
+
+fn field_hex<F: FieldReprHex>(value: &F) -> String {
+    value.to_repr_hex()
 }
 
 fn bytes_hex(bytes: &[u8]) -> String {
@@ -672,20 +748,48 @@ fn bytes_hex(bytes: &[u8]) -> String {
 fn make_golden_file() -> Result<GoldenFile, String> {
     let mut cases = Vec::new();
     for &(n_per_row, n_rows) in &[(32, 2), (64, 3), (128, 4)] {
-        cases.push(golden_case::<Ft127, SdigCode6>(
+        let mont_sdig6 = golden_case::<Mont127, SdigCode6>(
             "SdigCode6",
             "Ft127",
             n_per_row,
             n_rows,
             0x474f_4c44_1276,
-        )?);
-        cases.push(golden_case::<Ft127, SdigCode3>(
+        )?;
+        let ft_sdig6 = golden_case::<Ft127, SdigCode6>(
+            "SdigCode6",
+            "Ft127",
+            n_per_row,
+            n_rows,
+            0x474f_4c44_1276,
+        )?;
+        if mont_sdig6 != ft_sdig6 {
+            return Err(format!(
+                "Mont127 and Ft127 golden cases differ for SdigCode6 r={n_rows} n={n_per_row}"
+            ));
+        }
+        cases.push(mont_sdig6);
+
+        let mont_sdig3 = golden_case::<Mont127, SdigCode3>(
             "SdigCode3",
             "Ft127",
             n_per_row,
             n_rows,
             0x474f_4c44_1273,
-        )?);
+        )?;
+        let ft_sdig3 = golden_case::<Ft127, SdigCode3>(
+            "SdigCode3",
+            "Ft127",
+            n_per_row,
+            n_rows,
+            0x474f_4c44_1273,
+        )?;
+        if mont_sdig3 != ft_sdig3 {
+            return Err(format!(
+                "Mont127 and Ft127 golden cases differ for SdigCode3 r={n_rows} n={n_per_row}"
+            ));
+        }
+        cases.push(mont_sdig3);
+
         cases.push(golden_case::<Ft63, SdigCode6>(
             "SdigCode6",
             "Ft63",
@@ -719,7 +823,8 @@ fn golden_case<F, S>(
     base_seed: u64,
 ) -> Result<GoldenCase, String>
 where
-    F: PrimeField
+    F: Field
+        + FieldReprHex
         + FieldHash
         + MulAcc
         + Num

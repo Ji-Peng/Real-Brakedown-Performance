@@ -7,7 +7,7 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use super::{BrakedownCommit, SdigEncoding, SdigEncodingS};
+use super::{BrakedownCommit, Fp2M61, Mers127, Mont127, SdigEncoding, SdigEncodingS};
 
 use ff::{Field, PrimeField};
 use itertools::iterate;
@@ -600,11 +600,280 @@ fn golden_vectors_bit_exact_with_lcpc_orig() {
 
     for case in &golden.cases {
         match (case.field.as_str(), case.params.as_str()) {
-            ("Ft127", "SdigCode6") => verify_golden_case_generic::<Ft127, SdigCode6>(case),
-            ("Ft127", "SdigCode3") => verify_golden_case_generic::<Ft127, SdigCode3>(case),
+            ("Ft127", "SdigCode6") => {
+                verify_golden_case_generic::<Ft127, SdigCode6>(case);
+                verify_golden_case_generic::<Mont127, SdigCode6>(case);
+            }
+            ("Ft127", "SdigCode3") => {
+                verify_golden_case_generic::<Ft127, SdigCode3>(case);
+                verify_golden_case_generic::<Mont127, SdigCode3>(case);
+            }
             ("Ft63", "SdigCode6") => verify_golden_case_generic::<Ft63, SdigCode6>(case),
             ("Ft63", "SdigCode3") => verify_golden_case_generic::<Ft63, SdigCode3>(case),
             other => panic!("unexpected golden case (field, params) = {:?}", other),
         }
     }
+}
+
+#[test]
+fn test_mont127_vs_ft127_matgen_encode_and_pcs_bit_exact() {
+    use super::codespec::{SdigCode3, SdigCode6};
+    use super::encode::{codeword_length, encode};
+    use super::matgen::generate;
+
+    fn check_spec<S: super::codespec::SdigSpecification + std::fmt::Debug + Clone + Sync>(
+        n_per_row: usize,
+        n_rows: usize,
+        seed: u64,
+    ) {
+        let (pre_ft, post_ft) = generate::<Ft127, S>(n_per_row, seed);
+        let (pre_mt, post_mt) = generate::<Mont127, S>(n_per_row, seed);
+        assert_eq!(pre_ft.len(), pre_mt.len());
+        assert_eq!(post_ft.len(), post_mt.len());
+
+        for (m_ft, m_mt) in pre_ft
+            .iter()
+            .zip(pre_mt.iter())
+            .chain(post_ft.iter().zip(post_mt.iter()))
+        {
+            assert_eq!(m_ft.shape(), m_mt.shape());
+            assert_eq!(m_ft.indptr(), m_mt.indptr());
+            assert_eq!(m_ft.indices(), m_mt.indices());
+            assert_eq!(m_ft.data().len(), m_mt.data().len());
+            for (v_ft, v_mt) in m_ft.data().iter().zip(m_mt.data().iter()) {
+                assert_eq!(v_ft.to_repr().as_ref(), v_mt.to_repr().as_ref());
+                assert_eq!(
+                    bincode::serialize(v_ft).unwrap(),
+                    bincode::serialize(v_mt).unwrap()
+                );
+            }
+        }
+
+        let n_cols = codeword_length(&pre_ft, &post_ft);
+        assert_eq!(n_cols, codeword_length(&pre_mt, &post_mt));
+
+        let mut rng_ft = ChaCha20Rng::seed_from_u64(seed ^ 0x1234_5678_9abc_def0);
+        let mut rng_mt = ChaCha20Rng::seed_from_u64(seed ^ 0x1234_5678_9abc_def0);
+        let coeffs_ft: Vec<Ft127> = (0..n_rows * n_per_row)
+            .map(|_| Ft127::random(&mut rng_ft))
+            .collect();
+        let coeffs_mt: Vec<Mont127> = (0..n_rows * n_per_row)
+            .map(|_| Mont127::random(&mut rng_mt))
+            .collect();
+
+        for (a, b) in coeffs_ft.iter().zip(coeffs_mt.iter()) {
+            assert_eq!(a.to_repr().as_ref(), b.to_repr().as_ref());
+        }
+
+        // Check standalone row encoding bit-exactness
+        let mut row_ft = vec![Ft127::ZERO; n_cols];
+        let mut row_mt = vec![Mont127::ZERO; n_cols];
+        row_ft[..n_per_row].copy_from_slice(&coeffs_ft[..n_per_row]);
+        row_mt[..n_per_row].copy_from_slice(&coeffs_mt[..n_per_row]);
+        encode(&mut row_ft, &pre_ft, &post_ft);
+        encode(&mut row_mt, &pre_mt, &post_mt);
+        for (a, b) in row_ft.iter().zip(row_mt.iter()) {
+            assert_eq!(a.to_repr().as_ref(), b.to_repr().as_ref());
+            assert_eq!(
+                bincode::serialize(a).unwrap(),
+                bincode::serialize(b).unwrap()
+            );
+        }
+
+        // Check full 2D PCS commit, prove, and verify bit-exactness
+        let enc_ft = SdigEncodingS::<Ft127, S>::new_from_dims(n_per_row, n_cols, seed);
+        let enc_mt = SdigEncodingS::<Mont127, S>::new_from_dims(n_per_row, n_cols, seed);
+        let comm_ft = LcCommit::<Blake3, _>::commit(&coeffs_ft, &enc_ft).unwrap();
+        let comm_mt = LcCommit::<Blake3, _>::commit(&coeffs_mt, &enc_mt).unwrap();
+        assert_eq!(
+            comm_ft.get_root().as_ref().as_slice(),
+            comm_mt.get_root().as_ref().as_slice()
+        );
+
+        let pt_ft = Ft127::random(&mut rng_ft);
+        let pt_mt = Mont127::random(&mut rng_mt);
+        assert_eq!(pt_ft.to_repr().as_ref(), pt_mt.to_repr().as_ref());
+
+        let inner_ft: Vec<Ft127> = iterate(Ft127::ONE, |&v| v * pt_ft)
+            .take(n_per_row)
+            .collect();
+        let outer_ft: Vec<Ft127> = {
+            let xr = pt_ft * inner_ft.last().unwrap();
+            iterate(Ft127::ONE, |&v| v * xr).take(n_rows).collect()
+        };
+        let inner_mt: Vec<Mont127> = iterate(Mont127::ONE, |&v| v * pt_mt)
+            .take(n_per_row)
+            .collect();
+        let outer_mt: Vec<Mont127> = {
+            let xr = pt_mt * inner_mt.last().unwrap();
+            iterate(Mont127::ONE, |&v| v * xr).take(n_rows).collect()
+        };
+
+        let root = comm_ft.get_root();
+        let mut tr_prv_ft = Transcript::new(b"mont127 vs ft127");
+        tr_prv_ft.append_message(b"polycommit", root.as_ref());
+        tr_prv_ft.append_message(b"ncols", &(enc_ft.get_n_col_opens() as u64).to_be_bytes());
+        let pf_ft = comm_ft.prove(&outer_ft, &enc_ft, &mut tr_prv_ft).unwrap();
+
+        let mut tr_prv_mt = Transcript::new(b"mont127 vs ft127");
+        tr_prv_mt.append_message(b"polycommit", root.as_ref());
+        tr_prv_mt.append_message(b"ncols", &(enc_mt.get_n_col_opens() as u64).to_be_bytes());
+        let pf_mt = comm_mt.prove(&outer_mt, &enc_mt, &mut tr_prv_mt).unwrap();
+
+        let pf_ft_bytes = bincode::serialize(&pf_ft).unwrap();
+        let pf_mt_bytes = bincode::serialize(&pf_mt).unwrap();
+        assert_eq!(pf_ft_bytes, pf_mt_bytes);
+
+        let mut tr_ver_ft = Transcript::new(b"mont127 vs ft127");
+        tr_ver_ft.append_message(b"polycommit", root.as_ref());
+        tr_ver_ft.append_message(b"ncols", &(enc_ft.get_n_col_opens() as u64).to_be_bytes());
+        let eval_ft = pf_ft
+            .verify(root.as_ref(), &outer_ft, &inner_ft, &enc_ft, &mut tr_ver_ft)
+            .unwrap();
+
+        let mut tr_ver_mt = Transcript::new(b"mont127 vs ft127");
+        tr_ver_mt.append_message(b"polycommit", root.as_ref());
+        tr_ver_mt.append_message(b"ncols", &(enc_mt.get_n_col_opens() as u64).to_be_bytes());
+        let eval_mt = pf_mt
+            .verify(root.as_ref(), &outer_mt, &inner_mt, &enc_mt, &mut tr_ver_mt)
+            .unwrap();
+
+        assert_eq!(eval_ft.to_repr().as_ref(), eval_mt.to_repr().as_ref());
+    }
+
+    for &(n_per_row, n_rows, seed) in &[
+        (32, 2, 0x1111_2222_3333_4444),
+        (64, 4, 0x5555_6666_7777_8888),
+        (256, 3, 0x9999_aaaa_bbbb_cccc),
+    ] {
+        check_spec::<SdigCode6>(n_per_row, n_rows, seed);
+        check_spec::<SdigCode3>(n_per_row, n_rows, seed ^ 1);
+    }
+}
+
+#[test]
+fn test_end_to_end_lazy_fields() {
+    fn run_e2e<F>(seed: u64)
+    where
+        F: Field
+            + FieldHash
+            + MulAcc
+            + Num
+            + SizedField
+            + serde::Serialize
+            + serde::de::DeserializeOwned,
+    {
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
+        let lgl = 10usize;
+        let coeffs: Vec<F> = (0..(1 << lgl)).map(|_| F::random(&mut rng)).collect();
+        let enc = SdigEncoding::<F>::new_ml(lgl, seed);
+        let comm = BrakedownCommit::<Blake3, F>::commit(&coeffs, &enc).unwrap();
+        let root = comm.get_root();
+
+        let x = F::random(&mut rng);
+        let inner_tensor: Vec<F> = iterate(F::ONE, |&v| v * x)
+            .take(comm.get_n_per_row())
+            .collect();
+        let outer_tensor: Vec<F> = {
+            let xr = x * inner_tensor.last().unwrap();
+            iterate(F::ONE, |&v| v * xr)
+                .take(comm.get_n_rows())
+                .collect()
+        };
+
+        let expected: F = coeffs
+            .chunks(inner_tensor.len())
+            .zip(&outer_tensor)
+            .fold(F::ZERO, |acc, (row, &ow)| {
+                let row_val = row
+                    .iter()
+                    .zip(&inner_tensor)
+                    .fold(F::ZERO, |racc, (&c, &iw)| racc + c * iw);
+                acc + row_val * ow
+            });
+
+        let mut tr1 = Transcript::new(b"e2e lazy fields");
+        tr1.append_message(b"polycommit", root.as_ref());
+        tr1.append_message(b"ncols", &(enc.get_n_col_opens() as u64).to_be_bytes());
+        let pf = comm.prove(&outer_tensor, &enc, &mut tr1).unwrap();
+
+        let mut tr2 = Transcript::new(b"e2e lazy fields");
+        tr2.append_message(b"polycommit", root.as_ref());
+        tr2.append_message(b"ncols", &(enc.get_n_col_opens() as u64).to_be_bytes());
+        let enc2 = SdigEncoding::<F>::new_from_dims(pf.get_n_per_row(), pf.get_n_cols(), seed);
+        let verified = pf
+            .verify(root.as_ref(), &outer_tensor, &inner_tensor, &enc2, &mut tr2)
+            .unwrap();
+        assert_eq!(verified, expected);
+    }
+
+    run_e2e::<Mont127>(0x2026_0127);
+    run_e2e::<Mers127>(0x2026_0128);
+    run_e2e::<Fp2M61>(0x2026_0129);
+}
+
+#[test]
+fn test_end_to_end_fp2m61_with_proof_serde() {
+    use super::codespec::{SdigCode3, SdigCode6};
+
+    fn run_fp2_test<
+        S: super::codespec::SdigSpecification + 'static + Clone + std::fmt::Debug + Sync + Send,
+    >(
+        lgl: usize,
+        seed: u64,
+    ) {
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
+        let coeffs: Vec<Fp2M61> = (0..(1 << lgl)).map(|_| Fp2M61::random(&mut rng)).collect();
+        let enc = SdigEncodingS::<Fp2M61, S>::new_ml(lgl, seed);
+        let comm = LcCommit::<Blake3, _>::commit(&coeffs, &enc).unwrap();
+        let root = comm.get_root();
+
+        let x = Fp2M61::random(&mut rng);
+        let inner_tensor: Vec<Fp2M61> = iterate(Fp2M61::ONE, |&v| v * x)
+            .take(comm.get_n_per_row())
+            .collect();
+        let outer_tensor: Vec<Fp2M61> = {
+            let xr = x * inner_tensor.last().unwrap();
+            iterate(Fp2M61::ONE, |&v| v * xr)
+                .take(comm.get_n_rows())
+                .collect()
+        };
+
+        let expected: Fp2M61 = coeffs
+            .chunks(inner_tensor.len())
+            .zip(&outer_tensor)
+            .fold(Fp2M61::ZERO, |acc, (row, &ow)| {
+                let row_val = row
+                    .iter()
+                    .zip(&inner_tensor)
+                    .fold(Fp2M61::ZERO, |racc, (&c, &iw)| racc + c * iw);
+                acc + row_val * ow
+            });
+
+        let mut tr1 = Transcript::new(b"e2e fp2m61 serde");
+        tr1.append_message(b"polycommit", root.as_ref());
+        tr1.append_message(b"ncols", &(enc.get_n_col_opens() as u64).to_be_bytes());
+        let pf = comm.prove(&outer_tensor, &enc, &mut tr1).unwrap();
+
+        // Round-trip proof serialization
+        let pf_bytes = bincode::serialize(&pf).unwrap();
+        let pf_deser: super::LcEvalProof<Blake3, SdigEncodingS<Fp2M61, S>> =
+            bincode::deserialize(&pf_bytes).unwrap();
+
+        let mut tr2 = Transcript::new(b"e2e fp2m61 serde");
+        tr2.append_message(b"polycommit", root.as_ref());
+        tr2.append_message(b"ncols", &(enc.get_n_col_opens() as u64).to_be_bytes());
+        let enc2 = SdigEncodingS::<Fp2M61, S>::new_from_dims(
+            pf_deser.get_n_per_row(),
+            pf_deser.get_n_cols(),
+            seed,
+        );
+        let verified = pf_deser
+            .verify(root.as_ref(), &outer_tensor, &inner_tensor, &enc2, &mut tr2)
+            .unwrap();
+        assert_eq!(verified, expected);
+    }
+
+    run_fp2_test::<SdigCode3>(8, 0x1122_3344);
+    run_fp2_test::<SdigCode6>(10, 0x5566_7788);
 }

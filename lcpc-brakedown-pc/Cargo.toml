@@ -13,6 +13,7 @@ repository = "https://github.com/conroi/lcpc"
 ff = "0.14"
 itertools = "0.14"
 lcpc-2d = { path = "../lcpc-2d", version = "0.1.1" }
+lcpc-fields = { path = "../lcpc-fields", version = "0.1.1" }
 ndarray = "0.17"
 num-traits = "0.2"
 ppv-lite86 = { version = "0.2", default-features = false, features = ["no_simd"] }

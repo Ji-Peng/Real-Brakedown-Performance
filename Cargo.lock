@@ -342,6 +342,7 @@ dependencies = [
  "ff",
  "lcpc-2d",
  "lcpc-brakedown-pc",
+ "lcpc-fields",
  "lcpc-test-fields",
  "merlin",
  "num-traits",
@@ -362,6 +363,7 @@ dependencies = [
  "ff",
  "itertools",
  "lcpc-2d",
+ "lcpc-fields",
  "lcpc-test-fields",
  "merlin",
  "ndarray",
@@ -374,6 +376,25 @@ dependencies = [
  "serde_json",
  "sprs",
  "typenum",
+]
+
+[[package]]
+name = "lcpc-fields"
+version = "0.1.1"
+dependencies = [
+ "bincode",
+ "ff",
+ "lcpc-2d",
+ "lcpc-test-fields",
+ "num-bigint",
+ "num-integer",
+ "num-traits",
+ "rand",
+ "rand_chacha",
+ "rand_core 0.10.1",
+ "serde",
+ "serde_json",
+ "subtle",
 ]
 
 [[package]]
