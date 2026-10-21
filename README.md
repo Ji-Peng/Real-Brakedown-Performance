@@ -91,7 +91,7 @@ domain for 8-thread runs. Leave the remaining cores for the OS and the harness.
 
 ### Stop or delete the VMs
 
-Stop or delete the VMs as soon as no benchmark session is running:
+Cost rule: a VM runs only while a benchmark task is running on it. Stop it between sessions, while results are reviewed, and after any failure. `reproduce/gcp/run_session.sh` stops it automatically on exit. Delete both VMs once all benchmark sessions are finished.
 
 ```sh
 gcloud compute instances stop   rbd-bench-c3d --zone=us-central1-a   # keeps the disk
