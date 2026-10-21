@@ -8,6 +8,11 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 . "$SCRIPT_DIR/common.sh"
 . "$HOME/.cargo/env"
 parse_args "$@"
+REFERENCE_FIELD=$FIELD
+# The pinned arkworks defaults require 128-bit soundness and reject LCPC's
+# 127-bit field, so report the BN254-Fr field used by the driver. Retain the
+# requested field only as provenance for the field-mismatch note.
+FIELD="BN254-Fr"
 
 POLYCOMMIT_COMMIT="1eaec5090ba5bc87d75a69570ed38f6fcf8b9417"
 DRIVER_DIR="$CODE_DIR/external/polycommit"
@@ -101,6 +106,7 @@ POLY_THREADS="$THREADS" \
 POLY_CORES="$CORES" \
 POLY_RUNS="$RUNS" \
 POLY_WARMUP="$WARMUP" \
+POLY_REFERENCE_FIELD="$REFERENCE_FIELD" \
 POLYCOMMIT_COMMIT="$POLYCOMMIT_COMMIT" \
 python3 - <<'PY'
 import json
@@ -116,10 +122,12 @@ extra = {
         "driver_cargo_lock_sha256": os.environ["POLY_LOCK_SHA"],
         "raw_json_sha256": os.environ["POLY_RAW_SHA"],
         "field": {
-            "name": "Mont127",
-            "modulus_hex": "0x6e754097ba20e0bf7f2bd90000000001",
-            "modulus_decimal": "146823888364060453008360742206866194433",
-            "generator": "3",
+            "name": "BN254-Fr",
+            "modulus_hex": "0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001",
+            "modulus_decimal": "21888242871839275222246405745257275088548364400416034343698204186575808495617",
+            "generator": "5",
+            "requested_reference_field": os.environ["POLY_REFERENCE_FIELD"],
+            "comparison_note": "The pinned arkworks default requires 128-bit soundness and rejects the 127-bit LCPC field; BN254-Fr is used as the closest standard supported field.",
         },
         "parameters": "BrakedownPCParams::default",
         "measurement_scope": "linear-code encoding of all coefficient-matrix rows; setup and input generation separate",
@@ -139,7 +147,7 @@ PY
 UPSTREAM_COMMIT="$POLYCOMMIT_COMMIT"
 LCPC_COMMIT=""
 PARAMS="polycommit-brakedown-default"
-FIELD="Mont127"
+FIELD="BN254-Fr"
 SLICES="not-applicable"
 write_manifest "$DEST/manifest.json" "$EXTRA_FILE"
 log_info "PolyCommit raw JSON and manifest written under $DEST"

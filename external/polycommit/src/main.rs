@@ -15,7 +15,7 @@ use std::time::Instant;
 use ark_crypto_primitives::crh::{CRHScheme, TwoToOneCRHScheme};
 use ark_crypto_primitives::merkle_tree::{Config as MerkleConfig, IdentityDigestConverter};
 use ark_crypto_primitives::sponge::Absorb;
-use ark_ff::{fields::Fp128, MontBackend, MontConfig, PrimeField, UniformRand};
+use ark_ff::{fields::Fp256, MontBackend, MontConfig, PrimeField, UniformRand};
 use ark_poly::evaluations::multivariate::multilinear::DenseMultilinearExtension;
 use ark_poly_commit::linear_codes::{
     BrakedownPCParams, LinCodeParametersInfo, LinearEncode, MultilinearBrakedown,
@@ -27,15 +27,19 @@ use rayon::ThreadPool;
 use serde::Serialize;
 
 const POLY_COMMIT_COMMIT: &str = "1eaec5090ba5bc87d75a69570ed38f6fcf8b9417";
-const FIELD_MODULUS: &str = "146823888364060453008360742206866194433";
+const FIELD_MODULUS: &str = "21888242871839275222246405745257275088548364400416034343698204186575808495617";
 const SEED: u64 = 0x504f_4c59_434f_4d4d;
 
+// The pinned arkworks Brakedown parameters target 128-bit soundness. Its
+// soundness bound rejects LCPC's 127-bit field, even for the smallest planned
+// benchmark sizes, so use the nearest standard arkworks field with enough
+// capacity and report that mismatch explicitly in every result.
 #[derive(MontConfig)]
-#[modulus = "146823888364060453008360742206866194433"]
-#[generator = "3"]
-pub struct Mont127Config;
+#[modulus = "21888242871839275222246405745257275088548364400416034343698204186575808495617"]
+#[generator = "5"]
+pub struct Bn254FrConfig;
 
-type Mont127 = Fp128<MontBackend<Mont127Config, 2>>;
+type Bn254Fr = Fp256<MontBackend<Bn254FrConfig, 4>>;
 
 /// A marker CRH used only to satisfy the generic PCS parameter type.
 ///
@@ -101,11 +105,11 @@ impl<F: PrimeField + Absorb> MerkleConfig for EncodingOnlyMerkleConfig<F> {
     type TwoToOneHash = EncodingOnlyPairHash<F>;
 }
 
-type Tree = EncodingOnlyMerkleConfig<Mont127>;
-type Polynomial = DenseMultilinearExtension<Mont127>;
-type ColumnHash = EncodingOnlySliceHash<Mont127>;
-type Code = MultilinearBrakedown<Mont127, Tree, Polynomial, ColumnHash>;
-type Parameters = BrakedownPCParams<Mont127, Tree, ColumnHash>;
+type Tree = EncodingOnlyMerkleConfig<Bn254Fr>;
+type Polynomial = DenseMultilinearExtension<Bn254Fr>;
+type ColumnHash = EncodingOnlySliceHash<Bn254Fr>;
+type Code = MultilinearBrakedown<Bn254Fr, Tree, Polynomial, ColumnHash>;
+type Parameters = BrakedownPCParams<Bn254Fr, Tree, ColumnHash>;
 
 #[derive(Debug)]
 struct Args {
@@ -385,7 +389,7 @@ fn benchmark(args: &Args, log_n: u32, pool: &ThreadPool) -> Result<BenchReport, 
         hash_algorithm: "not invoked (encoding-only)",
         hash_crate_version: None,
         hash_mode: "not-invoked",
-        field: "Mont127",
+        field: "BN254-Fr",
         field_modulus: FIELD_MODULUS,
         params: "arkworks-brakedown-default",
         shape: "brakedown",
@@ -458,22 +462,22 @@ fn check_configuration(log_n: u32, pool: &ThreadPool) -> Result<(), String> {
     }
 }
 
-fn generate_input(length: usize, seed: u64) -> Vec<Mont127> {
+fn generate_input(length: usize, seed: u64) -> Vec<Bn254Fr> {
     let mut rng = ChaCha20Rng::seed_from_u64(seed);
-    (0..length).map(|_| Mont127::rand(&mut rng)).collect()
+    (0..length).map(|_| Bn254Fr::rand(&mut rng)).collect()
 }
 
 fn encode_matrix(
-    input: &[Mont127],
+    input: &[Bn254Fr],
     n_per_row: usize,
     parameters: &Parameters,
     pool: &ThreadPool,
-) -> Result<Vec<Vec<Mont127>>, String> {
+) -> Result<Vec<Vec<Bn254Fr>>, String> {
     pool.install(|| {
         input
             .par_chunks(n_per_row)
             .map(|row| {
-                <Code as LinearEncode<Mont127, Tree, Polynomial, ColumnHash>>::encode(
+                <Code as LinearEncode<Bn254Fr, Tree, Polynomial, ColumnHash>>::encode(
                     row, parameters,
                 )
                 .map_err(|error| error.to_string())
@@ -490,9 +494,9 @@ fn check_linearity(
     let left = generate_input(n_per_row, SEED ^ 0x1111_1111_1111_1111);
     let right = generate_input(n_per_row, SEED ^ 0x2222_2222_2222_2222);
     let sum: Vec<_> = left.iter().zip(&right).map(|(a, b)| *a + *b).collect();
-    let encode_one = |message: &[Mont127]| {
+    let encode_one = |message: &[Bn254Fr]| {
         pool.install(|| {
-            <Code as LinearEncode<Mont127, Tree, Polynomial, ColumnHash>>::encode(
+            <Code as LinearEncode<Bn254Fr, Tree, Polynomial, ColumnHash>>::encode(
                 message, parameters,
             )
         })

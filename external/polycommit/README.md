@@ -17,11 +17,14 @@ timed repetition gets a newly generated matrix from a fixed seed sequence. The
 encoder's returned rows and their output allocation are included in the timed
 operation. Caches are left warm between repetitions.
 
-The field is a custom ark-ff `MontConfig` instantiation of
-`q = 0x6e754097ba20e0bf7f2bd90000000001`, using generator `3`, matching LCPC's
-`Ft127` modulus. The code uses `BrakedownPCParams::default` from the pinned
-arkworks version. Effective matrix dimensions are read from those parameters
-and included in each report; the setup policy is not LCPC's `SdigCode6` mode.
+The pinned arkworks defaults require 128-bit soundness and reject LCPC's
+127-bit `Ft127` field, including at the smallest planned benchmark size. The
+driver therefore uses arkworks' BN254 scalar field (`BN254-Fr`, generator `5`)
+and records its modulus and the mismatch in each report. This is a different
+field from LCPC and the field difference must remain visible in comparisons.
+The code uses `BrakedownPCParams::default` from the pinned arkworks version.
+Effective matrix dimensions are read from those parameters and included in
+each report; the setup policy is not LCPC's `SdigCode6` mode.
 
 This driver does not run column hashing, Merkle construction, commit, open, or
 verify. Arkworks' linear encoder is generic over the Merkle and column hash
@@ -49,6 +52,6 @@ The output schema is `lcpc-bench-v1`. Local smoke data is development evidence
 only. Published figures must use the GCP c3d machine and the campaign protocol
 in `agent/plan/06-evaluation-and-paper-tables.md`.
 
-The driver lockfile is not present yet: this environment cannot resolve
-`github.com`, so Cargo cannot fetch the pinned revision or generate a lockfile.
-Generate and commit `Cargo.lock` before running the reproduction script.
+`Cargo.lock` pins the standalone driver dependencies. The reproduction script
+checks the arkworks Git revision in both `Cargo.toml` and `Cargo.lock` and builds
+with `--locked`.

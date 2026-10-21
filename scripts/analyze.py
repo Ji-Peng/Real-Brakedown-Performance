@@ -469,16 +469,18 @@ class BenchmarkAnalyzer:
                                shape="brakedown", log_n=20, threads=1),
                 "T1 original LCPC mode (a), logN=20, T=1")
         polycommit_skip = self.skipped_baselines.get("PolyCommit")
-        require(self._has_case(self.reports_polycommit, log_n=20, threads=1),
-                "T1 PolyCommit logN=20, T=1" + (f" (wrapper skipped: {polycommit_skip})" if polycommit_skip else ""))
+        require(self._has_case(self.reports_polycommit, log_n=20, threads=1)
+                or (self.profile == "smoke" and bool(polycommit_skip)),
+                "T1 PolyCommit logN=20, T=1 (or recorded smoke skip)")
 
         require(self._has_case(self.reports_this_work, field={"Mont127"}, params="simd-spielman",
                                shape="brakedown", log_n=20, threads=1),
                 "T2 This Work mode (b), Mont127, logN=20, T=1")
         simd_skip = self.skipped_baselines.get("SIMD-Spielman")
         require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman",
-                               shape="brakedown", log_n=20, threads=1),
-                "T2 SIMD-Spielman, Mont127, logN=20, T=1" + (f" (wrapper skipped: {simd_skip})" if simd_skip else ""))
+                               shape="brakedown", log_n=20, threads=1)
+                or (self.profile == "smoke" and bool(simd_skip)),
+                "T2 SIMD-Spielman, Mont127, logN=20, T=1 (or recorded smoke skip)")
 
         step_tags = {tag for tag, reports in self.reports_steps.items()
                      if any(r.get("mode", "a") == "a" and int(r.get("log_n", -1)) == 20
@@ -526,18 +528,21 @@ class BenchmarkAnalyzer:
                              or self._has_measurement(r, "verifier_encode")) for r in matching),
                     f"T7 This Work verifier v=1 and v=2, params={params}")
         require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman",
-                               shape="brakedown", log_n=20, threads=1, operation="verifier_encode_2"),
-                "T7 SIMD-Spielman verifier v=2 at logN=20")
+                               shape="brakedown", log_n=20, threads=1, operation="verifier_encode_2")
+                or (self.profile == "smoke" and bool(simd_skip)),
+                "T7 SIMD-Spielman verifier v=2 at logN=20 (or recorded smoke skip)")
 
         require(self._has_case(self.reports_this_work, field={"Mont127"}, params="simd-spielman",
                                shape="orion", log_n=20, threads=1),
                 "T9 This Work mode (b) Orion sample at logN=20")
         require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman",
-                               shape="orion", log_n=20, threads=1),
-                "T9 SIMD-Spielman Orion sample at logN=20")
+                               shape="orion", log_n=20, threads=1)
+                or (self.profile == "smoke" and bool(simd_skip)),
+                "T9 SIMD-Spielman Orion sample at logN=20 (or recorded smoke skip)")
         require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman",
-                               shape="brakedown", log_n=20, threads=1),
-                "T8 SIMD-Spielman Brakedown sample at logN=20")
+                               shape="brakedown", log_n=20, threads=1)
+                or (self.profile == "smoke" and bool(simd_skip)),
+                "T8 SIMD-Spielman Brakedown sample at logN=20 (or recorded smoke skip)")
         require(self._has_case(self.reports_this_work, field={"Mont127"}, params="lcpc-sdig6",
                                shape="brakedown", log_n=20, threads=1),
                 "T10 Brakedown encode sample at logN=20")
@@ -692,7 +697,7 @@ class BenchmarkAnalyzer:
             "log2(N)", "N", "k x n", "T",
             "This Work (ms)", "TW (ns/MAC)",
             "LCPC Orig (ms)", "Speedup over LCPC", "Significance",
-            "PolyCommit (ms)", "Speedup over PolyCommit"
+            "PolyCommit BN254-Fr (ms)", "Speedup over PolyCommit (field differs)"
         ]
         tw_by_nt = defaultdict(list)
         for r in self.reports_this_work:
@@ -747,6 +752,9 @@ class BenchmarkAnalyzer:
             # PolyCommit
             poly_ms_str = format_ns_to_ms(poly_stats["mean_median_ns"])
             poly_spd_str = "-"
+            if (poly_stats["mean_median_ns"] is None and self.profile == "smoke"
+                    and self.skipped_baselines.get("PolyCommit")):
+                poly_ms_str = "SKIPPED"
             if tw_stats["mean_median_ns"] and poly_stats["mean_median_ns"]:
                 spd = poly_stats["mean_median_ns"] / tw_stats["mean_median_ns"]
                 poly_spd_str = f"{spd:.2f}x"
@@ -764,9 +772,13 @@ class BenchmarkAnalyzer:
 
         notes = [
             "Mode (a) SdigCode6 parameter set over Mont127 field.",
+            "PolyCommit uses BN254-Fr because the pinned arkworks default's 128-bit soundness check rejects the 127-bit LCPC field; its result is a field-mismatched comparison.",
             "Reported values are mean of session medians with [min-max] across runs.",
             "Significance: 'faster' denotes non-overlapping sample ranges (max(TW) < min(Base)); else 'comparable'."
         ]
+        if self.profile == "smoke" and self.skipped_baselines.get("PolyCommit"):
+            notes.append("PolyCommit cells marked SKIPPED for this local smoke: "
+                         + self.skipped_baselines["PolyCommit"])
         self._write_artefact("table_T1_headline_encoding",
                              "Headline Prover Encoding Comparison (This Work vs. LCPC Baseline vs. PolyCommit)",
                              "tab:headline_encoding", headers, rows, notes)
@@ -801,6 +813,9 @@ class BenchmarkAnalyzer:
 
             tw_ms_str = format_ns_to_ms(tw_stats["mean_median_ns"])
             simd_ms_str = format_ns_to_ms(simd_stats["mean_median_ns"])
+            if (simd_stats["mean_median_ns"] is None and self.profile == "smoke"
+                    and self.skipped_baselines.get("SIMD-Spielman")):
+                simd_ms_str = "SKIPPED"
 
             gap_recovered = "-"
             if tw_stats["mean_median_ns"] and simd_stats["mean_median_ns"]:
@@ -833,6 +848,9 @@ class BenchmarkAnalyzer:
             "SIMD Gap Recovered = T_SIMD / T_ThisWork. Values >= 1.0x indicate This Work matches or exceeds AVX-512.",
             "[KDHR26] reported numbers quoted verbatim from SIMD-Spielman paper Table 2 (page 11) on AMD EPYC 9754."
         ]
+        if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
+            notes.append("SIMD-Spielman cells marked SKIPPED for this local smoke: "
+                         + self.skipped_baselines["SIMD-Spielman"])
         self._write_artefact("table_T2_simd_spielman",
                              "Comparison with SIMD-Spielman (AVX-512 IFMA) and Prior Reported Results",
                              "tab:simd_spielman_comparison", headers, rows, notes)
@@ -1102,6 +1120,10 @@ class BenchmarkAnalyzer:
             simd_v2_stat = self._compute_stat_across_sessions(simd_reps, "verifier_encode_2")
             if simd_v2_stat["mean_median_ns"] is None:
                 simd_v2_stat = self._compute_stat_across_sessions(simd_reps, "verifier_encode")
+            simd_v2_us = format_ns_to_us(simd_v2_stat["mean_median_ns"])
+            if (simd_v2_stat["mean_median_ns"] is None and self.profile == "smoke"
+                    and self.skipped_baselines.get("SIMD-Spielman")):
+                simd_v2_us = "SKIPPED"
 
             k = 1 << (log_n // 2) if log_n > 0 else 0
             kd_entry = kdhr26_table6.get(k, {})
@@ -1118,7 +1140,7 @@ class BenchmarkAnalyzer:
                 params, field, log_n, k,
                 format_ns_to_us(v1_stat["mean_median_ns"]),
                 format_ns_to_us(v2_stat["mean_median_ns"]),
-                format_ns_to_us(simd_v2_stat["mean_median_ns"]),
+                simd_v2_us,
                 kd_str, spd_str
             ])
 
@@ -1126,6 +1148,9 @@ class BenchmarkAnalyzer:
             "Verifier-side encoding latency in microseconds for 1 vector (v=1) and 2 vectors (v=2) of length k.",
             "[KDHR26] values quoted verbatim from Table 6 (page 14) for Montgomery verifier encoding."
         ]
+        if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
+            notes.append("SIMD-Spielman verifier cells marked SKIPPED for this local smoke: "
+                         + self.skipped_baselines["SIMD-Spielman"])
         self._write_artefact("table_T7_verifier_encoding",
                              "Verifier-Side Small-Batch Encoding Latency Comparison",
                              "tab:verifier_encoding", headers, rows, notes)
@@ -1179,11 +1204,17 @@ class BenchmarkAnalyzer:
                     "-", "-"
                 ])
 
+        if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
+            rows.append(["SIMD-Spielman", 20, "SKIPPED", "SKIPPED", "SKIPPED", "SKIPPED"])
+
         notes = [
             "Setup includes bipartite expander graph sampling, transposition, prepare_weight, and allocation.",
             "Peak RSS recorded via VmHWM from /proc/self/status.",
             "SIMD-Spielman wrapper currently reports encoding only; its setup and RSS cells are left blank."
         ]
+        if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
+            notes.append("SIMD-Spielman row marked SKIPPED for this local smoke: "
+                         + self.skipped_baselines["SIMD-Spielman"])
         self._write_artefact("table_T8_setup_memory",
                              "One-Time Setup Cost and Peak Memory Overhead",
                              "tab:setup_memory", headers, rows, notes)
@@ -1212,6 +1243,10 @@ class BenchmarkAnalyzer:
 
             tw_orion = self._compute_stat_across_sessions(tw_grouped.get(key, []))["mean_median_ns"]
             simd_orion = self._compute_stat_across_sessions(simd_grouped.get(key, []))["mean_median_ns"]
+            simd_orion_text = format_ns_to_ms(simd_orion)
+            if (simd_orion is None and self.profile == "smoke"
+                    and self.skipped_baselines.get("SIMD-Spielman")):
+                simd_orion_text = "SKIPPED"
 
             # Ratio vs Brakedown shape
             tw_brake = self._compute_stat_across_sessions(tw_grouped.get((field, params, "brakedown", log_n, threads), []))["mean_median_ns"]
@@ -1223,15 +1258,19 @@ class BenchmarkAnalyzer:
             kd_entry = kdhr26_table3.get(log_n)
             if kd_entry:
                 if field == "Mont127":
-                    kd_reported = str(kd_entry.get("montgomery_1t_ms") if threads == 1 else kd_entry.get("montgomery_8t_ms", "-"))
+                    value = kd_entry.get("montgomery_1t_ms" if threads == 1 else "montgomery_8t_ms")
                 elif field == "Mers127":
-                    kd_reported = str(kd_entry.get("mersenne_1t_ms") if threads == 1 else kd_entry.get("mersenne_8t_ms", "-"))
+                    value = kd_entry.get("mersenne_1t_ms" if threads == 1 else "mersenne_8t_ms")
                 elif field == "Fp2M61":
-                    kd_reported = str(kd_entry.get("extension_1t_ms") if threads == 1 else kd_entry.get("extension_8t_ms", "-"))
+                    value = kd_entry.get("extension_1t_ms" if threads == 1 else "extension_8t_ms")
+                else:
+                    value = None
+                if value is not None:
+                    kd_reported = str(value)
 
             rows.append([
                 field, threads, log_n,
-                format_ns_to_ms(tw_orion), format_ns_to_ms(simd_orion),
+                format_ns_to_ms(tw_orion), simd_orion_text,
                 kd_reported, ratio_str
             ])
 
@@ -1239,6 +1278,9 @@ class BenchmarkAnalyzer:
             "Orion matrix shape uses fixed 128 rows (k = 128, n_per_row = N / 128).",
             "[KDHR26] values quoted verbatim from Table 3 (page 12) on AMD EPYC 9754."
         ]
+        if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
+            notes.append("SIMD-Spielman Orion cells marked SKIPPED for this local smoke: "
+                         + self.skipped_baselines["SIMD-Spielman"])
         self._write_artefact("table_T9_orion_shape",
                              "Orion Matrix Shape Encoding Comparison (128 Rows)",
                              "tab:orion_shape", headers, rows, notes)
