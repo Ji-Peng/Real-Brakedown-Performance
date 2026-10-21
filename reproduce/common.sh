@@ -52,6 +52,7 @@ PARAMS="lcpc-sdig6"
 HOST_PROFILE=""
 FIELD="mont127"
 SLICES="adaptive"
+AUTOTUNE=0
 TEST_ONLY=0
 EXPLICIT_CORES=0
 
@@ -192,6 +193,7 @@ Options:
   --host <name>       Host profile name from reproduce/hosts/<name>.sh
   --field <name>      Field: mont127 | mers127 | fp2m61 (default: mont127)
   --slices <n>        LLC slice count: adaptive | 1 | 2 | 4 | 8 | 16... (default: adaptive)
+  --autotune          Auto-tune LLC slice count empirically
   --test-only         Acknowledge test-only run on local workstation
   -h, --help          Show this help message
 EOF
@@ -253,6 +255,10 @@ parse_args() {
                 [ $# -ge 2 ] || { log_error "Option --slices requires an argument"; exit 1; }
                 SLICES="$2"
                 shift 2
+                ;;
+            --autotune)
+                AUTOTUNE=1
+                shift
                 ;;
             --test-only)
                 TEST_ONLY=1

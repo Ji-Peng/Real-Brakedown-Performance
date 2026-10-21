@@ -12,7 +12,137 @@ SIMD: portable stable Rust, compiler-generated scalar code. Each technique is ad
 one tagged commit (`step/NN-<name>`) on top of the import (`step/00-import`), so the
 history itself documents what changed relative to upstream.
 
-Build, test, and reproduction instructions will be added as the work progresses.
+---
+
+## 1. Build Policy and Prerequisites
+
+- **Toolchain**: Pinned stable Rust via `rust-toolchain.toml` (Rust 1.99.1, edition 2021).
+- **Auto-Vectorization Policy**: Disables LLVM loop and SLP vectorizers across workspace crates
+  via `.cargo/config.toml` (`-C no-vectorize-loops -C no-vectorize-slp`).
+- **Target Optimization**: `-C target-cpu=native` enables the best scalar instructions (e.g. `mulx`, `adc` on x86-64).
+- **Portable Dependencies**: `blake3` is built portable-only with `features = ["pure", "no_sse2", "no_sse41", "no_avx2", "no_avx512"]`.
+
+To build the workspace in release mode:
+
+```sh
+. "$HOME/.cargo/env"
+cargo build --workspace --release
+```
+
+---
+
+## 2. Testing and Correctness Verification
+
+The test suite runs unit tests, big-integer algebraic field axioms, bit-exactness oracles against original LCPC (`f0e2116`), and test-vector checks against upstream SIMD-Spielman:
+
+```sh
+# Run on permitted cores (CPU 2 is reserved on the local workstation):
+taskset -c 0,1,3-7 cargo test --workspace --release
+```
+
+Or using the test orchestrator:
+
+```sh
+python3 scripts/run_tests.py --cores 0,1,3-7
+```
+
+### Codegen Verification (`scripts/check_codegen.py`)
+
+Ensures hot kernels contain no vector-register arithmetic instructions:
+
+```sh
+python3 scripts/check_codegen.py target-harness/release/lcpc-bench \
+    --output-json target-harness/codegen_report.json \
+    --output-listing target-harness/disassembly.txt
+```
+
+---
+
+## 3. Benchmark Binaries (`bench/`)
+
+The workspace provides stable benchmark binaries adhering to the `lcpc-bench-v1` JSON schema (`docs/bench-json-schema.md`):
+
+1. **`lcpc-bench`**: The complete benchmark driver evaluating prover encoding, verifier encoding, hash decomposition, commit total, prove, verify, and peak RSS:
+   ```sh
+   taskset -c 0 cargo run --release --bin lcpc-bench -- \
+       --field mont127 \
+       --params lcpc-sdig6 \
+       --logN 16,18,20 \
+       --threads 1 \
+       --slices adaptive \
+       --runs 30 \
+       --warmup 5 \
+       --output results.json
+   ```
+
+2. **`bench_encode`**: Dedicated prover and small-batch verifier encoding benchmark binary:
+   ```sh
+   taskset -c 0 cargo run --release --bin bench_encode -- \
+       --field mont127 --params lcpc-sdig6 --logN 16,18,20 --slices adaptive --output encode.json
+   ```
+
+3. **`bench_pcs`**: Dedicated end-to-end PCS benchmark binary (Commit / Prove / Verify with encoding vs. portable hashing breakdown):
+   ```sh
+   taskset -c 0 cargo run --release --bin bench_pcs -- \
+       --field mont127 --params lcpc-sdig6 --logN 16,18,20 --slices adaptive --output pcs.json
+   ```
+
+4. **`bench_fields`**: Microbenchmark binary for modular field arithmetic (`mul`, `mac`, `reduce`):
+   ```sh
+   taskset -c 0 cargo run --release --bin bench_fields -- \
+       --field all --runs 100000 --output field_benchmarks.json
+   ```
+
+---
+
+## 4. Reproduction Scripts (`reproduce/`)
+
+POSIX `sh` scripts reproduce all experiments and baseline comparisons with automated manifest generation:
+
+- **`reproduce/this_work.sh`**:
+  Builds the fork HEAD, runs tests (aborting on any failure), generates the disassembly codegen report, executes the timed benchmarks, and writes results and manifest into `results/<host>/<date>-<gitsha>/this_work/`.
+  ```sh
+  ./reproduce/this_work.sh --threads 1 --logN 16,18,20,22,24,26 --cores 0 --runs 30
+  ```
+
+- **`reproduce/steps.sh`**:
+  Evaluates the cumulative per-technique progression by checking out each tagged commit (`step/01-modernize` through `HEAD`) in isolated worktrees, running correctness tests, and measuring performance under identical parameters:
+  ```sh
+  ./reproduce/steps.sh --threads 1 --logN 16,18,20 --cores 0 --runs 30
+  ```
+
+- **`reproduce/lcpc_orig.sh`**:
+  Builds and benchmarks the unmodified upstream LCPC implementation at commit `f0e2116` via the external stable-Rust driver (`external/lcpc-orig`):
+  ```sh
+  ./reproduce/lcpc_orig.sh --threads 1 --logN 16,18,20 --cores 0 --runs 30
+  ```
+
+- **`reproduce/simd_spielman.sh`**:
+  Builds and benchmarks the upstream C++ AVX-512 IFMA baseline (`7b399db`) out of tree with `external/simd_spielman/params.patch`:
+  ```sh
+  ./reproduce/simd_spielman.sh --threads 1 --logN 16,18,20 --cores 0 --runs 30
+  ```
+
+- **`reproduce/all.sh`**:
+  Orchestrates all four targets in one unified session with identical parameters and generates analysis tables and plots:
+  ```sh
+  ./reproduce/all.sh --threads 1 --logN 16,18,20,22,24,26 --cores 0 --runs 30
+  ```
+
+---
+
+## 5. Result Analysis and LaTeX Table Generation (`scripts/analyze.py`)
+
+To aggregate raw JSON results into publication-ready CSVs, LaTeX tables (`paper/`), and charts:
+
+```sh
+python3 scripts/analyze.py --results-dir results/ --out-dir analysis/
+```
+
+Outputs:
+- **CSVs**: `csv/prover_encoding_comparison.csv`, `csv/pcs_breakdown.csv`, `csv/steps_ablation.csv`, `csv/field_microbenchmarks.csv`
+- **LaTeX Tables**: `latex/table_encoding_comparison.tex`, `latex/table_pcs_breakdown.tex`, `latex/table_steps_ablation.tex`, `latex/table_field_microbenchmarks.tex`
+- **Plots**: `plots/encoding_latency_vs_logn.png`, `plots/pcs_breakdown.png`
 
 ## Benchmark machines (Google Cloud)
 

@@ -19,12 +19,13 @@ Each report contains:
 | `dimensions` | `coefficient_count`, `n_rows`, `n_per_row`, and encoded `n_cols`. |
 | `recursion_depth`, `level_parameters` | The dimensions and degree choices at each recursion level (`n_i`, `m_i`, `c_n`, `n_i_prime`, `m_i_prime`, `d_n`). Since `step/04-r2l` the fork reads them from the sampled graphs (left degree = edges / left nodes, exact in both modes) instead of recomputing LCPC's formulas. |
 | `setup_ns` | One-time graph/encoding construction, deterministic coefficient and row-buffer setup, and verifier encoding construction. |
-| `measurements` | `encode_matrix`, `hash_matrix_decomposition`, `commit_total`, `prove`, and `verify`. |
+| `measurements` | `encode_matrix`, `verifier_encode`, `hash_matrix_decomposition`, `commit_total`, `prove`, and `verify`. |
 | `correctness` | Whether direct encoding hashes to the committed root, whether the proof verifies, and the verified evaluation in field-representation hex. |
+| `peak_rss_bytes` | Peak resident set size (VmHWM) in bytes recorded from `/proc/self/status`. |
 | `hash_decomposition_includes_scratch_allocation` | `true`; the decomposition allocates its local Merkle buffers. |
 
 Each measurement is an object with `samples_ns` (the raw timed samples) and a
-`summary` object containing `min_ns`, `q1_ns`, `median_ns`, `q3_ns`, `max_ns`,
+`summary` object containing `min_ns`, `q1_ns`, `median_ns`, `q3_ns`, `iqr_ns`, `max_ns`,
 and `mean_ns`. Samples are integer nanoseconds. Summary values are numeric;
 the median and mean may be fractional when the sample count is even.
 
@@ -35,9 +36,30 @@ encode the rows one at a time on the calling thread. From `step/03-column-major`
 on, the fork calls `LcEncoding::encode_rows`, the same entry point that
 `LcCommit::commit` uses, which encodes all rows in one batched column-major pass;
 its time includes allocating the column-major scratch buffer and the transposes
-between the row-major matrix and that buffer. The standalone
-`hash_matrix_decomposition` reproduces LCPC's leaf and Merkle hash operations,
-including local scratch allocation; it is a checked decomposition rather than
-an internal hook into upstream. `commit_total` includes all work performed by
+between the row-major matrix and that buffer.
+
+`verifier_encode` times small-batch verifier-side encoding (2 vectors of length
+$k = n_{\text{per\_row}}$ expanded to $n_{\text{cols}}$ elements), corresponding to
+Brakedown/SIMD-Spielman verification checks.
+
+The standalone `hash_matrix_decomposition` reproduces LCPC's leaf and Merkle hash
+operations, including local scratch allocation; it is a checked decomposition rather
+than an internal hook into upstream. `commit_total` includes all work performed by
 `LcCommit::commit` and is the authoritative end-to-end commitment time. These
 quantities are not additive.
+
+## Field microbenchmarks schema
+
+When invoked with `--field-bench`, `lcpc-bench` (or `bench_fields`) produces a JSON
+array of field microbenchmark reports:
+
+```json
+[
+  {
+    "field": "Mont127",
+    "mul": { "op": "mul", "iterations": 100000, "total_ns": 234567, "ns_per_op": 2.345 },
+    "mac": { "op": "mac", "iterations": 100000, "total_ns": 198765, "ns_per_op": 1.987 },
+    "reduce": { "op": "reduce", "iterations": 100000, "total_ns": 145678, "ns_per_op": 1.456 }
+  }
+]
+```
