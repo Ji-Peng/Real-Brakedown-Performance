@@ -39,9 +39,11 @@ Detailed toolchain metadata is recorded in [`environment.json`](environment.json
 
 | Target Architecture | Checked Kernels | Vector Arith Violations | Vector Moves (Memory) | MULX | MUL / UMULH / MULHU | Carry (ADC / CINC / SLTU) | Stack Spills | Total Insns |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **x86-64 Native (BMI2)** | 16 | **0** | 1,959 | 241 | 152 | 397 | 0 | 6,308 |
-| **x86-64 Portability (v1)** | 16 | **0** | 2,350 | 0 | 369 | 373 | 0 | 6,433 |
-| **AArch64 (ARMv8-A)** | 16 | **0** | 264 | 0 | 563 | 373 | 95 | 4,716 |
-| **RISC-V 64 (RV64GC)** | 16 | **0** | 0 | 0 | 73 | 53 | 245 | 1,296 |
+| **x86-64 Native (BMI2)** | 16 | **0** | 94 | 255 | 103 | 403 | 717 | 5,521 |
+| **x86-64 Portability (v1)** | 16 | **0** | 152 | 0 | 352 | 391 | 767 | 6,087 |
+| **AArch64 (ARMv8-A)** | 16 | **0** | 26 | 0 | 586 | 393 | 161 | 4,481 |
+| **RISC-V 64 (RV64GC)** | 16 | **0** | 0 | 0 | 55 | 57 | 224 | 1,281 |
+
+The listings were regenerated on 2026-10-21 with the corrected `check_codegen.py`, from `step/09-codegen` plus the verification fixes, which do not change the generated code. Earlier numbers counted general-purpose `movq` (x86-64) and `ldr`/`str` (AArch64) as vector moves and hid x86-64 stack accesses; see the correction note in [`docs/CODEGEN.md`](../CODEGEN.md) §3.1. "Stack Spills" counts `(%rsp)` loads and stores on x86-64, but only stores to `[sp]`/`(sp)` on AArch64 and RISC-V. The AArch64 and RISC-V inputs are the `lcpc-bench` objects from `cargo rustc -p lcpc-bench --release --target <t> --bin lcpc-bench -- --emit=obj`. That command fails at the final link because no cross linker is installed, but it emits the objects first. They were disassembled with the toolchain's `llvm-objdump`.
 
 For complete architectural analysis and instruction lowering details, see [`docs/CODEGEN.md`](../CODEGEN.md).

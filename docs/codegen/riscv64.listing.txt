@@ -14,8 +14,8 @@ SUMMARY METRICS (Hot Kernels):
   Total Instructions             : 1281
 
 SUMMARY METRICS (Outside Hot Kernels - e.g. stdlib / portable blake3):
-  Vector Arithmetic              : 0
-  Vector Moves                   : 178
+  Vector Arithmetic              : 178
+  Vector Moves                   : 0
 
 ================================================================================
 HOT KERNEL LISTINGS:

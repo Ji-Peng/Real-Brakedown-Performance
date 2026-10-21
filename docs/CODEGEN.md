@@ -82,9 +82,11 @@ Disassembly of all 16 hot kernels was verified across all three architectures us
 | **Primary Carry Synthesis** | `adcq` (hardware flag) | `adcq` (hardware flag) | `adds` + `adcs` / `cinc` | `add` + `sltu` (emulated) |
 | **Hot Kernel Multiply Insns** | 358 (`mulx` 255, `mul` 103) | 352 (`mul` 352) | 586 (`mul`/`umulh`) | 55 (`mul`/`mulhu`) |
 | **Hot Kernel Carry Insns** | 403 (`adcq`) | 391 (`adcq`) | 393 (`adcs`/`cinc`) | 57 (`sltu`) |
-| **Hot Kernel Vector Moves** | 1,711 (buffer zeroing) | 2,297 (buffer zeroing) | 327 (buffer zeroing) | 0 |
-| **Hot Kernel Stack Spills** | 0 | 6 | 91 (prologue/epilogue) | 224 |
+| **Hot Kernel Vector Moves** | 94 (zeroing, 32-byte copies) | 152 (zeroing, 16-byte copies) | 26 (`movi` zeroing, `stp q`) | 0 |
+| **Hot Kernel Stack Accesses** | 717 (`mov` to/from `(%rsp)`) | 767 (`mov` to/from `(%rsp)`) | 161 (`str`/`stp` to `[sp]`) | 224 (`sd` to `(sp)`) |
 | **Total Hot Instructions** | 5,521 | 6,087 | 4,481 | 1,281 |
+
+> **Correction (independent verification, 2026-10-21; see `docs/STATUS.md`).** Earlier versions of this table were produced by a `check_codegen.py` that classified every AT&T `movq`/`movd` and every AArch64 `ldr`/`str` as a vector move, even on general-purpose registers. That inflated the vector-move counts (previously 1,711 / 2,297 / 327) and hid stack accesses, so x86-64 reported 0 spills. The classifier now counts these instructions as vector moves only when a vector register is involved. It treats any other instruction on a vector register as vector arithmetic, except the register-zeroing idiom. The numbers above come from the fixed checker on the same code (the instruction totals are unchanged). The verdict still holds: no hot kernel contains vector arithmetic on any target. The stack-access row counts loads and stores anywhere in the function on x86-64, but only stores on AArch64 and RISC-V. In the x86-64 `B = 4` inner row loop of `encode_column_block`, the stack accesses are real spills and reloads (§5.2).
 
 ---
 
@@ -113,7 +115,7 @@ addq    %r11, %r8
 adcq    %r12, %r9
 adcq    $0, %r10
 ```
-Zero registers are spilled to the stack (`spill=0`) in all hot field MAC kernels.
+The out-of-line field MAC kernels (`mac_column_*`) touch the stack only in their prologue (two argument stores); their row loops have no stack accesses.
 
 ---
 
@@ -206,7 +208,8 @@ The disassembly listings record vector move instructions (`vmovaps`, `vmovups`, 
   ```
   and slice resets (`acc.fill(F::Acc::default())`).
 - **Codegen:** LLVM synthesizes AVX/NEON vector moves (`vmovaps %ymm0, (%rcx)` on x86, `movi v0.2d, #0` on AArch64) to zero 256 bits or 128 bits per instruction when initializing scratch buffers.
-- **Classification:** These instructions perform bulk memory initialization (`memset`), not mathematical computation. They do not alter arithmetic results and are classified separately as `VEC_MOVE`.
+- **Also:** `vmovups` pairs copy 32-byte accumulators (`Mont127Acc`, `Mers127Acc`) and `vxorps %xmm0, %xmm0, %xmm0` creates the zero register for the stores. The checker classifies this zeroing idiom as a move.
+- **Classification:** These instructions perform bulk memory initialization (`memset`) and copies, not mathematical computation. They do not alter arithmetic results and are classified separately as `VEC_MOVE`.
 
 ### 4.3 Precompiled Standard Library & Runtime `memcpy`
 
@@ -218,7 +221,7 @@ In `Cargo.toml`, `blake3` is configured with:
 ```toml
 features = ["pure", "no_sse2", "no_sse41", "no_avx2", "no_avx512"]
 ```
-- **Investigation:** Inspection of the binary reveals 812 vector arithmetic instructions outside hot kernels. These reside inside the uninvoked fallback modules compiled by `blake3`'s upstream crate structure.
+- **Investigation:** Inspection of the binary shows vector-register arithmetic outside the hot kernels. Most of it is in `blake3::sse2::compress_in_place` and `blake3::sse41::compress_in_place` (316 and 307 instructions). Those modules are compiled but never selected at run time. The rest is scalar SSE floating point (`addsd`, `cvtsi2sd`, and so on) in the benchmark harness and in `matgen::get_dims`, which the conservative classifier also counts.
 - **Run-time Verification:** When built with `no_sse2`, `no_sse41`, `no_avx2`, and `no_avx512`, BLAKE3's dynamic platform detection (`blake3::platform::Platform::detect()`) is hardwired to always select the portable scalar implementation. The compiled SIMD code blocks are dead code paths and are never executed at run time.
 
 ---
@@ -248,7 +251,7 @@ features = ["pure", "no_sse2", "no_sse41", "no_avx2", "no_avx512"]
    - *Impact:* RISC-V requires approximately 20–30% more instructions for multi-limb arithmetic. Redundant-headroom accumulators (Plan 02 §4.2) that postpone carry propagation until reduction offer the highest relative speedup on RISC-V.
 
 2. **Register Pressure under Multi-Edge Blocking ($B = 4$):**
-   - x86-64 has only 16 GPRs. With $B = 4$, keeping a 4-word accumulator (`scratch[row]`), 4 input pointers, row counter, and edge weights resident in registers stresses the register allocator. LLVM successfully pinned accumulators without spilling to the stack in the hot inner loop (`spill=0`), demonstrating that $B = 4$ is the optimal blocking factor for x86-64.
+   - x86-64 has only 16 GPRs. With $B = 4$, keeping a 4-word accumulator (`scratch[row]`), 4 input pointers, row counter, and edge weights resident in registers stresses the register allocator. **Corrected:** LLVM does *not* keep everything in registers. In the `B = 4` inner row loop of `encode_column_block::<Mont127>` (113 instructions, 16 `mulx`), 22 instructions access `(%rsp)`. They reload prepared weights and source pointers and spill and reload a partial accumulator; `Mers127` has 20 and `Fp2M61` 34. Choosing `B = 4` (D8) therefore rests on the timings in `docs/BLOCKING.md`, not on spill-free code. Whether `B = 2` would avoid the spills on x86-64 has not been measured.
    - RISC-V has 32 GPRs, but LLVM emitted 245 stack accesses across the full outer function frame due to conservative frame-pointer and callee-saved register preservation (`s0`–`s11`).
 
 3. **Single vs Dual Instruction Widening Multiplies:**

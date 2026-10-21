@@ -23,8 +23,8 @@
       "total_instructions": 1281
     },
     "outside_hot_kernels": {
-      "vector_arithmetic_count": 0,
-      "vector_moves_count": 178,
+      "vector_arithmetic_count": 178,
+      "vector_moves_count": 0,
       "total_instructions": 380737
     }
   },
@@ -1597,7 +1597,2819 @@
         "18: li a3, -0x1",
         "1a: lui a4, 0x7f3"
       ]
+    },
+    {
+      "symbol_raw": ".Lpcrel_hi6832",
+      "symbol_demangled": ".Lpcrel_hi6832",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "122",
+          "insn": "jalr -0x11e(ra) <<rustc_demangle::v0::Printer>::print_path>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 0,
+        "spills": 0,
+        "total": 23
+      },
+      "disassembly_lines": [
+        "ea: auipc a1, 0x0",
+        "ee: mv a1, a1",
+        "f2: li a2, 0x10",
+        "f4: auipc ra, 0x0",
+        "f8: jalr ra <.Lpcrel_hi6832+0xa>",
+        "fc: beqz a0, 0x1aa <.Lpcrel_hi6833+0xa>",
+        "fe: li s2, 0x1",
+        "100: j 0x600 <.Lpcrel_hi6854+0x42>",
+        "102: li a0, 0x42",
+        "106: beq s3, a0, 0x1e8 <.Lpcrel_hi6859+0xc>",
+        "10a: li a0, 0x43",
+        "10e: beq s3, a0, 0x286 <.Lpcrel_hi6860+0x1a>",
+        "112: li a0, 0x49",
+        "116: bne s3, a0, 0x19a <.Lpcrel_hi6864+0x1a>",
+        "11a: mv a0, s4",
+        "11c: mv a1, s1",
+        "11e: auipc ra, 0x0",
+        "122: jalr -0x11e(ra) <<rustc_demangle::v0::Printer>::print_path>",
+        "126: li s2, 0x1",
+        "128: bnez a0, 0x600 <.Lpcrel_hi6854+0x42>",
+        "12c: beqz s1, 0x14a <.Lpcrel_hi6863+0x16>",
+        "12e: ld a0, 0x20(s4)",
+        "132: beqz a0, 0x14a <.Lpcrel_hi6863+0x16>"
+      ]
+    },
+    {
+      "symbol_raw": ".Lpcrel_hi6861",
+      "symbol_demangled": ".Lpcrel_hi6861",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "25c",
+          "insn": "jalr -0x258(ra) <<rustc_demangle::v0::Printer>::print_path>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 0,
+        "spills": 0,
+        "total": 13
+      },
+      "disassembly_lines": [
+        "23e: auipc a1, 0x0",
+        "242: mv a1, a1",
+        "246: li a2, 0x4",
+        "248: auipc ra, 0x0",
+        "24c: jalr ra <.Lpcrel_hi6861+0xa>",
+        "250: bnez a0, 0x600 <.Lpcrel_hi6854+0x42>",
+        "254: mv a0, s4",
+        "256: li a1, 0x0",
+        "258: auipc ra, 0x0",
+        "25c: jalr -0x258(ra) <<rustc_demangle::v0::Printer>::print_path>",
+        "260: bnez a0, 0x600 <.Lpcrel_hi6854+0x42>",
+        "264: ld a0, 0x20(s4)",
+        "268: beqz a0, 0x5ec <.Lpcrel_hi6854+0x2e>"
+      ]
+    },
+    {
+      "symbol_raw": ".Lpcrel_hi6835",
+      "symbol_demangled": ".Lpcrel_hi6835",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "2c0",
+          "insn": "jalr -0x2bc(ra) <<rustc_demangle::v0::Printer>::print_path>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 1,
+        "spills": 0,
+        "total": 23
+      },
+      "disassembly_lines": [
+        "2ac: auipc a1, 0x0",
+        "2b0: mv a1, a1",
+        "2b4: li a2, 0x10",
+        "2b6: j 0x3d8 <.Lpcrel_hi6834+0xa>",
+        "2b8: mv a0, s4",
+        "2ba: mv a1, s1",
+        "2bc: auipc ra, 0x0",
+        "2c0: jalr -0x2bc(ra) <<rustc_demangle::v0::Printer>::print_path>",
+        "2c4: li s2, 0x1",
+        "2c6: bnez a0, 0x600 <.Lpcrel_hi6854+0x42>",
+        "2ca: ld a0, 0x0(s4)",
+        "2ce: beqz a0, 0x408 <.Lpcrel_hi6838+0xc>",
+        "2d2: addi a0, sp, 0x28",
+        "2d4: li a2, 0x73",
+        "2d8: mv a1, s4",
+        "2da: auipc ra, 0x0",
+        "2de: jalr ra <.Lpcrel_hi6835+0x2e>",
+        "2e2: lbu a0, 0x28(sp)",
+        "2e6: beqz a0, 0x440 <.Lpcrel_hi6844+0xa>",
+        "2ea: ld a0, 0x20(s4)",
+        "2ee: lbu s1, 0x29(sp)",
+        "2f2: beqz a0, 0x3e4 <.Lpcrel_hi6834+0x16>",
+        "2f4: bnez s1, 0x4d2 <.Lpcrel_hi6845>"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_path::{closure#1}>",
+      "symbol_demangled": "<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_path::{closure#1}>",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "10",
+          "insn": "beqz a0, 0x64 <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_path::{closure#1}>+0x64>"
+        },
+        {
+          "addr": "1c",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_path::{closure#1}>+0x18>"
+        },
+        {
+          "addr": "56",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_path::{closure#1}>+0x52>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 2,
+        "spills": 8,
+        "total": 45
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0x60",
+        "2: sd ra, 0x58(sp)",
+        "4: sd s0, 0x50(sp)",
+        "6: sd s1, 0x48(sp)",
+        "8: sd s2, 0x40(sp)",
+        "a: addi s0, sp, 0x60",
+        "c: mv s1, a0",
+        "e: ld a0, 0x0(a0)",
+        "10: beqz a0, 0x64 <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_path::{closure#1}>+0x64>",
+        "12: mv s2, a1",
+        "14: mv a0, sp",
+        "16: mv a1, s1",
+        "18: auipc ra, 0x0",
+        "1c: jalr ra <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_path::{closure#1}>+0x18>",
+        "20: ld a0, 0x0(sp)",
+        "22: beqz a0, 0x84 <.Lpcrel_hi6866+0x1c>",
+        "24: ld a0, 0x20(s1)",
+        "26: beqz a0, 0xb0 <.Lpcrel_hi6867+0x16>",
+        "28: ld a6, 0x0(s1)",
+        "2c: ld a7, 0x8(s1)",
+        "30: ld a2, 0x10(s1)",
+        "32: ld a3, 0x18(s1)",
+        "34: ld a4, 0x0(sp)",
+        "36: ld a5, 0x8(sp)",
+        "38: ld a0, 0x10(sp)",
+        "3a: ld a1, 0x18(sp)",
+        "3c: sd a6, 0x20(sp)",
+        "3e: sd a7, 0x28(sp)",
+        "40: sd a2, 0x30(sp)",
+        "42: sd a3, 0x38(sp)",
+        "44: sd a4, 0x0(s1)",
+        "46: sd a5, 0x8(s1)",
+        "48: sd a0, 0x10(s1)",
+        "4a: sd a1, 0x18(s1)",
+        "4c: andi a1, s2, 0x1",
+        "50: mv a0, s1",
+        "52: auipc ra, 0x0",
+        "56: jalr ra <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_path::{closure#1}>+0x52>",
+        "5a: ld a1, 0x20(sp)",
+        "5c: ld a2, 0x28(sp)",
+        "5e: ld a3, 0x30(sp)",
+        "60: ld a4, 0x38(sp)",
+        "62: j 0xbc <.Lpcrel_hi6867+0x22>",
+        "64: ld a0, 0x20(s1)",
+        "66: beqz a0, 0xb0 <.Lpcrel_hi6867+0x16>"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Parser>::opt_integer_62",
+      "symbol_demangled": "<rustc_demangle::v0::Parser>::opt_integer_62",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "10",
+          "insn": "bgeu a3, a4, 0x40 <<rustc_demangle::v0::Parser>::opt_integer_62+0x40>"
+        },
+        {
+          "addr": "1c",
+          "insn": "bne a0, a2, 0x40 <<rustc_demangle::v0::Parser>::opt_integer_62+0x40>"
+        },
+        {
+          "addr": "2a",
+          "insn": "jalr ra <<rustc_demangle::v0::Parser>::opt_integer_62+0x26>"
+        },
+        {
+          "addr": "32",
+          "insn": "beqz a0, 0x54 <<rustc_demangle::v0::Parser>::opt_integer_62+0x54>"
+        },
+        {
+          "addr": "3e",
+          "insn": "j 0x46 <<rustc_demangle::v0::Parser>::opt_integer_62+0x46>"
+        },
+        {
+          "addr": "58",
+          "insn": "beqz a1, 0x60 <<rustc_demangle::v0::Parser>::opt_integer_62+0x60>"
+        },
+        {
+          "addr": "5e",
+          "insn": "j 0x46 <<rustc_demangle::v0::Parser>::opt_integer_62+0x46>"
+        },
+        {
+          "addr": "64",
+          "insn": "j 0x3c <<rustc_demangle::v0::Parser>::opt_integer_62+0x3c>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 7,
+        "spills": 3,
+        "total": 40
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0x30",
+        "2: sd ra, 0x28(sp)",
+        "4: sd s0, 0x20(sp)",
+        "6: sd s1, 0x18(sp)",
+        "8: addi s0, sp, 0x30",
+        "a: ld a4, 0x8(a1)",
+        "c: ld a3, 0x10(a1)",
+        "e: mv s1, a0",
+        "10: bgeu a3, a4, 0x40 <<rustc_demangle::v0::Parser>::opt_integer_62+0x40>",
+        "14: ld a0, 0x0(a1)",
+        "16: add a0, a0, a3",
+        "18: lbu a0, 0x0(a0)",
+        "1c: bne a0, a2, 0x40 <<rustc_demangle::v0::Parser>::opt_integer_62+0x40>",
+        "20: addi a3, a3, 0x1",
+        "22: sd a3, 0x10(a1)",
+        "24: addi a0, sp, 0x8",
+        "26: auipc ra, 0x0",
+        "2a: jalr ra <<rustc_demangle::v0::Parser>::opt_integer_62+0x26>",
+        "2e: lbu a0, 0x8(sp)",
+        "32: beqz a0, 0x54 <<rustc_demangle::v0::Parser>::opt_integer_62+0x54>",
+        "34: lbu a0, 0x9(sp)",
+        "38: sb a0, 0x1(s1)",
+        "3c: li a0, 0x1",
+        "3e: j 0x46 <<rustc_demangle::v0::Parser>::opt_integer_62+0x46>",
+        "40: li a0, 0x0",
+        "42: sd zero, 0x8(s1)",
+        "46: sb a0, 0x0(s1)",
+        "4a: ld ra, 0x28(sp)",
+        "4c: ld s0, 0x20(sp)",
+        "4e: ld s1, 0x18(sp)",
+        "50: addi sp, sp, 0x30",
+        "52: ret",
+        "54: ld a1, 0x10(sp)",
+        "56: addi a1, a1, 0x1",
+        "58: beqz a1, 0x60 <<rustc_demangle::v0::Parser>::opt_integer_62+0x60>",
+        "5a: li a0, 0x0",
+        "5c: sd a1, 0x8(s1)",
+        "5e: j 0x46 <<rustc_demangle::v0::Parser>::opt_integer_62+0x46>",
+        "60: sb zero, 0x1(s1)",
+        "64: j 0x3c <<rustc_demangle::v0::Parser>::opt_integer_62+0x3c>"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Parser>::ident",
+      "symbol_demangled": "<rustc_demangle::v0::Parser>::ident",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "10",
+          "insn": "bgeu a2, t2, 0x30 <<rustc_demangle::v0::Parser>::ident+0x30>"
+        },
+        {
+          "addr": "20",
+          "insn": "bne a1, a3, 0x30 <<rustc_demangle::v0::Parser>::ident+0x30>"
+        },
+        {
+          "addr": "2a",
+          "insn": "bltu a2, t2, 0x36 <<rustc_demangle::v0::Parser>::ident+0x36>"
+        },
+        {
+          "addr": "2e",
+          "insn": "j 0xb8 <<rustc_demangle::v0::Parser>::ident+0xb8>"
+        },
+        {
+          "addr": "32",
+          "insn": "bgeu a2, t2, 0xb8 <<rustc_demangle::v0::Parser>::ident+0xb8>"
+        },
+        {
+          "addr": "4c",
+          "insn": "bgeu a1, a3, 0xb8 <<rustc_demangle::v0::Parser>::ident+0xb8>"
+        },
+        {
+          "addr": "54",
+          "insn": "beqz a1, 0x8e <<rustc_demangle::v0::Parser>::ident+0x8e>"
+        },
+        {
+          "addr": "5a",
+          "insn": "beq t2, a2, 0xa8 <<rustc_demangle::v0::Parser>::ident+0xa8>"
+        },
+        {
+          "addr": "6e",
+          "insn": "bltu t1, a3, 0x8e <<rustc_demangle::v0::Parser>::ident+0x8e>"
+        },
+        {
+          "addr": "7a",
+          "insn": "bnez a5, 0xb8 <<rustc_demangle::v0::Parser>::ident+0xb8>"
+        },
+        {
+          "addr": "88",
+          "insn": "bgeu a1, a5, 0x5a <<rustc_demangle::v0::Parser>::ident+0x5a>"
+        },
+        {
+          "addr": "8c",
+          "insn": "j 0xb8 <<rustc_demangle::v0::Parser>::ident+0xb8>"
+        },
+        {
+          "addr": "8e",
+          "insn": "bgeu a2, t2, 0xaa <<rustc_demangle::v0::Parser>::ident+0xaa>"
+        },
+        {
+          "addr": "9e",
+          "insn": "bne a3, a5, 0xaa <<rustc_demangle::v0::Parser>::ident+0xaa>"
+        },
+        {
+          "addr": "a6",
+          "insn": "j 0xaa <<rustc_demangle::v0::Parser>::ident+0xaa>"
+        },
+        {
+          "addr": "ae",
+          "insn": "bltu a3, a2, 0xb8 <<rustc_demangle::v0::Parser>::ident+0xb8>"
+        },
+        {
+          "addr": "b4",
+          "insn": "bgeu t2, a3, 0xc8 <<rustc_demangle::v0::Parser>::ident+0xc8>"
+        },
+        {
+          "addr": "cc",
+          "insn": "beq a2, t2, 0xf2 <<rustc_demangle::v0::Parser>::ident+0xf2>"
+        },
+        {
+          "addr": "d0",
+          "insn": "beqz a2, 0xde <<rustc_demangle::v0::Parser>::ident+0xde>"
+        },
+        {
+          "addr": "de",
+          "insn": "beq a3, t2, 0xf2 <<rustc_demangle::v0::Parser>::ident+0xf2>"
+        },
+        {
+          "addr": "f2",
+          "insn": "beqz t0, 0x12c <<rustc_demangle::v0::Parser>::ident+0x12c>"
+        },
+        {
+          "addr": "102",
+          "insn": "beqz a3, 0x13c <<rustc_demangle::v0::Parser>::ident+0x13c>"
+        },
+        {
+          "addr": "110",
+          "insn": "bne a5, a6, 0x102 <<rustc_demangle::v0::Parser>::ident+0x102>"
+        },
+        {
+          "addr": "114",
+          "insn": "beqz a3, 0x146 <<rustc_demangle::v0::Parser>::ident+0x146>"
+        },
+        {
+          "addr": "116",
+          "insn": "bgeu a3, a1, 0x140 <<rustc_demangle::v0::Parser>::ident+0x140>"
+        },
+        {
+          "addr": "126",
+          "insn": "blt a5, a4, 0x146 <<rustc_demangle::v0::Parser>::ident+0x146>"
+        },
+        {
+          "addr": "13a",
+          "insn": "j 0xc0 <<rustc_demangle::v0::Parser>::ident+0xc0>"
+        },
+        {
+          "addr": "146",
+          "insn": "bgeu a2, a1, 0x15e <<rustc_demangle::v0::Parser>::ident+0x15e>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 1,
+        "adc": 0,
+        "add": 24,
+        "spills": 2,
+        "total": 115
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0x10",
+        "2: sd ra, 0x8(sp)",
+        "4: sd s0, 0x0(sp)",
+        "6: addi s0, sp, 0x10",
+        "8: mv a4, a1",
+        "a: ld t2, 0x8(a1)",
+        "e: ld a2, 0x10(a1)",
+        "10: bgeu a2, t2, 0x30 <<rustc_demangle::v0::Parser>::ident+0x30>",
+        "14: ld a1, 0x0(a4)",
+        "16: add a1, a1, a2",
+        "18: lbu a1, 0x0(a1)",
+        "1c: li a3, 0x75",
+        "20: bne a1, a3, 0x30 <<rustc_demangle::v0::Parser>::ident+0x30>",
+        "24: addi a2, a2, 0x1",
+        "26: sd a2, 0x10(a4)",
+        "28: li t0, 0x1",
+        "2a: bltu a2, t2, 0x36 <<rustc_demangle::v0::Parser>::ident+0x36>",
+        "2e: j 0xb8 <<rustc_demangle::v0::Parser>::ident+0xb8>",
+        "30: li t0, 0x0",
+        "32: bgeu a2, t2, 0xb8 <<rustc_demangle::v0::Parser>::ident+0xb8>",
+        "36: ld a6, 0x0(a4)",
+        "3a: add a1, a6, a2",
+        "3e: lbu a1, 0x0(a1)",
+        "42: addi a1, a1, -0x30",
+        "46: zext.b a1, a1",
+        "4a: li a3, 0xa",
+        "4c: bgeu a1, a3, 0xb8 <<rustc_demangle::v0::Parser>::ident+0xb8>",
+        "50: addi a2, a2, 0x1",
+        "52: sd a2, 0x10(a4)",
+        "54: beqz a1, 0x8e <<rustc_demangle::v0::Parser>::ident+0x8e>",
+        "56: li t1, 0x9",
+        "58: li a7, 0xa",
+        "5a: beq t2, a2, 0xa8 <<rustc_demangle::v0::Parser>::ident+0xa8>",
+        "5e: add a3, a6, a2",
+        "62: lbu a3, 0x0(a3)",
+        "66: addi a3, a3, -0x30",
+        "6a: zext.b a3, a3",
+        "6e: bltu t1, a3, 0x8e <<rustc_demangle::v0::Parser>::ident+0x8e>",
+        "72: mulhu a5, a1, a7",
+        "76: addi a2, a2, 0x1",
+        "78: sd a2, 0x10(a4)",
+        "7a: bnez a5, 0xb8 <<rustc_demangle::v0::Parser>::ident+0xb8>",
+        "7c: slli a5, a1, 0x1",
+        "80: slli a1, a1, 0x3",
+        "82: add a5, a5, a1",
+        "84: add a1, a5, a3",
+        "88: bgeu a1, a5, 0x5a <<rustc_demangle::v0::Parser>::ident+0x5a>",
+        "8c: j 0xb8 <<rustc_demangle::v0::Parser>::ident+0xb8>",
+        "8e: bgeu a2, t2, 0xaa <<rustc_demangle::v0::Parser>::ident+0xaa>",
+        "92: add a3, a6, a2",
+        "96: lbu a3, 0x0(a3)",
+        "9a: li a5, 0x5f",
+        "9e: bne a3, a5, 0xaa <<rustc_demangle::v0::Parser>::ident+0xaa>",
+        "a2: addi a2, a2, 0x1",
+        "a4: sd a2, 0x10(a4)",
+        "a6: j 0xaa <<rustc_demangle::v0::Parser>::ident+0xaa>",
+        "a8: mv a2, t2",
+        "aa: add a3, a2, a1",
+        "ae: bltu a3, a2, 0xb8 <<rustc_demangle::v0::Parser>::ident+0xb8>",
+        "b2: sd a3, 0x10(a4)",
+        "b4: bgeu t2, a3, 0xc8 <<rustc_demangle::v0::Parser>::ident+0xc8>",
+        "b8: sd zero, 0x0(a0)",
+        "bc: sb zero, 0x8(a0)",
+        "c0: ld ra, 0x8(sp)",
+        "c2: ld s0, 0x0(sp)",
+        "c4: addi sp, sp, 0x10",
+        "c6: ret",
+        "c8: add a7, a6, a2",
+        "cc: beq a2, t2, 0xf2 <<rustc_demangle::v0::Parser>::ident+0xf2>",
+        "d0: beqz a2, 0xde <<rustc_demangle::v0::Parser>::ident+0xde>",
+        "d2: lb a4, 0x0(a7)",
+        "d6: li a5, -0x41",
+        "da: bge a5, a4, 0x18e <.Lpcrel_hi6869>",
+        "de: beq a3, t2, 0xf2 <<rustc_demangle::v0::Parser>::ident+0xf2>",
+        "e2: add a4, a6, a3",
+        "e6: lb a4, 0x0(a4)",
+        "ea: li a5, -0x41",
+        "ee: bge a5, a4, 0x198 <.Lpcrel_hi6870>",
+        "f2: beqz t0, 0x12c <<rustc_demangle::v0::Parser>::ident+0x12c>",
+        "f6: add a2, a2, a6",
+        "f8: addi a4, a2, -0x1",
+        "fc: li a6, 0x5f",
+        "100: mv a3, a1",
+        "102: beqz a3, 0x13c <<rustc_demangle::v0::Parser>::ident+0x13c>",
+        "104: mv a2, a3",
+        "106: add a3, a3, a4",
+        "108: lbu a5, 0x0(a3)",
+        "10c: addi a3, a2, -0x1",
+        "110: bne a5, a6, 0x102 <<rustc_demangle::v0::Parser>::ident+0x102>",
+        "114: beqz a3, 0x146 <<rustc_demangle::v0::Parser>::ident+0x146>",
+        "116: bgeu a3, a1, 0x140 <<rustc_demangle::v0::Parser>::ident+0x140>",
+        "11a: add a4, a7, a3",
+        "11e: lb a4, 0x0(a4)",
+        "122: li a5, -0x41",
+        "126: blt a5, a4, 0x146 <<rustc_demangle::v0::Parser>::ident+0x146>",
+        "12a: j 0x1ac <.Lpcrel_hi6871>",
+        "12c: li a2, 0x1",
+        "12e: sd a7, 0x0(a0)",
+        "132: sd a1, 0x8(a0)",
+        "134: sd a2, 0x10(a0)",
+        "136: sd zero, 0x18(a0)",
+        "13a: j 0xc0 <<rustc_demangle::v0::Parser>::ident+0xc0>",
+        "13c: li a2, 0x1",
+        "13e: j 0x180 <.Lpcrel_hi6872+0x1c>",
+        "140: bne a3, a1, 0x1ac <.Lpcrel_hi6871>",
+        "144: beqz a2, 0x178 <.Lpcrel_hi6872+0x14>",
+        "146: bgeu a2, a1, 0x15e <<rustc_demangle::v0::Parser>::ident+0x15e>",
+        "14a: add a4, a7, a2",
+        "14e: lb a4, 0x0(a4)",
+        "152: li a5, -0x40",
+        "156: blt a4, a5, 0x164 <.Lpcrel_hi6872>",
+        "15a: mv a4, a2",
+        "15c: j 0x17a <.Lpcrel_hi6872+0x16>",
+        "15e: mv a4, a1",
+        "160: beq a2, a1, 0x17a <.Lpcrel_hi6872+0x16>"
+      ]
+    },
+    {
+      "symbol_raw": ".Lpcrel_hi6872",
+      "symbol_demangled": ".Lpcrel_hi6872",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "180",
+          "insn": "beqz a1, 0xb8 <<rustc_demangle::v0::Parser>::ident+0xb8>"
+        },
+        {
+          "addr": "18c",
+          "insn": "j 0xc0 <<rustc_demangle::v0::Parser>::ident+0xc0>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 1,
+        "spills": 0,
+        "total": 16
+      },
+      "disassembly_lines": [
+        "164: auipc a4, 0x0",
+        "168: mv a4, a4",
+        "16c: mv a0, a7",
+        "16e: mv a3, a1",
+        "170: auipc ra, 0x0",
+        "174: jalr ra <.Lpcrel_hi6872+0xc>",
+        "178: li a4, 0x0",
+        "17a: mv a2, a7",
+        "17c: add a7, a7, a4",
+        "17e: sub a1, a1, a4",
+        "180: beqz a1, 0xb8 <<rustc_demangle::v0::Parser>::ident+0xb8>",
+        "182: sd a2, 0x0(a0)",
+        "184: sd a3, 0x8(a0)",
+        "186: sd a7, 0x10(a0)",
+        "18a: sd a1, 0x18(a0)",
+        "18c: j 0xc0 <<rustc_demangle::v0::Parser>::ident+0xc0>"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Ident as core::fmt::Display>::fmt",
+      "symbol_demangled": "<rustc_demangle::v0::Ident as core::fmt::Display>::fmt",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "48",
+          "insn": "jalr ra <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x44>"
+        },
+        {
+          "addr": "66",
+          "insn": "beqz a1, 0xee <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0xee>"
+        },
+        {
+          "addr": "82",
+          "insn": "bltz a2, 0x8e <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x8e>"
+        },
+        {
+          "addr": "8c",
+          "insn": "j 0xe4 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0xe4>"
+        },
+        {
+          "addr": "9a",
+          "insn": "bgeu a7, a4, 0xca <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0xca>"
+        },
+        {
+          "addr": "aa",
+          "insn": "bltu a4, a6, 0xd8 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0xd8>"
+        },
+        {
+          "addr": "c8",
+          "insn": "j 0xe4 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0xe4>"
+        },
+        {
+          "addr": "d6",
+          "insn": "j 0xe4 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0xe4>"
+        },
+        {
+          "addr": "ea",
+          "insn": "bne s1, a0, 0x7a <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x7a>"
+        },
+        {
+          "addr": "f4",
+          "insn": "bltu a0, t0, 0xfc <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0xfc>"
+        },
+        {
+          "addr": "160",
+          "insn": "bltu a7, a2, 0x166 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x166>"
+        },
+        {
+          "addr": "16a",
+          "insn": "beqz a2, 0x178 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x178>"
+        },
+        {
+          "addr": "176",
+          "insn": "j 0x17a <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x17a>"
+        },
+        {
+          "addr": "182",
+          "insn": "bltu a0, ra, 0x196 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x196>"
+        },
+        {
+          "addr": "1aa",
+          "insn": "bltu a2, a7, 0x1c4 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x1c4>"
+        },
+        {
+          "addr": "1c2",
+          "insn": "j 0x14c <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x14c>"
+        },
+        {
+          "addr": "200",
+          "insn": "bgeu a0, t0, 0x218 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x218>"
+        },
+        {
+          "addr": "212",
+          "insn": "bltu a0, a2, 0x204 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x204>"
+        },
+        {
+          "addr": "216",
+          "insn": "j 0x220 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x220>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 5,
+        "adc": 1,
+        "add": 35,
+        "spills": 5,
+        "total": 187
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0x2a0",
+        "4: addi a2, sp, 0x200",
+        "6: sd ra, 0x98(a2)",
+        "a: sd s0, 0x90(a2)",
+        "c: sd s1, 0x88(a2)",
+        "e: sd s2, 0x80(a2)",
+        "12: sd s3, 0x78(a2)",
+        "16: sd s4, 0x70(a2)",
+        "1a: sd s5, 0x68(a2)",
+        "1e: sd s6, 0x60(a2)",
+        "22: sd s7, 0x58(a2)",
+        "26: sd s8, 0x50(a2)",
+        "2a: sd s9, 0x48(a2)",
+        "2e: sd s10, 0x40(a2)",
+        "32: sd s11, 0x38(a2)",
+        "36: addi s0, sp, 0x2a0",
+        "38: mv s6, a1",
+        "3a: mv s1, a0",
+        "3c: addi a0, sp, 0x34",
+        "3e: li a2, 0x200",
+        "42: li a1, 0x0",
+        "44: auipc ra, 0x0",
+        "48: jalr ra <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x44>",
+        "4c: ld s3, 0x18(s1)",
+        "50: beqz s3, 0x31e <.Lpcrel_hi6877+0x5e>",
+        "54: ld a0, 0x10(s1)",
+        "56: ld a1, 0x8(s1)",
+        "58: ld s1, 0x0(s1)",
+        "5a: sd a0, 0x20(sp)",
+        "5c: lbu t3, 0x0(a0)",
+        "60: sd s1, 0x10(sp)",
+        "62: sd a1, 0x18(sp)",
+        "64: li t0, 0x0",
+        "66: beqz a1, 0xee <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0xee>",
+        "68: add a0, s1, a1",
+        "6c: addi a1, sp, 0x34",
+        "6e: li t1, 0x80",
+        "72: li a7, 0xdf",
+        "76: li a6, 0xf0",
+        "7a: lb a2, 0x0(s1)",
+        "7e: zext.b a4, a2",
+        "82: bltz a2, 0x8e <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x8e>",
+        "86: addi s1, s1, 0x1",
+        "88: beq t0, t1, 0x294 <.Lpcrel_hi6874+0x4c>",
+        "8c: j 0xe4 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0xe4>",
+        "8e: lbu a2, 0x1(s1)",
+        "92: andi a5, a4, 0x1f",
+        "96: andi a2, a2, 0x3f",
+        "9a: bgeu a7, a4, 0xca <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0xca>",
+        "9e: lbu a3, 0x2(s1)",
+        "a2: slli a2, a2, 0x6",
+        "a4: andi a3, a3, 0x3f",
+        "a8: or a2, a2, a3",
+        "aa: bltu a4, a6, 0xd8 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0xd8>",
+        "ae: lbu a3, 0x3(s1)",
+        "b2: addi s1, s1, 0x4",
+        "b4: slli a5, a5, 0x3d",
+        "b6: srli a5, a5, 0x2b",
+        "b8: slli a2, a2, 0x6",
+        "ba: andi a3, a3, 0x3f",
+        "be: or a2, a2, a5",
+        "c0: or a4, a2, a3",
+        "c4: beq t0, t1, 0x294 <.Lpcrel_hi6874+0x4c>",
+        "c8: j 0xe4 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0xe4>",
+        "ca: slli a4, a5, 0x6",
+        "ce: addi s1, s1, 0x2",
+        "d0: or a4, a4, a2",
+        "d2: beq t0, t1, 0x294 <.Lpcrel_hi6874+0x4c>",
+        "d6: j 0xe4 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0xe4>",
+        "d8: slli a4, a5, 0xc",
+        "dc: addi s1, s1, 0x3",
+        "de: or a4, a4, a2",
+        "e0: beq t0, t1, 0x294 <.Lpcrel_hi6874+0x4c>",
+        "e4: addi t0, t0, 0x1",
+        "e6: sw a4, 0x0(a1)",
+        "e8: addi a1, a1, 0x4",
+        "ea: bne s1, a0, 0x7a <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x7a>",
+        "ee: li a0, 0x80",
+        "f2: mv s4, t0",
+        "f4: bltu a0, t0, 0xfc <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0xfc>",
+        "f8: li s4, 0x80",
+        "fc: li s5, 0x0",
+        "fe: ld a3, 0x20(sp)",
+        "100: add s2, a3, s3",
+        "104: slli t5, t0, 0x2",
+        "108: addi a0, sp, 0x34",
+        "10a: addi s7, t5, 0x4",
+        "10e: add s1, a0, t5",
+        "112: li a0, 0x2bc",
+        "116: sd a0, 0x28(sp)",
+        "118: li t2, 0x48",
+        "11c: li ra, 0x1a",
+        "11e: li a1, 0x1b",
+        "120: slli t5, a1, 0xb",
+        "124: lui a1, 0xffef1",
+        "128: addi a0, a1, -0x800",
+        "12c: sd a0, 0x8(sp)",
+        "12e: lui t6, 0x10",
+        "130: li s8, 0x7ca",
+        "134: addi t6, t6, -0x1",
+        "136: li s10, 0x24",
+        "13a: li s9, 0x9",
+        "13c: li s11, 0x80",
+        "140: li t1, 0x0",
+        "142: li t4, 0x0",
+        "144: addi a3, a3, 0x1",
+        "146: li a1, 0x1",
+        "148: li a6, 0x24",
+        "14c: sub a2, a6, t2",
+        "150: sltu a5, a6, a2",
+        "154: addi a5, a5, -0x1",
+        "156: and a2, a2, a5",
+        "158: seqz a7, a2",
+        "15c: add a7, a7, a2",
+        "15e: li a2, 0x1a",
+        "160: bltu a7, a2, 0x166 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x166>",
+        "164: li a7, 0x1a",
+        "166: andi a2, t1, 0x1",
+        "16a: beqz a2, 0x178 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x178>",
+        "16c: beq a3, s2, 0x294 <.Lpcrel_hi6874+0x4c>",
+        "170: lbu a5, 0x0(a3)",
+        "174: addi a3, a3, 0x1",
+        "176: j 0x17a <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x17a>",
+        "178: mv a5, t3",
+        "17a: addi a2, a5, -0x61",
+        "17e: zext.b a0, a2",
+        "182: bltu a0, ra, 0x196 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x196>",
+        "186: addi a0, a5, -0x30",
+        "18a: zext.b a0, a0",
+        "18e: bltu s9, a0, 0x294 <.Lpcrel_hi6874+0x4c>",
+        "192: addi a2, a5, -0x16",
+        "196: zext.b a2, a2",
+        "19a: mulhu a0, a2, a1",
+        "19e: bnez a0, 0x294 <.Lpcrel_hi6874+0x4c>",
+        "1a0: mul a0, a2, a1",
+        "1a4: add t4, t4, a0",
+        "1a6: bltu t4, a0, 0x294 <.Lpcrel_hi6874+0x4c>",
+        "1aa: bltu a2, a7, 0x1c4 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x1c4>",
+        "1ae: sub a2, s10, a7",
+        "1b2: mulhu a0, a1, a2",
+        "1b6: bnez a0, 0x294 <.Lpcrel_hi6874+0x4c>",
+        "1b8: mul a1, a1, a2",
+        "1bc: addi a6, a6, 0x24",
+        "1c0: li t1, 0x1",
+        "1c2: j 0x14c <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x14c>",
+        "1c4: add a0, t4, s5",
+        "1c8: bltu a0, t4, 0x294 <.Lpcrel_hi6874+0x4c>",
+        "1cc: addi a1, t0, 0x1",
+        "1d0: divu a5, a0, a1",
+        "1d4: add s11, s11, a5",
+        "1d6: bltu s11, a5, 0x294 <.Lpcrel_hi6874+0x4c>",
+        "1da: srli a2, s11, 0x20",
+        "1de: bnez a2, 0x294 <.Lpcrel_hi6874+0x4c>",
+        "1e0: xor a2, s11, t5",
+        "1e4: mv t1, s1",
+        "1e6: lui s1, 0xffef0",
+        "1ea: addw a2, a2, s1",
+        "1ec: ld a4, 0x8(sp)",
+        "1ee: bltu a2, a4, 0x294 <.Lpcrel_hi6874+0x4c>",
+        "1f2: beq t0, s4, 0x294 <.Lpcrel_hi6874+0x4c>",
+        "1f6: mul a2, a5, a1",
+        "1fa: sub a0, a0, a2",
+        "1fc: mv a5, t1",
+        "1fe: mv a2, t0",
+        "200: bgeu a0, t0, 0x218 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x218>",
+        "204: lw a4, -0x4(a5)",
+        "208: addi a2, a2, -0x1",
+        "20a: addi s1, a5, -0x4",
+        "20e: sw a4, 0x0(a5)",
+        "210: mv a5, s1",
+        "212: bltu a0, a2, 0x204 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x204>",
+        "216: j 0x220 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x220>",
+        "218: li a2, 0x80",
+        "21c: bgeu a0, a2, 0x3b6 <.Lpcrel_hi6873>",
+        "220: slli a2, a0, 0x2",
+        "224: addi a4, sp, 0x34",
+        "226: add a2, a2, a4",
+        "228: sw s11, 0x0(a2)",
+        "22c: beq a3, s2, 0x370 <.Lpcrel_hi6878+0xe>",
+        "230: ld a2, 0x28(sp)",
+        "232: divu a2, t4, a2",
+        "236: divu a4, a2, a1",
+        "23a: add a2, a2, a4",
+        "23c: li t2, 0x0",
+        "23e: mv s1, t1",
+        "240: li a4, 0x1c8",
+        "244: bltu a2, a4, 0x264 <.Lpcrel_hi6874+0x1c>"
+      ]
+    },
+    {
+      "symbol_raw": ".Lpcrel_hi6874",
+      "symbol_demangled": ".Lpcrel_hi6874",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "292",
+          "insn": "j 0x140 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x140>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 1,
+        "adc": 0,
+        "add": 7,
+        "spills": 1,
+        "total": 26
+      },
+      "disassembly_lines": [
+        "248: auipc a4, 0x0",
+        "24c: ld a4, 0x0(a4)",
+        "250: mulhu a4, a2, a4",
+        "254: srli a5, a2, 0x3",
+        "258: srli a2, a4, 0x5",
+        "25c: addi t2, t2, 0x24",
+        "260: bltu s8, a5, 0x248 <.Lpcrel_hi6874>",
+        "264: slli a4, a2, 0x2",
+        "268: slli a5, a2, 0x5",
+        "26c: addi a2, a2, 0x26",
+        "270: add a4, a4, a5",
+        "272: and a2, a2, t6",
+        "276: and a4, a4, t6",
+        "27a: divuw a2, a4, a2",
+        "27e: lbu t3, 0x0(a3)",
+        "282: addi s5, a0, 0x1",
+        "286: addi s7, s7, 0x4",
+        "288: addi s1, s1, 0x4",
+        "28a: add t2, t2, a2",
+        "28c: li a0, 0x2",
+        "28e: sd a0, 0x28(sp)",
+        "290: mv t0, a1",
+        "292: j 0x140 <<rustc_demangle::v0::Ident as core::fmt::Display>::fmt+0x140>",
+        "294: ld a0, 0x8(s6)",
+        "298: ld s6, 0x0(s6)",
+        "29c: ld a5, 0x18(a0)"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Parser>::namespace",
+      "symbol_demangled": "<rustc_demangle::v0::Parser>::namespace",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "4",
+          "insn": "bgeu a2, a1, 0x34 <<rustc_demangle::v0::Parser>::namespace+0x34>"
+        },
+        {
+          "addr": "1a",
+          "insn": "bgeu a3, a4, 0x24 <<rustc_demangle::v0::Parser>::namespace+0x24>"
+        },
+        {
+          "addr": "2a",
+          "insn": "bltu a0, a1, 0x34 <<rustc_demangle::v0::Parser>::namespace+0x34>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 4,
+        "spills": 0,
+        "total": 21
+      },
+      "disassembly_lines": [
+        "0: ld a1, 0x8(a0)",
+        "2: ld a2, 0x10(a0)",
+        "4: bgeu a2, a1, 0x34 <<rustc_demangle::v0::Parser>::namespace+0x34>",
+        "8: ld a1, 0x0(a0)",
+        "a: add a1, a1, a2",
+        "c: lbu a1, 0x0(a1)",
+        "10: addi a2, a2, 0x1",
+        "12: addi a3, a1, -0x41",
+        "16: li a4, 0x1a",
+        "18: sd a2, 0x10(a0)",
+        "1a: bgeu a3, a4, 0x24 <<rustc_demangle::v0::Parser>::namespace+0x24>",
+        "1e: slli a0, a1, 0x20",
+        "22: ret",
+        "24: addi a0, a1, -0x7b",
+        "28: li a1, -0x1a",
+        "2a: bltu a0, a1, 0x34 <<rustc_demangle::v0::Parser>::namespace+0x34>",
+        "2e: li a0, -0x1",
+        "30: slli a0, a0, 0x20",
+        "32: ret",
+        "34: li a0, 0x1",
+        "36: ret"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Printer>::skipping_printing::<<rustc_demangle::v0::Printer>::print_path::{closure#0}>",
+      "symbol_demangled": "<rustc_demangle::v0::Printer>::skipping_printing::<<rustc_demangle::v0::Printer>::print_path::{closure#0}>",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "1c",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::skipping_printing::<<rustc_demangle::v0::Printer>::print_path::{closure#0}>+0x18>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 3,
+        "spills": 4,
+        "total": 20
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0x30",
+        "2: sd ra, 0x28(sp)",
+        "4: sd s0, 0x20(sp)",
+        "6: sd s1, 0x18(sp)",
+        "8: sd s2, 0x10(sp)",
+        "a: addi s0, sp, 0x30",
+        "c: mv s1, a0",
+        "e: ld s2, 0x20(a0)",
+        "12: sd zero, 0x20(a0)",
+        "16: li a1, 0x0",
+        "18: auipc ra, 0x0",
+        "1c: jalr ra <<rustc_demangle::v0::Printer>::skipping_printing::<<rustc_demangle::v0::Printer>::print_path::{closure#0}>+0x18>",
+        "20: bnez a0, 0x32 <.Lpcrel_hi6879>",
+        "22: sd s2, 0x20(s1)",
+        "26: ld ra, 0x28(sp)",
+        "28: ld s0, 0x20(sp)",
+        "2a: ld s1, 0x18(sp)",
+        "2c: ld s2, 0x10(sp)",
+        "2e: addi sp, sp, 0x30",
+        "30: ret"
+      ]
+    },
+    {
+      "symbol_raw": ".Lpcrel_hi6889",
+      "symbol_demangled": ".Lpcrel_hi6889",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "160",
+          "insn": "jalr -0x15c(ra) <<rustc_demangle::v0::Printer>::print_type>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 0,
+        "spills": 0,
+        "total": 16
+      },
+      "disassembly_lines": [
+        "142: auipc a1, 0x0",
+        "146: mv a1, a1",
+        "14a: li a2, 0x1",
+        "14c: li s2, 0x1",
+        "14e: auipc ra, 0x0",
+        "152: jalr ra <.Lpcrel_hi6889+0xc>",
+        "156: bnez a0, 0x472 <.Lpcrel_hi6895+0x38>",
+        "15a: mv a0, s4",
+        "15c: auipc ra, 0x0",
+        "160: jalr -0x15c(ra) <<rustc_demangle::v0::Printer>::print_type>",
+        "164: li s2, 0x1",
+        "166: bnez a0, 0x472 <.Lpcrel_hi6895+0x38>",
+        "16a: li a0, 0x41",
+        "16e: bne s3, a0, 0x1a0 <.Lpcrel_hi6898+0x28>",
+        "172: ld a0, 0x20(s4)",
+        "176: beqz a0, 0x18e <.Lpcrel_hi6898+0x16>"
+      ]
+    },
+    {
+      "symbol_raw": ".Lpcrel_hi6901",
+      "symbol_demangled": ".Lpcrel_hi6901",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "2de",
+          "insn": "jalr -0x2da(ra) <<rustc_demangle::v0::Printer>::print_type>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 0,
+        "spills": 0,
+        "total": 15
+      },
+      "disassembly_lines": [
+        "2be: auipc a1, 0x0",
+        "2c2: mv a1, a1",
+        "2c6: li a2, 0x1",
+        "2c8: li s2, 0x1",
+        "2ca: auipc ra, 0x0",
+        "2ce: jalr ra <.Lpcrel_hi6901+0xc>",
+        "2d2: beqz a0, 0x45e <.Lpcrel_hi6895+0x24>",
+        "2d6: j 0x472 <.Lpcrel_hi6895+0x38>",
+        "2d8: mv a0, s4",
+        "2da: auipc ra, 0x0",
+        "2de: jalr -0x2da(ra) <<rustc_demangle::v0::Printer>::print_type>",
+        "2e2: li s2, 0x1",
+        "2e4: bnez a0, 0x472 <.Lpcrel_hi6895+0x38>",
+        "2e8: ld a0, 0x20(s4)",
+        "2ec: beqz a0, 0x304 <.Lpcrel_hi6906+0x16>"
+      ]
+    },
+    {
+      "symbol_raw": ".Lpcrel_hi6895",
+      "symbol_demangled": ".Lpcrel_hi6895",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "456",
+          "insn": "jalr -0x452(ra) <<rustc_demangle::v0::Printer>::print_type>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 2,
+        "spills": 0,
+        "total": 30
+      },
+      "disassembly_lines": [
+        "43a: auipc a1, 0x0",
+        "43e: mv a1, a1",
+        "442: li a2, 0x4",
+        "444: auipc ra, 0x0",
+        "448: jalr ra <.Lpcrel_hi6895+0xa>",
+        "44c: bnez a0, 0xe4 <.Lpcrel_hi6884+0x16>",
+        "450: mv a0, s4",
+        "452: auipc ra, 0x0",
+        "456: jalr -0x452(ra) <<rustc_demangle::v0::Printer>::print_type>",
+        "45a: bnez a0, 0xe4 <.Lpcrel_hi6884+0x16>",
+        "45e: ld a0, 0x0(s4)",
+        "462: beqz a0, 0x470 <.Lpcrel_hi6895+0x36>",
+        "464: li s2, 0x0",
+        "466: mv a1, s4",
+        "468: lw a0, 0x18(a1)",
+        "46a: addi a0, a0, -0x1",
+        "46c: sw a0, 0x18(a1)",
+        "46e: j 0x472 <.Lpcrel_hi6895+0x38>",
+        "470: li s2, 0x0",
+        "472: mv a0, s2",
+        "474: ld ra, 0x48(sp)",
+        "476: ld s0, 0x40(sp)",
+        "478: ld s1, 0x38(sp)",
+        "47a: ld s2, 0x30(sp)",
+        "47c: ld s3, 0x28(sp)",
+        "47e: ld s4, 0x20(sp)",
+        "480: ld s5, 0x18(sp)",
+        "482: ld s6, 0x10(sp)",
+        "484: addi sp, sp, 0x50",
+        "486: ret"
+      ]
+    },
+    {
+      "symbol_raw": ".Lpcrel_hi6929",
+      "symbol_demangled": ".Lpcrel_hi6929",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "216",
+          "insn": "jalr -0x212(ra) <<rustc_demangle::v0::Printer>::print_const>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 1,
+        "spills": 0,
+        "total": 36
+      },
+      "disassembly_lines": [
+        "1f8: auipc a1, 0x0",
+        "1fc: mv a1, a1",
+        "200: li a2, 0x4",
+        "202: auipc ra, 0x0",
+        "206: jalr ra <.Lpcrel_hi6929+0xa>",
+        "20a: bnez a0, 0x10c <.Lpcrel_hi6916+0x28>",
+        "20c: li a1, 0x1",
+        "20e: mv a0, s1",
+        "210: li s3, 0x1",
+        "212: auipc ra, 0x0",
+        "216: jalr -0x212(ra) <<rustc_demangle::v0::Printer>::print_const>",
+        "21a: beqz a0, 0x40c <.Lpcrel_hi6932+0x16>",
+        "21e: j 0x488 <.Lpcrel_hi6938+0xc>",
+        "220: mv a0, sp",
+        "222: mv a1, s1",
+        "224: auipc ra, 0x0",
+        "228: jalr ra <.Lpcrel_hi6929+0x2c>",
+        "22c: ld a0, 0x0(sp)",
+        "22e: beqz a0, 0x460 <.Lpcrel_hi6918+0xc>",
+        "232: ld a1, 0x8(sp)",
+        "234: auipc ra, 0x0",
+        "238: jalr ra <.Lpcrel_hi6929+0x3c>",
+        "23c: li a2, 0x1",
+        "23e: bne a0, a2, 0x260 <.Lpcrel_hi6929+0x68>",
+        "242: srli a0, a1, 0x20",
+        "246: bnez a0, 0x260 <.Lpcrel_hi6929+0x68>",
+        "248: li a0, 0x1b",
+        "24a: slli a0, a0, 0xb",
+        "24c: xor a0, a0, a1",
+        "24e: lui a2, 0xffef0",
+        "252: lui a3, 0xffef1",
+        "256: addw a0, a0, a2",
+        "258: addi a2, a3, -0x800",
+        "25c: bgeu a0, a2, 0x49a <.Lpcrel_hi6938+0x1e>",
+        "260: ld a0, 0x20(s1)",
+        "262: beqz a0, 0xa0 <.Lpcrel_hi6911+0x14>"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Parser>::integer_62",
+      "symbol_demangled": "<rustc_demangle::v0::Parser>::integer_62",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "8",
+          "insn": "bgeu a2, a3, 0x28 <<rustc_demangle::v0::Parser>::integer_62+0x28>"
+        },
+        {
+          "addr": "18",
+          "insn": "bne a4, a5, 0x28 <<rustc_demangle::v0::Parser>::integer_62+0x28>"
+        },
+        {
+          "addr": "26",
+          "insn": "j 0xae <<rustc_demangle::v0::Parser>::integer_62+0xae>"
+        },
+        {
+          "addr": "2a",
+          "insn": "bltu a3, a2, 0x30 <<rustc_demangle::v0::Parser>::integer_62+0x30>"
+        },
+        {
+          "addr": "3e",
+          "insn": "beq t3, a2, 0x9a <<rustc_demangle::v0::Parser>::integer_62+0x9a>"
+        },
+        {
+          "addr": "4a",
+          "insn": "beq a3, a6, 0xa2 <<rustc_demangle::v0::Parser>::integer_62+0xa2>"
+        },
+        {
+          "addr": "56",
+          "insn": "bltu a4, a7, 0x7c <<rustc_demangle::v0::Parser>::integer_62+0x7c>"
+        },
+        {
+          "addr": "62",
+          "insn": "bgeu a4, t1, 0x6c <<rustc_demangle::v0::Parser>::integer_62+0x6c>"
+        },
+        {
+          "addr": "6a",
+          "insn": "j 0x7c <<rustc_demangle::v0::Parser>::integer_62+0x7c>"
+        },
+        {
+          "addr": "74",
+          "insn": "bgeu a4, t1, 0x9a <<rustc_demangle::v0::Parser>::integer_62+0x9a>"
+        },
+        {
+          "addr": "84",
+          "insn": "bnez a3, 0x9a <<rustc_demangle::v0::Parser>::integer_62+0x9a>"
+        },
+        {
+          "addr": "96",
+          "insn": "bgeu a5, a3, 0x3e <<rustc_demangle::v0::Parser>::integer_62+0x3e>"
+        },
+        {
+          "addr": "a0",
+          "insn": "j 0xae <<rustc_demangle::v0::Parser>::integer_62+0xae>"
+        },
+        {
+          "addr": "a8",
+          "insn": "beqz a5, 0x9a <<rustc_demangle::v0::Parser>::integer_62+0x9a>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 1,
+        "adc": 0,
+        "add": 12,
+        "spills": 0,
+        "total": 58
+      },
+      "disassembly_lines": [
+        "0: ld a3, 0x8(a1)",
+        "2: ld a2, 0x10(a1)",
+        "4: ld t2, 0x0(a1)",
+        "8: bgeu a2, a3, 0x28 <<rustc_demangle::v0::Parser>::integer_62+0x28>",
+        "c: add a4, t2, a2",
+        "10: lbu a4, 0x0(a4)",
+        "14: li a5, 0x5f",
+        "18: bne a4, a5, 0x28 <<rustc_demangle::v0::Parser>::integer_62+0x28>",
+        "1c: li a3, 0x0",
+        "1e: addi a2, a2, 0x1",
+        "20: sd a2, 0x10(a1)",
+        "22: sd zero, 0x8(a0)",
+        "26: j 0xae <<rustc_demangle::v0::Parser>::integer_62+0xae>",
+        "28: mv t3, a2",
+        "2a: bltu a3, a2, 0x30 <<rustc_demangle::v0::Parser>::integer_62+0x30>",
+        "2e: mv t3, a3",
+        "30: li a5, 0x0",
+        "32: li a6, 0x5f",
+        "36: li a7, 0xa",
+        "38: li t0, 0x3e",
+        "3c: li t1, 0x1a",
+        "3e: beq t3, a2, 0x9a <<rustc_demangle::v0::Parser>::integer_62+0x9a>",
+        "42: add a3, t2, a2",
+        "46: lbu a3, 0x0(a3)",
+        "4a: beq a3, a6, 0xa2 <<rustc_demangle::v0::Parser>::integer_62+0xa2>",
+        "4e: addi t4, a3, -0x30",
+        "52: zext.b a4, t4",
+        "56: bltu a4, a7, 0x7c <<rustc_demangle::v0::Parser>::integer_62+0x7c>",
+        "5a: addi a4, a3, -0x61",
+        "5e: zext.b a4, a4",
+        "62: bgeu a4, t1, 0x6c <<rustc_demangle::v0::Parser>::integer_62+0x6c>",
+        "66: addi t4, a3, -0x57",
+        "6a: j 0x7c <<rustc_demangle::v0::Parser>::integer_62+0x7c>",
+        "6c: addi a4, a3, -0x41",
+        "70: zext.b a4, a4",
+        "74: bgeu a4, t1, 0x9a <<rustc_demangle::v0::Parser>::integer_62+0x9a>",
+        "78: addi t4, a3, -0x1d",
+        "7c: mulhu a3, a5, t0",
+        "80: addi a2, a2, 0x1",
+        "82: sd a2, 0x10(a1)",
+        "84: bnez a3, 0x9a <<rustc_demangle::v0::Parser>::integer_62+0x9a>",
+        "86: slli a3, a5, 0x1",
+        "8a: slli a5, a5, 0x6",
+        "8c: sub a3, a5, a3",
+        "90: zext.b a5, t4",
+        "94: add a5, a5, a3",
+        "96: bgeu a5, a3, 0x3e <<rustc_demangle::v0::Parser>::integer_62+0x3e>",
+        "9a: sb zero, 0x1(a0)",
+        "9e: li a3, 0x1",
+        "a0: j 0xae <<rustc_demangle::v0::Parser>::integer_62+0xae>",
+        "a2: addi a2, a2, 0x1",
+        "a4: addi a5, a5, 0x1",
+        "a6: sd a2, 0x10(a1)",
+        "a8: beqz a5, 0x9a <<rustc_demangle::v0::Parser>::integer_62+0x9a>",
+        "aa: li a3, 0x0",
+        "ac: sd a5, 0x8(a0)",
+        "ae: sb a3, 0x0(a0)",
+        "b2: ret"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Printer>::print_const_uint",
+      "symbol_demangled": "<rustc_demangle::v0::Printer>::print_const_uint",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "16",
+          "insn": "beqz a0, 0x56 <<rustc_demangle::v0::Printer>::print_const_uint+0x56>"
+        },
+        {
+          "addr": "22",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::print_const_uint+0x1e>"
+        },
+        {
+          "addr": "36",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::print_const_uint+0x32>"
+        },
+        {
+          "addr": "4e",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::print_const_uint+0x4a>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 4,
+        "spills": 8,
+        "total": 37
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0x50",
+        "2: sd ra, 0x48(sp)",
+        "4: sd s0, 0x40(sp)",
+        "6: sd s1, 0x38(sp)",
+        "8: sd s2, 0x30(sp)",
+        "a: sd s3, 0x28(sp)",
+        "c: sd s4, 0x20(sp)",
+        "e: sd s5, 0x18(sp)",
+        "10: addi s0, sp, 0x50",
+        "12: mv s1, a0",
+        "14: ld a0, 0x0(a0)",
+        "16: beqz a0, 0x56 <<rustc_demangle::v0::Printer>::print_const_uint+0x56>",
+        "18: mv s2, a1",
+        "1a: addi a0, sp, 0x8",
+        "1c: mv a1, s1",
+        "1e: auipc ra, 0x0",
+        "22: jalr ra <<rustc_demangle::v0::Printer>::print_const_uint+0x1e>",
+        "26: ld s4, 0x8(sp)",
+        "28: beqz s4, 0x7c <.Lpcrel_hi6950+0x22>",
+        "2c: ld s5, 0x10(sp)",
+        "2e: mv a0, s4",
+        "30: mv a1, s5",
+        "32: auipc ra, 0x0",
+        "36: jalr ra <<rustc_demangle::v0::Printer>::print_const_uint+0x32>",
+        "3a: li a2, 0x1",
+        "3c: bne a0, a2, 0x94 <.Lpcrel_hi6952+0xc>",
+        "40: ld s1, 0x20(s1)",
+        "42: sd a1, 0x8(sp)",
+        "44: beqz s1, 0xe0 <.Lpcrel_hi6953+0x48>",
+        "46: addi a0, sp, 0x8",
+        "48: mv a1, s1",
+        "4a: auipc ra, 0x0",
+        "4e: jalr ra <<rustc_demangle::v0::Printer>::print_const_uint+0x4a>",
+        "52: beqz a0, 0xc0 <.Lpcrel_hi6953+0x28>",
+        "54: j 0xf8 <.Lpcrel_hi6951+0x14>",
+        "56: ld a0, 0x20(s1)",
+        "58: beqz a0, 0xe0 <.Lpcrel_hi6953+0x48>"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_const::{closure#6}>",
+      "symbol_demangled": "<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_const::{closure#6}>",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "10",
+          "insn": "beqz a0, 0x64 <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_const::{closure#6}>+0x64>"
+        },
+        {
+          "addr": "1c",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_const::{closure#6}>+0x18>"
+        },
+        {
+          "addr": "56",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_const::{closure#6}>+0x52>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 2,
+        "spills": 8,
+        "total": 45
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0x60",
+        "2: sd ra, 0x58(sp)",
+        "4: sd s0, 0x50(sp)",
+        "6: sd s1, 0x48(sp)",
+        "8: sd s2, 0x40(sp)",
+        "a: addi s0, sp, 0x60",
+        "c: mv s1, a0",
+        "e: ld a0, 0x0(a0)",
+        "10: beqz a0, 0x64 <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_const::{closure#6}>+0x64>",
+        "12: mv s2, a1",
+        "14: mv a0, sp",
+        "16: mv a1, s1",
+        "18: auipc ra, 0x0",
+        "1c: jalr ra <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_const::{closure#6}>+0x18>",
+        "20: ld a0, 0x0(sp)",
+        "22: beqz a0, 0x84 <.Lpcrel_hi6955+0x1c>",
+        "24: ld a0, 0x20(s1)",
+        "26: beqz a0, 0xb0 <.Lpcrel_hi6956+0x16>",
+        "28: ld a6, 0x0(s1)",
+        "2c: ld a7, 0x8(s1)",
+        "30: ld a2, 0x10(s1)",
+        "32: ld a3, 0x18(s1)",
+        "34: ld a4, 0x0(sp)",
+        "36: ld a5, 0x8(sp)",
+        "38: ld a0, 0x10(sp)",
+        "3a: ld a1, 0x18(sp)",
+        "3c: sd a6, 0x20(sp)",
+        "3e: sd a7, 0x28(sp)",
+        "40: sd a2, 0x30(sp)",
+        "42: sd a3, 0x38(sp)",
+        "44: sd a4, 0x0(s1)",
+        "46: sd a5, 0x8(s1)",
+        "48: sd a0, 0x10(s1)",
+        "4a: sd a1, 0x18(s1)",
+        "4c: andi a1, s2, 0x1",
+        "50: mv a0, s1",
+        "52: auipc ra, 0x0",
+        "56: jalr ra <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_const::{closure#6}>+0x52>",
+        "5a: ld a1, 0x20(sp)",
+        "5c: ld a2, 0x28(sp)",
+        "5e: ld a3, 0x30(sp)",
+        "60: ld a4, 0x38(sp)",
+        "62: j 0xbc <.Lpcrel_hi6956+0x22>",
+        "64: ld a0, 0x20(s1)",
+        "66: beqz a0, 0xb0 <.Lpcrel_hi6956+0x16>"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Parser>::hex_nibbles",
+      "symbol_demangled": "<rustc_demangle::v0::Parser>::hex_nibbles",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "12",
+          "insn": "bltu a1, a2, 0x18 <<rustc_demangle::v0::Parser>::hex_nibbles+0x18>"
+        },
+        {
+          "addr": "22",
+          "insn": "beq t2, a4, 0x70 <<rustc_demangle::v0::Parser>::hex_nibbles+0x70>"
+        },
+        {
+          "addr": "3e",
+          "insn": "bltu t4, a7, 0x22 <<rustc_demangle::v0::Parser>::hex_nibbles+0x22>"
+        },
+        {
+          "addr": "42",
+          "insn": "bltu t3, t0, 0x22 <<rustc_demangle::v0::Parser>::hex_nibbles+0x22>"
+        },
+        {
+          "addr": "4a",
+          "insn": "bne a5, a4, 0x70 <<rustc_demangle::v0::Parser>::hex_nibbles+0x70>"
+        },
+        {
+          "addr": "56",
+          "insn": "beq a2, a1, 0x68 <<rustc_demangle::v0::Parser>::hex_nibbles+0x68>"
+        },
+        {
+          "addr": "5a",
+          "insn": "beqz a2, 0x68 <<rustc_demangle::v0::Parser>::hex_nibbles+0x68>"
+        },
+        {
+          "addr": "6e",
+          "insn": "j 0x78 <<rustc_demangle::v0::Parser>::hex_nibbles+0x78>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 8,
+        "spills": 2,
+        "total": 43
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0x10",
+        "2: sd ra, 0x8(sp)",
+        "4: sd s0, 0x0(sp)",
+        "6: addi s0, sp, 0x10",
+        "8: mv t1, a1",
+        "a: ld a1, 0x8(a1)",
+        "c: ld a2, 0x10(t1)",
+        "10: mv t2, a2",
+        "12: bltu a1, a2, 0x18 <<rustc_demangle::v0::Parser>::hex_nibbles+0x18>",
+        "16: mv t2, a1",
+        "18: ld a6, 0x0(t1)",
+        "1c: li a7, 0xa",
+        "1e: li t0, 0x6",
+        "20: mv a4, a2",
+        "22: beq t2, a4, 0x70 <<rustc_demangle::v0::Parser>::hex_nibbles+0x70>",
+        "26: mv a3, a4",
+        "28: add a4, a4, a6",
+        "2a: lbu a5, 0x0(a4)",
+        "2e: addi a4, a3, 0x1",
+        "32: addi t4, a5, -0x30",
+        "36: sd a4, 0x10(t1)",
+        "3a: addi t3, a5, -0x61",
+        "3e: bltu t4, a7, 0x22 <<rustc_demangle::v0::Parser>::hex_nibbles+0x22>",
+        "42: bltu t3, t0, 0x22 <<rustc_demangle::v0::Parser>::hex_nibbles+0x22>",
+        "46: li a4, 0x5f",
+        "4a: bne a5, a4, 0x70 <<rustc_demangle::v0::Parser>::hex_nibbles+0x70>",
+        "4e: bltu a1, a3, 0x80 <.Lpcrel_hi6958>",
+        "52: add a4, a6, a2",
+        "56: beq a2, a1, 0x68 <<rustc_demangle::v0::Parser>::hex_nibbles+0x68>",
+        "5a: beqz a2, 0x68 <<rustc_demangle::v0::Parser>::hex_nibbles+0x68>",
+        "5c: lb a7, 0x0(a4)",
+        "60: li a5, -0x40",
+        "64: blt a7, a5, 0x80 <.Lpcrel_hi6958>",
+        "68: sub a3, a3, a2",
+        "6a: sd a4, 0x0(a0)",
+        "6c: sd a3, 0x8(a0)",
+        "6e: j 0x78 <<rustc_demangle::v0::Parser>::hex_nibbles+0x78>",
+        "70: sd zero, 0x0(a0)",
+        "74: sb zero, 0x8(a0)",
+        "78: ld ra, 0x8(sp)",
+        "7a: ld s0, 0x0(sp)",
+        "7c: addi sp, sp, 0x10",
+        "7e: ret"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>",
+      "symbol_demangled": "<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "1e",
+          "insn": "beqz a0, 0xa4 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0xa4>"
+        },
+        {
+          "addr": "32",
+          "insn": "bnez a0, 0xa6 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0xa6>"
+        },
+        {
+          "addr": "42",
+          "insn": "beq s3, s4, 0x8c <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0x8c>"
+        },
+        {
+          "addr": "46",
+          "insn": "beq s3, s5, 0xc6 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0xc6>"
+        },
+        {
+          "addr": "52",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0x4e>"
+        },
+        {
+          "addr": "60",
+          "insn": "bltu s3, s11, 0x66 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0x66>"
+        },
+        {
+          "addr": "6c",
+          "insn": "beq s9, s11, 0xa0 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0xa0>"
+        },
+        {
+          "addr": "72",
+          "insn": "bltu s7, s3, 0x7a <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0x7a>"
+        },
+        {
+          "addr": "88",
+          "insn": "beqz a0, 0x6c <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0x6c>"
+        },
+        {
+          "addr": "8a",
+          "insn": "j 0xa6 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0xa6>"
+        },
+        {
+          "addr": "9c",
+          "insn": "beqz a0, 0x42 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0x42>"
+        },
+        {
+          "addr": "9e",
+          "insn": "j 0xa6 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0xa6>"
+        },
+        {
+          "addr": "a2",
+          "insn": "j 0x42 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0x42>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 9,
+        "spills": 13,
+        "total": 103
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0x80",
+        "2: sd ra, 0x78(sp)",
+        "4: sd s0, 0x70(sp)",
+        "6: sd s1, 0x68(sp)",
+        "8: sd s2, 0x60(sp)",
+        "a: sd s3, 0x58(sp)",
+        "c: sd s4, 0x50(sp)",
+        "e: sd s5, 0x48(sp)",
+        "10: sd s6, 0x40(sp)",
+        "12: sd s7, 0x38(sp)",
+        "14: sd s8, 0x30(sp)",
+        "16: sd s9, 0x28(sp)",
+        "18: sd s10, 0x20(sp)",
+        "1a: sd s11, 0x18(sp)",
+        "1c: addi s0, sp, 0x80",
+        "1e: beqz a0, 0xa4 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0xa4>",
+        "20: mv s8, a0",
+        "22: mv s3, a1",
+        "24: ld a1, 0x8(a0)",
+        "26: ld a0, 0x0(a0)",
+        "28: ld a2, 0x20(a1)",
+        "2a: li a1, 0x27",
+        "2e: jalr a2",
+        "30: li s2, 0x1",
+        "32: bnez a0, 0xa6 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0xa6>",
+        "34: li s4, 0x22",
+        "38: li s5, -0x1",
+        "3a: addi s6, sp, 0x8",
+        "3e: li s7, 0x80",
+        "42: beq s3, s4, 0x8c <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0x8c>",
+        "46: beq s3, s5, 0xc6 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0xc6>",
+        "4a: addi a0, sp, 0x8",
+        "4c: mv a1, s3",
+        "4e: auipc ra, 0x0",
+        "52: jalr ra <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0x4e>",
+        "56: lbu s11, 0x14(sp)",
+        "5a: lbu s3, 0x15(sp)",
+        "5e: mv s9, s11",
+        "60: bltu s3, s11, 0x66 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0x66>",
+        "64: mv s9, s3",
+        "66: lw s10, 0x8(sp)",
+        "68: add s1, s6, s11",
+        "6c: beq s9, s11, 0xa0 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0xa0>",
+        "70: mv a1, s10",
+        "72: bltu s7, s3, 0x7a <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0x7a>",
+        "76: lbu a1, 0x0(s1)",
+        "7a: mv a3, s8",
+        "7c: ld a2, 0x8(a3)",
+        "7e: ld a0, 0x0(a3)",
+        "80: ld a2, 0x20(a2)",
+        "82: jalr a2",
+        "84: addi s1, s1, 0x1",
+        "86: addi s11, s11, 0x1",
+        "88: beqz a0, 0x6c <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0x6c>",
+        "8a: j 0xa6 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0xa6>",
+        "8c: mv a2, s8",
+        "8e: ld a1, 0x8(a2)",
+        "90: ld a0, 0x0(a2)",
+        "92: ld a2, 0x20(a1)",
+        "94: li a1, 0x22",
+        "98: jalr a2",
+        "9a: li s3, -0x1",
+        "9c: beqz a0, 0x42 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0x42>",
+        "9e: j 0xa6 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0xa6>",
+        "a0: li s3, -0x1",
+        "a2: j 0x42 <<rustc_demangle::v0::Printer>::print_quoted_escaped_chars::<core::iter::sources::once::Once<char>>+0x42>",
+        "a4: li s2, 0x0",
+        "a6: mv a0, s2",
+        "a8: ld ra, 0x78(sp)",
+        "aa: ld s0, 0x70(sp)",
+        "ac: ld s1, 0x68(sp)",
+        "ae: ld s2, 0x60(sp)",
+        "b0: ld s3, 0x58(sp)",
+        "b2: ld s4, 0x50(sp)",
+        "b4: ld s5, 0x48(sp)",
+        "b6: ld s6, 0x40(sp)",
+        "b8: ld s7, 0x38(sp)",
+        "ba: ld s8, 0x30(sp)",
+        "bc: ld s9, 0x28(sp)",
+        "be: ld s10, 0x20(sp)",
+        "c0: ld s11, 0x18(sp)",
+        "c2: addi sp, sp, 0x80",
+        "c4: ret",
+        "c6: mv a2, s8",
+        "c8: ld a1, 0x8(a2)",
+        "ca: ld a0, 0x0(a2)",
+        "cc: ld a5, 0x20(a1)",
+        "ce: li a1, 0x27",
+        "d2: ld ra, 0x78(sp)",
+        "d4: ld s0, 0x70(sp)",
+        "d6: ld s1, 0x68(sp)",
+        "d8: ld s2, 0x60(sp)",
+        "da: ld s3, 0x58(sp)",
+        "dc: ld s4, 0x50(sp)",
+        "de: ld s5, 0x48(sp)",
+        "e0: ld s6, 0x40(sp)",
+        "e2: ld s7, 0x38(sp)",
+        "e4: ld s8, 0x30(sp)",
+        "e6: ld s9, 0x28(sp)",
+        "e8: ld s10, 0x20(sp)",
+        "ea: ld s11, 0x18(sp)",
+        "ec: addi sp, sp, 0x80",
+        "ee: jr a5"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Printer>::print_const_str_literal",
+      "symbol_demangled": "<rustc_demangle::v0::Printer>::print_const_str_literal",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "2c",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::print_const_str_literal+0x28>"
+        },
+        {
+          "addr": "3c",
+          "insn": "bnez a1, 0x6e <<rustc_demangle::v0::Printer>::print_const_str_literal+0x6e>"
+        },
+        {
+          "addr": "60",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::print_const_str_literal+0x5c>"
+        },
+        {
+          "addr": "6a",
+          "insn": "bne a0, s2, 0x5a <<rustc_demangle::v0::Printer>::print_const_str_literal+0x5a>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 5,
+        "spills": 18,
+        "total": 47
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0xb0",
+        "2: sd ra, 0xa8(sp)",
+        "4: sd s0, 0xa0(sp)",
+        "6: sd s1, 0x98(sp)",
+        "8: sd s2, 0x90(sp)",
+        "a: sd s3, 0x88(sp)",
+        "c: sd s4, 0x80(sp)",
+        "e: sd s5, 0x78(sp)",
+        "10: sd s6, 0x70(sp)",
+        "12: sd s7, 0x68(sp)",
+        "14: sd s8, 0x60(sp)",
+        "16: sd s9, 0x58(sp)",
+        "18: sd s10, 0x50(sp)",
+        "1a: sd s11, 0x48(sp)",
+        "1c: addi s0, sp, 0xb0",
+        "1e: mv s6, a0",
+        "20: ld a0, 0x0(a0)",
+        "22: beqz a0, 0x96 <.Lpcrel_hi6967+0x22>",
+        "24: addi a0, sp, 0x8",
+        "26: mv a1, s6",
+        "28: auipc ra, 0x0",
+        "2c: jalr ra <<rustc_demangle::v0::Printer>::print_const_str_literal+0x28>",
+        "30: ld s3, 0x8(sp)",
+        "32: beqz s3, 0xca <.Lpcrel_hi6961+0x2e>",
+        "36: ld a0, 0x10(sp)",
+        "38: andi a1, a0, 0x1",
+        "3c: bnez a1, 0x6e <<rustc_demangle::v0::Printer>::print_const_str_literal+0x6e>",
+        "3e: li a1, -0x3",
+        "40: srli a1, a1, 0x1",
+        "42: li a2, 0x2",
+        "44: and s4, a0, a1",
+        "48: sd a2, 0x28(sp)",
+        "4a: add s5, s3, s4",
+        "4e: sd s3, 0x8(sp)",
+        "50: sd s4, 0x10(sp)",
+        "52: sd s5, 0x18(sp)",
+        "54: sd zero, 0x20(sp)",
+        "56: li s1, -0x2",
+        "58: li s2, -0x1",
+        "5a: addi a0, sp, 0x8",
+        "5c: auipc ra, 0x0",
+        "60: jalr ra <<rustc_demangle::v0::Printer>::print_const_str_literal+0x5c>",
+        "64: sext.w a0, a0",
+        "66: beq a0, s1, 0xe4 <.Lpcrel_hi6963+0xc>",
+        "6a: bne a0, s2, 0x5a <<rustc_demangle::v0::Printer>::print_const_str_literal+0x5a>",
+        "6e: ld a0, 0x20(s6)",
+        "72: beqz a0, 0x8a <.Lpcrel_hi6967+0x16>"
+      ]
+    },
+    {
+      "symbol_raw": "<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next",
+      "symbol_demangled": "<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "c",
+          "insn": "bgeu a3, a2, 0x14 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x14>"
+        },
+        {
+          "addr": "12",
+          "insn": "j 0x1e0 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1e0>"
+        },
+        {
+          "addr": "34",
+          "insn": "bltu a3, a2, 0x3e <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x3e>"
+        },
+        {
+          "addr": "3c",
+          "insn": "j 0x48 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x48>"
+        },
+        {
+          "addr": "56",
+          "insn": "bltu a3, a1, 0x60 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x60>"
+        },
+        {
+          "addr": "5e",
+          "insn": "j 0x6a <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x6a>"
+        },
+        {
+          "addr": "80",
+          "insn": "bltz a2, 0xb0 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0xb0>"
+        },
+        {
+          "addr": "a4",
+          "insn": "jalr ra <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0xa0>"
+        },
+        {
+          "addr": "aa",
+          "insn": "beqz a0, 0xd2 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0xd2>"
+        },
+        {
+          "addr": "ae",
+          "insn": "j 0x1e0 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1e0>"
+        },
+        {
+          "addr": "b6",
+          "insn": "bltu a1, a2, 0x1e0 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1e0>"
+        },
+        {
+          "addr": "c2",
+          "insn": "bltu a1, a4, 0x148 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x148>"
+        },
+        {
+          "addr": "ca",
+          "insn": "bgeu a1, a2, 0x13e <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x13e>"
+        },
+        {
+          "addr": "d0",
+          "insn": "j 0x148 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x148>"
+        },
+        {
+          "addr": "ea",
+          "insn": "bltz a2, 0xf4 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0xf4>"
+        },
+        {
+          "addr": "f2",
+          "insn": "j 0x1dc <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1dc>"
+        },
+        {
+          "addr": "104",
+          "insn": "bgeu a5, a3, 0x132 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x132>"
+        },
+        {
+          "addr": "118",
+          "insn": "bltu a3, a6, 0x1d2 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1d2>"
+        },
+        {
+          "addr": "130",
+          "insn": "j 0x1da <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1da>"
+        },
+        {
+          "addr": "13c",
+          "insn": "j 0x1dc <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1dc>"
+        },
+        {
+          "addr": "142",
+          "insn": "bgeu a1, a2, 0x1e0 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1e0>"
+        },
+        {
+          "addr": "178",
+          "insn": "bltu a5, a6, 0xac <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0xac>"
+        },
+        {
+          "addr": "188",
+          "insn": "bltu t4, a1, 0x192 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x192>"
+        },
+        {
+          "addr": "190",
+          "insn": "j 0x19c <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x19c>"
+        },
+        {
+          "addr": "1a4",
+          "insn": "bltu t4, a1, 0x1ae <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1ae>"
+        },
+        {
+          "addr": "1ac",
+          "insn": "j 0x1b8 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1b8>"
+        },
+        {
+          "addr": "1ce",
+          "insn": "bnez a5, 0x174 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x174>"
+        },
+        {
+          "addr": "1d0",
+          "insn": "j 0x9c <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x9c>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 34,
+        "spills": 16,
+        "total": 160
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0x70",
+        "2: sd ra, 0x68(sp)",
+        "4: sd s0, 0x60(sp)",
+        "6: addi s0, sp, 0x70",
+        "8: ld a3, 0x8(a0)",
+        "a: ld a2, 0x20(a0)",
+        "c: bgeu a3, a2, 0x14 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x14>",
+        "10: li a3, -0x2",
+        "12: j 0x1e0 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1e0>",
+        "14: ld a1, 0x0(a0)",
+        "16: add a7, a1, a2",
+        "1a: sub t0, a3, a2",
+        "1e: li a3, 0x2",
+        "20: sd a7, 0x0(a0)",
+        "24: sd t0, 0x8(a0)",
+        "28: bne a2, a3, 0x20a <.Lpcrel_hi6977>",
+        "2c: lbu a2, 0x0(a1)",
+        "30: li a3, 0x39",
+        "34: bltu a3, a2, 0x3e <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x3e>",
+        "38: addi a2, a2, -0x30",
+        "3c: j 0x48 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x48>",
+        "3e: addi a2, a2, -0x41",
+        "42: andi a2, a2, -0x21",
+        "46: addi a2, a2, 0xa",
+        "48: li a3, 0xf",
+        "4a: bltu a3, a2, 0x226 <.Lpcrel_hi6979>",
+        "4e: lbu a1, 0x1(a1)",
+        "52: li a3, 0x39",
+        "56: bltu a3, a1, 0x60 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x60>",
+        "5a: addi a1, a1, -0x30",
+        "5e: j 0x6a <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x6a>",
+        "60: addi a1, a1, -0x41",
+        "64: andi a1, a1, -0x21",
+        "68: addi a1, a1, 0xa",
+        "6a: li a3, 0x10",
+        "6c: bgeu a1, a3, 0x236 <.Lpcrel_hi6980>",
+        "70: zext.b a2, a2",
+        "74: slli a2, a2, 0x4",
+        "76: zext.b a1, a1",
+        "7a: or a1, a1, a2",
+        "7c: slli a2, a1, 0x38",
+        "80: bltz a2, 0xb0 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0xb0>",
+        "84: sb a1, 0x14(sp)",
+        "88: sb zero, 0x15(sp)",
+        "8c: sb zero, 0x16(sp)",
+        "90: sb zero, 0x17(sp)",
+        "94: addi a0, sp, 0x14",
+        "96: li a2, 0x1",
+        "98: sd a0, 0x0(sp)",
+        "9a: sd a2, 0x8(sp)",
+        "9c: addi a0, sp, 0x30",
+        "9e: addi a1, sp, 0x14",
+        "a0: auipc ra, 0x0",
+        "a4: jalr ra <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0xa0>",
+        "a8: ld a0, 0x30(sp)",
+        "aa: beqz a0, 0xd2 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0xd2>",
+        "ac: li a3, -0x1",
+        "ae: j 0x1e0 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1e0>",
+        "b0: li a2, 0xc0",
+        "b4: li a3, -0x1",
+        "b6: bltu a1, a2, 0x1e0 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1e0>",
+        "ba: li a4, 0xe0",
+        "be: li a6, 0x2",
+        "c0: li a2, 0x2",
+        "c2: bltu a1, a4, 0x148 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x148>",
+        "c6: li a2, 0xf0",
+        "ca: bgeu a1, a2, 0x13e <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x13e>",
+        "ce: li a2, 0x3",
+        "d0: j 0x148 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x148>",
+        "d2: ld a0, 0x38(sp)",
+        "d4: ld a2, 0x40(sp)",
+        "d6: sd a0, 0x18(sp)",
+        "d8: sd a2, 0x20(sp)",
+        "da: add a1, a0, a2",
+        "de: beqz a2, 0x256 <.Lpcrel_hi6980+0x20>",
+        "e2: lb a2, 0x0(a0)",
+        "e6: zext.b a3, a2",
+        "ea: bltz a2, 0xf4 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0xf4>",
+        "ee: addi a2, a0, 0x1",
+        "f2: j 0x1dc <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1dc>",
+        "f4: lbu a4, 0x1(a0)",
+        "f8: li a5, 0xdf",
+        "fc: andi a2, a3, 0x1f",
+        "100: andi a4, a4, 0x3f",
+        "104: bgeu a5, a3, 0x132 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x132>",
+        "108: lbu a5, 0x2(a0)",
+        "10c: slli a4, a4, 0x6",
+        "10e: andi a5, a5, 0x3f",
+        "112: li a6, 0xf0",
+        "116: or a4, a4, a5",
+        "118: bltu a3, a6, 0x1d2 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1d2>",
+        "11c: lbu a3, 0x3(a0)",
+        "120: slli a2, a2, 0x3d",
+        "122: srli a2, a2, 0x2b",
+        "124: slli a4, a4, 0x6",
+        "126: andi a3, a3, 0x3f",
+        "12a: or a4, a4, a2",
+        "12c: addi a2, a0, 0x4",
+        "130: j 0x1da <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1da>",
+        "132: slli a3, a2, 0x6",
+        "136: addi a2, a0, 0x2",
+        "13a: or a3, a3, a4",
+        "13c: j 0x1dc <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1dc>",
+        "13e: li a2, 0xf8",
+        "142: bgeu a1, a2, 0x1e0 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1e0>",
+        "146: li a2, 0x4",
+        "148: li a3, 0x0",
+        "14a: addi a4, sp, 0x15",
+        "14e: sb a1, 0x14(sp)",
+        "152: sb zero, 0x15(sp)",
+        "156: sb zero, 0x16(sp)",
+        "15a: sb zero, 0x17(sp)",
+        "15e: addi a1, sp, 0x14",
+        "160: slli t3, a2, 0x1",
+        "164: sd a1, 0x0(sp)",
+        "166: sd a2, 0x8(sp)",
+        "168: addi t3, t3, -0x2",
+        "16a: addi a7, a7, 0x2",
+        "16c: li t4, 0x39",
+        "170: li t1, 0xf",
+        "172: li t2, 0x10",
+        "174: add a5, t0, a3",
+        "178: bltu a5, a6, 0xac <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0xac>",
+        "17c: lbu a1, -0x2(a7)",
+        "180: addi a5, a5, -0x2",
+        "182: sd a7, 0x0(a0)",
+        "186: sd a5, 0x8(a0)",
+        "188: bltu t4, a1, 0x192 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x192>",
+        "18c: addi a5, a1, -0x30",
+        "190: j 0x19c <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x19c>",
+        "192: addi a1, a1, -0x41",
+        "196: andi a5, a1, -0x21",
+        "19a: addi a5, a5, 0xa",
+        "19c: bltu t1, a5, 0x1ea <.Lpcrel_hi6986>",
+        "1a0: lbu a1, -0x1(a7)",
+        "1a4: bltu t4, a1, 0x1ae <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1ae>",
+        "1a8: addi a1, a1, -0x30",
+        "1ac: j 0x1b8 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x1b8>",
+        "1ae: addi a1, a1, -0x41",
+        "1b2: andi a1, a1, -0x21",
+        "1b6: addi a1, a1, 0xa",
+        "1b8: bgeu a1, t2, 0x1fa <.Lpcrel_hi6987>",
+        "1bc: slli a5, a5, 0x4",
+        "1be: addi a3, a3, -0x2",
+        "1c0: or a1, a1, a5",
+        "1c2: add a5, t3, a3",
+        "1c6: sb a1, 0x0(a4)",
+        "1ca: addi a4, a4, 0x1",
+        "1cc: addi a7, a7, 0x2",
+        "1ce: bnez a5, 0x174 <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x174>",
+        "1d0: j 0x9c <<core::iter::sources::from_fn::FromFn<<rustc_demangle::v0::HexNibbles>::try_parse_str_chars::{closure#2}> as core::iter::traits::iterator::Iterator>::next+0x9c>",
+        "1d2: slli a3, a2, 0xc",
+        "1d6: addi a2, a0, 0x3",
+        "1da: or a3, a3, a4",
+        "1dc: bne a2, a1, 0x246 <.Lpcrel_hi6980+0x10>",
+        "1e0: mv a0, a3",
+        "1e2: ld ra, 0x68(sp)",
+        "1e4: ld s0, 0x60(sp)",
+        "1e6: addi sp, sp, 0x70",
+        "1e8: ret"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Parser>::backref",
+      "symbol_demangled": "<rustc_demangle::v0::Parser>::backref",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "1c",
+          "insn": "jalr ra <<rustc_demangle::v0::Parser>::backref+0x18>"
+        },
+        {
+          "addr": "24",
+          "insn": "beqz a0, 0x34 <<rustc_demangle::v0::Parser>::backref+0x34>"
+        },
+        {
+          "addr": "32",
+          "insn": "j 0x64 <<rustc_demangle::v0::Parser>::backref+0x64>"
+        },
+        {
+          "addr": "38",
+          "insn": "bgeu a0, s3, 0x4c <<rustc_demangle::v0::Parser>::backref+0x4c>"
+        },
+        {
+          "addr": "44",
+          "insn": "bgeu a2, a1, 0x56 <<rustc_demangle::v0::Parser>::backref+0x56>"
+        },
+        {
+          "addr": "4a",
+          "insn": "j 0x2a <<rustc_demangle::v0::Parser>::backref+0x2a>"
+        },
+        {
+          "addr": "54",
+          "insn": "j 0x64 <<rustc_demangle::v0::Parser>::backref+0x64>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 5,
+        "spills": 5,
+        "total": 45
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0x40",
+        "2: sd ra, 0x38(sp)",
+        "4: sd s0, 0x30(sp)",
+        "6: sd s1, 0x28(sp)",
+        "8: sd s2, 0x20(sp)",
+        "a: sd s3, 0x18(sp)",
+        "c: addi s0, sp, 0x40",
+        "e: mv s1, a1",
+        "10: ld s3, 0x10(a1)",
+        "14: mv s2, a0",
+        "16: addi a0, sp, 0x8",
+        "18: auipc ra, 0x0",
+        "1c: jalr ra <<rustc_demangle::v0::Parser>::backref+0x18>",
+        "20: lbu a0, 0x8(sp)",
+        "24: beqz a0, 0x34 <<rustc_demangle::v0::Parser>::backref+0x34>",
+        "26: lbu a0, 0x9(sp)",
+        "2a: sd zero, 0x0(s2)",
+        "2e: sb a0, 0x8(s2)",
+        "32: j 0x64 <<rustc_demangle::v0::Parser>::backref+0x64>",
+        "34: ld a0, 0x10(sp)",
+        "36: addi s3, s3, -0x1",
+        "38: bgeu a0, s3, 0x4c <<rustc_demangle::v0::Parser>::backref+0x4c>",
+        "3c: lw a1, 0x18(s1)",
+        "3e: addiw a1, a1, 0x1",
+        "40: li a2, 0x1f4",
+        "44: bgeu a2, a1, 0x56 <<rustc_demangle::v0::Parser>::backref+0x56>",
+        "48: li a0, 0x1",
+        "4a: j 0x2a <<rustc_demangle::v0::Parser>::backref+0x2a>",
+        "4c: sd zero, 0x0(s2)",
+        "50: sb zero, 0x8(s2)",
+        "54: j 0x64 <<rustc_demangle::v0::Parser>::backref+0x64>",
+        "56: ld a2, 0x0(s1)",
+        "58: ld a3, 0x8(s1)",
+        "5a: mv a4, s2",
+        "5c: sd a2, 0x0(a4)",
+        "5e: sd a3, 0x8(a4)",
+        "60: sd a0, 0x10(a4)",
+        "62: sw a1, 0x18(a4)",
+        "64: ld ra, 0x38(sp)",
+        "66: ld s0, 0x30(sp)",
+        "68: ld s1, 0x28(sp)",
+        "6a: ld s2, 0x20(sp)",
+        "6c: ld s3, 0x18(sp)",
+        "6e: addi sp, sp, 0x40",
+        "70: ret"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Printer>::in_binder::<<rustc_demangle::v0::Printer>::print_type::{closure#0}>",
+      "symbol_demangled": "<rustc_demangle::v0::Printer>::in_binder::<<rustc_demangle::v0::Printer>::print_type::{closure#0}>",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "24",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::in_binder::<<rustc_demangle::v0::Printer>::print_type::{closure#0}>+0x20>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 3,
+        "spills": 7,
+        "total": 23
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0x50",
+        "2: sd ra, 0x48(sp)",
+        "4: sd s0, 0x40(sp)",
+        "6: sd s1, 0x38(sp)",
+        "8: sd s2, 0x30(sp)",
+        "a: sd s3, 0x28(sp)",
+        "c: sd s4, 0x20(sp)",
+        "e: sd s5, 0x18(sp)",
+        "10: addi s0, sp, 0x50",
+        "12: mv s3, a0",
+        "14: ld a0, 0x0(a0)",
+        "16: beqz a0, 0x46 <.Lpcrel_hi6999+0xc>",
+        "18: addi a0, sp, 0x8",
+        "1a: li a2, 0x47",
+        "1e: mv a1, s3",
+        "20: auipc ra, 0x0",
+        "24: jalr ra <<rustc_demangle::v0::Printer>::in_binder::<<rustc_demangle::v0::Printer>::print_type::{closure#0}>+0x20>",
+        "28: lbu a0, 0x8(sp)",
+        "2c: beqz a0, 0x6e <.Lpcrel_hi6997+0x22>",
+        "2e: ld a0, 0x20(s3)",
+        "32: lbu s1, 0x9(sp)",
+        "36: beqz a0, 0x104 <.Lpcrel_hi6998+0x18>",
+        "38: bnez s1, 0xec <.Lpcrel_hi6998>"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_type>",
+      "symbol_demangled": "<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_type>",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "e",
+          "insn": "beqz a0, 0x5c <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_type>+0x5c>"
+        },
+        {
+          "addr": "18",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_type>+0x14>"
+        },
+        {
+          "addr": "4e",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_type>+0x4a>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 3,
+        "spills": 7,
+        "total": 42
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0x60",
+        "2: sd ra, 0x58(sp)",
+        "4: sd s0, 0x50(sp)",
+        "6: sd s1, 0x48(sp)",
+        "8: addi s0, sp, 0x60",
+        "a: mv s1, a0",
+        "c: ld a0, 0x0(a0)",
+        "e: beqz a0, 0x5c <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_type>+0x5c>",
+        "10: addi a0, sp, 0x8",
+        "12: mv a1, s1",
+        "14: auipc ra, 0x0",
+        "18: jalr ra <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_type>+0x14>",
+        "1c: ld a0, 0x8(sp)",
+        "1e: beqz a0, 0x7a <.Lpcrel_hi7003+0x1a>",
+        "20: ld a0, 0x20(s1)",
+        "22: beqz a0, 0xa6 <.Lpcrel_hi7004+0x16>",
+        "24: ld a6, 0x0(s1)",
+        "28: ld a7, 0x8(s1)",
+        "2c: ld a2, 0x10(s1)",
+        "2e: ld a3, 0x18(s1)",
+        "30: ld a4, 0x8(sp)",
+        "32: ld a5, 0x10(sp)",
+        "34: ld a0, 0x18(sp)",
+        "36: ld a1, 0x20(sp)",
+        "38: sd a6, 0x28(sp)",
+        "3a: sd a7, 0x30(sp)",
+        "3c: sd a2, 0x38(sp)",
+        "3e: sd a3, 0x40(sp)",
+        "40: sd a4, 0x0(s1)",
+        "42: sd a5, 0x8(s1)",
+        "44: sd a0, 0x10(s1)",
+        "46: sd a1, 0x18(s1)",
+        "48: mv a0, s1",
+        "4a: auipc ra, 0x0",
+        "4e: jalr ra <<rustc_demangle::v0::Printer>::print_backref::<<rustc_demangle::v0::Printer>::print_type>+0x4a>",
+        "52: ld a1, 0x28(sp)",
+        "54: ld a2, 0x30(sp)",
+        "56: ld a3, 0x38(sp)",
+        "58: ld a4, 0x40(sp)",
+        "5a: j 0xb2 <.Lpcrel_hi7004+0x22>",
+        "5c: ld a0, 0x20(s1)",
+        "5e: beqz a0, 0xa6 <.Lpcrel_hi7004+0x16>"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Printer>::in_binder::<<rustc_demangle::v0::Printer>::print_type::{closure#1}>",
+      "symbol_demangled": "<rustc_demangle::v0::Printer>::in_binder::<<rustc_demangle::v0::Printer>::print_type::{closure#1}>",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "24",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::in_binder::<<rustc_demangle::v0::Printer>::print_type::{closure#1}>+0x20>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 3,
+        "spills": 7,
+        "total": 23
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0x50",
+        "2: sd ra, 0x48(sp)",
+        "4: sd s0, 0x40(sp)",
+        "6: sd s1, 0x38(sp)",
+        "8: sd s2, 0x30(sp)",
+        "a: sd s3, 0x28(sp)",
+        "c: sd s4, 0x20(sp)",
+        "e: sd s5, 0x18(sp)",
+        "10: addi s0, sp, 0x50",
+        "12: mv s2, a0",
+        "14: ld a0, 0x0(a0)",
+        "16: beqz a0, 0x46 <.Lpcrel_hi7009+0xc>",
+        "18: addi a0, sp, 0x8",
+        "1a: li a2, 0x47",
+        "1e: mv a1, s2",
+        "20: auipc ra, 0x0",
+        "24: jalr ra <<rustc_demangle::v0::Printer>::in_binder::<<rustc_demangle::v0::Printer>::print_type::{closure#1}>+0x20>",
+        "28: lbu a0, 0x8(sp)",
+        "2c: beqz a0, 0x6e <.Lpcrel_hi7007+0x22>",
+        "2e: ld a0, 0x20(s2)",
+        "32: lbu s1, 0x9(sp)",
+        "36: beqz a0, 0xf8 <.Lpcrel_hi7008+0x18>",
+        "38: bnez s1, 0xe0 <.Lpcrel_hi7008>"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Printer>::print_pat",
+      "symbol_demangled": "<rustc_demangle::v0::Printer>::print_pat",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "48",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::print_pat+0x44>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 4,
+        "spills": 6,
+        "total": 32
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0x30",
+        "2: sd ra, 0x28(sp)",
+        "4: sd s0, 0x20(sp)",
+        "6: sd s1, 0x18(sp)",
+        "8: sd s2, 0x10(sp)",
+        "a: sd s3, 0x8(sp)",
+        "c: sd s4, 0x0(sp)",
+        "e: addi s0, sp, 0x30",
+        "10: mv s1, a0",
+        "12: ld a0, 0x0(a0)",
+        "14: beqz a0, 0x7c <.Lpcrel_hi7017+0x26>",
+        "16: ld a2, 0x8(s1)",
+        "18: ld a1, 0x10(s1)",
+        "1a: bgeu a1, a2, 0xa0 <.Lpcrel_hi7013+0x20>",
+        "1e: add a0, a0, a1",
+        "20: lbu a0, 0x0(a0)",
+        "24: addi a1, a1, 0x1",
+        "26: li a2, 0x4e",
+        "2a: sd a1, 0x10(s1)",
+        "2c: beq a0, a2, 0xf0 <.Lpcrel_hi7019+0x22>",
+        "30: li a1, 0x4f",
+        "34: beq a0, a1, 0xbc <.Lpcrel_hi7014+0x18>",
+        "38: li a1, 0x52",
+        "3c: bne a0, a1, 0x10c <.Lpcrel_hi7016+0x18>",
+        "40: mv a0, s1",
+        "42: li a1, 0x0",
+        "44: auipc ra, 0x0",
+        "48: jalr ra <<rustc_demangle::v0::Printer>::print_pat+0x44>",
+        "4c: li s2, 0x1",
+        "4e: bnez a0, 0x18c <.Lpcrel_hi7020+0x1e>",
+        "52: ld a0, 0x20(s1)",
+        "54: beqz a0, 0x6c <.Lpcrel_hi7017+0x16>"
+      ]
+    },
+    {
+      "symbol_raw": ".Lpcrel_hi7015",
+      "symbol_demangled": ".Lpcrel_hi7015",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "120",
+          "insn": "jalr -0x11c(ra) <<rustc_demangle::v0::Printer>::print_pat>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 0,
+        "spills": 0,
+        "total": 8
+      },
+      "disassembly_lines": [
+        "110: auipc a1, 0x0",
+        "114: mv a1, a1",
+        "118: j 0xac <.Lpcrel_hi7014+0x8>",
+        "11a: mv a0, s1",
+        "11c: auipc ra, 0x0",
+        "120: jalr -0x11c(ra) <<rustc_demangle::v0::Printer>::print_pat>",
+        "124: li s2, 0x1",
+        "126: bnez a0, 0x18c <.Lpcrel_hi7020+0x1e>"
+      ]
+    },
+    {
+      "symbol_raw": ".Lpcrel_hi7018",
+      "symbol_demangled": ".Lpcrel_hi7018",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "162",
+          "insn": "jalr -0x15e(ra) <<rustc_demangle::v0::Printer>::print_pat>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 1,
+        "spills": 0,
+        "total": 25
+      },
+      "disassembly_lines": [
+        "128: auipc a0, 0x0",
+        "12c: li s4, 0x45",
+        "130: mv s3, a0",
+        "134: ld a1, 0x0(s1)",
+        "136: beqz a1, 0x16a <.Lpcrel_hi7018+0x42>",
+        "138: ld a2, 0x8(s1)",
+        "13a: ld a0, 0x10(s1)",
+        "13c: bgeu a0, a2, 0x14a <.Lpcrel_hi7018+0x22>",
+        "140: add a1, a1, a0",
+        "142: lbu a1, 0x0(a1)",
+        "146: beq a1, s4, 0x19e <.Lpcrel_hi7020+0x30>",
+        "14a: ld a0, 0x20(s1)",
+        "14c: beqz a0, 0x15c <.Lpcrel_hi7018+0x34>",
+        "14e: li a2, 0x3",
+        "150: mv a1, s3",
+        "152: auipc ra, 0x0",
+        "156: jalr ra <.Lpcrel_hi7018+0x2a>",
+        "15a: bnez a0, 0x18c <.Lpcrel_hi7020+0x1e>",
+        "15c: mv a0, s1",
+        "15e: auipc ra, 0x0",
+        "162: jalr -0x15e(ra) <<rustc_demangle::v0::Printer>::print_pat>",
+        "166: beqz a0, 0x134 <.Lpcrel_hi7018+0xc>",
+        "168: j 0x18c <.Lpcrel_hi7020+0x1e>",
+        "16a: ld a0, 0x20(s1)",
+        "16c: beqz a0, 0x182 <.Lpcrel_hi7020+0x14>"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Printer>::print_path_maybe_open_generics",
+      "symbol_demangled": "<rustc_demangle::v0::Printer>::print_path_maybe_open_generics",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "10",
+          "insn": "beqz a1, 0x9e <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0x9e>"
+        },
+        {
+          "addr": "18",
+          "insn": "bgeu a0, a2, 0x9e <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0x9e>"
+        },
+        {
+          "addr": "26",
+          "insn": "beq a1, a2, 0xbc <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xbc>"
+        },
+        {
+          "addr": "2e",
+          "insn": "bne a1, a2, 0x9e <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0x9e>"
+        },
+        {
+          "addr": "40",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0x3c>"
+        },
+        {
+          "addr": "84",
+          "insn": "jalr -0x80(ra) <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics>"
+        },
+        {
+          "addr": "9c",
+          "insn": "j 0xb0 <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xb0>"
+        },
+        {
+          "addr": "a6",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xa2>"
+        },
+        {
+          "addr": "ca",
+          "insn": "jalr ra <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xc6>"
+        },
+        {
+          "addr": "d0",
+          "insn": "bnez a0, 0xae <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xae>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 6,
+        "spills": 8,
+        "total": 81
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0x60",
+        "2: sd ra, 0x58(sp)",
+        "4: sd s0, 0x50(sp)",
+        "6: sd s1, 0x48(sp)",
+        "8: sd s2, 0x40(sp)",
+        "a: addi s0, sp, 0x60",
+        "c: mv s2, a0",
+        "e: ld a1, 0x0(a0)",
+        "10: beqz a1, 0x9e <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0x9e>",
+        "12: mv a3, s2",
+        "14: ld a2, 0x8(a3)",
+        "16: ld a0, 0x10(a3)",
+        "18: bgeu a0, a2, 0x9e <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0x9e>",
+        "1c: add a1, a1, a0",
+        "1e: lbu a1, 0x0(a1)",
+        "22: li a2, 0x49",
+        "26: beq a1, a2, 0xbc <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xbc>",
+        "2a: li a2, 0x42",
+        "2e: bne a1, a2, 0x9e <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0x9e>",
+        "32: addi a0, a0, 0x1",
+        "34: sd a0, 0x10(s2)",
+        "38: mv a0, sp",
+        "3a: mv a1, s2",
+        "3c: auipc ra, 0x0",
+        "40: jalr ra <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0x3c>",
+        "44: ld a0, 0x0(sp)",
+        "46: beqz a0, 0xfc <.Lpcrel_hi7031+0x24>",
+        "48: ld a0, 0x20(s2)",
+        "4c: beqz a0, 0x13e <.Lpcrel_hi7029+0x2a>",
+        "4e: ld a6, 0x0(s2)",
+        "52: ld a1, 0x8(s2)",
+        "56: ld a2, 0x10(s2)",
+        "5a: ld a3, 0x18(s2)",
+        "5e: ld a4, 0x0(sp)",
+        "60: ld a5, 0x8(sp)",
+        "62: ld s1, 0x10(sp)",
+        "64: ld a0, 0x18(sp)",
+        "66: sd a6, 0x20(sp)",
+        "68: sd a1, 0x28(sp)",
+        "6a: sd a2, 0x30(sp)",
+        "6c: sd a3, 0x38(sp)",
+        "6e: sd a4, 0x0(s2)",
+        "72: sd a5, 0x8(s2)",
+        "76: sd s1, 0x10(s2)",
+        "7a: mv s1, s2",
+        "7c: sd a0, 0x18(s1)",
+        "7e: mv a0, s2",
+        "80: auipc ra, 0x0",
+        "84: jalr -0x80(ra) <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics>",
+        "88: ld a1, 0x20(sp)",
+        "8a: ld a2, 0x28(sp)",
+        "8c: ld a3, 0x30(sp)",
+        "8e: ld a4, 0x38(sp)",
+        "90: zext.b a0, a0",
+        "94: sd a1, 0x0(s1)",
+        "96: sd a2, 0x8(s1)",
+        "98: sd a3, 0x10(s1)",
+        "9a: sd a4, 0x18(s1)",
+        "9c: j 0xb0 <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xb0>",
+        "9e: mv a0, s2",
+        "a0: li a1, 0x0",
+        "a2: auipc ra, 0x0",
+        "a6: jalr ra <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xa2>",
+        "aa: slli s1, a0, 0x1",
+        "ae: mv a0, s1",
+        "b0: ld ra, 0x58(sp)",
+        "b2: ld s0, 0x50(sp)",
+        "b4: ld s1, 0x48(sp)",
+        "b6: ld s2, 0x40(sp)",
+        "b8: addi sp, sp, 0x60",
+        "ba: ret",
+        "bc: addi a0, a0, 0x1",
+        "be: sd a0, 0x10(s2)",
+        "c2: mv a0, s2",
+        "c4: li a1, 0x0",
+        "c6: auipc ra, 0x0",
+        "ca: jalr ra <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xc6>",
+        "ce: li s1, 0x2",
+        "d0: bnez a0, 0xae <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xae>",
+        "d2: ld a0, 0x20(s2)",
+        "d6: beqz a0, 0xec <.Lpcrel_hi7031+0x14>"
+      ]
+    },
+    {
+      "symbol_raw": ".Lpcrel_hi7031",
+      "symbol_demangled": ".Lpcrel_hi7031",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "ea",
+          "insn": "bnez a0, 0xae <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xae>"
+        },
+        {
+          "addr": "fa",
+          "insn": "j 0xae <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xae>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 1,
+        "spills": 0,
+        "total": 15
+      },
+      "disassembly_lines": [
+        "d8: auipc a1, 0x0",
+        "dc: mv a1, a1",
+        "e0: li a2, 0x1",
+        "e2: auipc ra, 0x0",
+        "e6: jalr ra <.Lpcrel_hi7031+0xa>",
+        "ea: bnez a0, 0xae <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xae>",
+        "ec: mv a0, s2",
+        "ee: auipc ra, 0x0",
+        "f2: jalr ra <.Lpcrel_hi7031+0x16>",
+        "f6: addi s1, a0, 0x1",
+        "fa: j 0xae <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xae>",
+        "fc: ld a0, 0x20(s2)",
+        "100: beqz a0, 0x12c <.Lpcrel_hi7029+0x18>",
+        "102: lbu a1, 0x8(sp)",
+        "106: bnez a1, 0x114 <.Lpcrel_hi7029>"
+      ]
+    },
+    {
+      "symbol_raw": ".Lpcrel_hi7029",
+      "symbol_demangled": ".Lpcrel_hi7029",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "12a",
+          "insn": "j 0xae <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xae>"
+        },
+        {
+          "addr": "140",
+          "insn": "j 0xae <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xae>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 0,
+        "spills": 0,
+        "total": 19
+      },
+      "disassembly_lines": [
+        "114: auipc a1, 0x0",
+        "118: mv a1, a1",
+        "11c: li a2, 0x19",
+        "11e: auipc ra, 0x0",
+        "122: jalr ra <.Lpcrel_hi7029+0xa>",
+        "126: beqz a0, 0x12c <.Lpcrel_hi7029+0x18>",
+        "128: li s1, 0x2",
+        "12a: j 0xae <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xae>",
+        "12c: ld a0, 0x0(sp)",
+        "12e: ld a1, 0x8(sp)",
+        "130: ld a2, 0x10(sp)",
+        "132: ld a3, 0x18(sp)",
+        "134: mv a4, s2",
+        "136: sd a0, 0x0(a4)",
+        "138: sd a1, 0x8(a4)",
+        "13a: sd a2, 0x10(a4)",
+        "13c: sd a3, 0x18(a4)",
+        "13e: li s1, 0x0",
+        "140: j 0xae <<rustc_demangle::v0::Printer>::print_path_maybe_open_generics+0xae>"
+      ]
+    },
+    {
+      "symbol_raw": "<rustc_demangle::v0::Printer>::print_type::{closure#0}",
+      "symbol_demangled": "<rustc_demangle::v0::Printer>::print_type::{closure#0}",
+      "is_hot_kernel": false,
+      "status": "PASS",
+      "vector_arithmetic": [
+        {
+          "addr": "24",
+          "insn": "bgeu a0, a2, 0x46 <<rustc_demangle::v0::Printer>::print_type::{closure#0}+0x46>"
+        },
+        {
+          "addr": "34",
+          "insn": "bne a3, a4, 0x46 <<rustc_demangle::v0::Printer>::print_type::{closure#0}+0x46>"
+        },
+        {
+          "addr": "40",
+          "insn": "bltu a0, a2, 0x4c <<rustc_demangle::v0::Printer>::print_type::{closure#0}+0x4c>"
+        }
+      ],
+      "vector_moves": [],
+      "scalar_stats": {
+        "mulx": 0,
+        "mul": 0,
+        "adc": 0,
+        "add": 8,
+        "spills": 9,
+        "total": 41
+      },
+      "disassembly_lines": [
+        "0: addi sp, sp, -0xe0",
+        "2: sd ra, 0xd8(sp)",
+        "4: sd s0, 0xd0(sp)",
+        "6: sd s1, 0xc8(sp)",
+        "8: sd s2, 0xc0(sp)",
+        "a: sd s3, 0xb8(sp)",
+        "c: sd s4, 0xb0(sp)",
+        "e: sd s5, 0xa8(sp)",
+        "10: sd s6, 0xa0(sp)",
+        "12: sd s7, 0x98(sp)",
+        "14: addi s0, sp, 0xe0",
+        "16: mv s3, a0",
+        "18: ld a1, 0x0(a0)",
+        "1a: beqz a1, 0x1aa <.Lpcrel_hi7041+0x16>",
+        "1e: mv a3, s3",
+        "20: ld a2, 0x8(a3)",
+        "22: ld a0, 0x10(a3)",
+        "24: bgeu a0, a2, 0x46 <<rustc_demangle::v0::Printer>::print_type::{closure#0}+0x46>",
+        "28: add a3, a1, a0",
+        "2c: lbu a3, 0x0(a3)",
+        "30: li a4, 0x55",
+        "34: bne a3, a4, 0x46 <<rustc_demangle::v0::Printer>::print_type::{closure#0}+0x46>",
+        "38: addi a0, a0, 0x1",
+        "3a: sd a0, 0x10(s3)",
+        "3e: li s1, 0x1",
+        "40: bltu a0, a2, 0x4c <<rustc_demangle::v0::Printer>::print_type::{closure#0}+0x4c>",
+        "44: j 0x88 <.Lpcrel_hi7032+0x10>",
+        "46: li s1, 0x0",
+        "48: bgeu a0, a2, 0x88 <.Lpcrel_hi7032+0x10>",
+        "4c: add a3, a1, a0",
+        "50: lbu a3, 0x0(a3)",
+        "54: li a4, 0x4b",
+        "58: bne a3, a4, 0x88 <.Lpcrel_hi7032+0x10>",
+        "5c: addi a3, a0, 0x1",
+        "60: sd a3, 0x10(s3)",
+        "64: bgeu a3, a2, 0xb0 <.Lpcrel_hi7036+0x1c>",
+        "68: add a1, a1, a3",
+        "6a: lbu a1, 0x0(a1)",
+        "6e: li a2, 0x43",
+        "72: bne a1, a2, 0xb0 <.Lpcrel_hi7036+0x1c>",
+        "76: addi a0, a0, 0x2"
+      ]
     }
   ],
-  "file_path": "/home/jipeng/code/RealBrakedownPerf/code/target-codegen-tuning/riscv64gc-unknown-linux-gnu/release/deps/lcpc_bench-350c2ab70bf617b2.lcpc_bench.52461e846150a4df-cgu.0.rcgu.o"
+  "file_path": "/home/jipeng/code/RealBrakedownPerf/code/target-verify/cross/riscv64gc-unknown-linux-gnu/release/deps/lcpc_bench-d400ef44a6fef774.o"
 }

@@ -185,6 +185,13 @@ manifest = {
     "custom_slice_table": os.environ.get("SIMD_SLICE_TABLE") or None,
     "effective_slice_counts_by_benchmark": effective_slices,
     "cxx": os.environ.get("SIMD_CXX"),
+    # Compiler search-path overrides (e.g. a local Boost header tree when
+    # libboost-all-dev is not installed); None when the system headers are used.
+    "cxx_include_env": {
+        name: os.environ.get(name)
+        for name in ("CPATH", "CPLUS_INCLUDE_PATH")
+        if os.environ.get(name)
+    } or None,
     "upstream_compile_flags": os.environ.get("SIMD_CXX_FLAGS"),
     "cmake_configuration": {
         "test_poly_sizes": [12, 14, 16],
@@ -296,7 +303,9 @@ if ! printf '#include <boost/multiprecision/cpp_int.hpp>\nint main() {}\n' | \
     exit 1
 fi
 
-TEST_BUILD="$RUN_ROOT/build-tests"
+# Upstream run_tests.py runs the test programs from ./build/ in the source tree
+# (and they read ../tv/), so the test build must live there.
+TEST_BUILD="$PATCHED_SOURCE/build"
 BENCH_BUILD="$RUN_ROOT/build-bench-$THREADS"
 TEST_JOBS=$(count_cores "$TEST_CORES")
 LOGN_CMAKE=$(printf '%s' "$LOGN" | tr ',' ';')

@@ -914,8 +914,13 @@ fn fp2m61_max_accumulator_fill_and_boundaries() {
 fn fp2m61_simd_spielman_test_vectors_and_encoding() {
     use std::path::Path;
 
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let tv_in_path = manifest_dir.join("../../SIMD-Spielman-for-ZKPs/tv/bd_spielman_extension_N12_in.txt");
+    // Same lookup as `lcpc_spielman_oracle::locate_tv_dir`: the
+    // `SIMD_SPIELMAN_TV_DIR` override first, then the workspace layout.
+    let tv_dir = match std::env::var_os("SIMD_SPIELMAN_TV_DIR") {
+        Some(dir) => Path::new(&dir).to_path_buf(),
+        None => Path::new(env!("CARGO_MANIFEST_DIR")).join("../../SIMD-Spielman-for-ZKPs/tv"),
+    };
+    let tv_in_path = tv_dir.join("bd_spielman_extension_N12_in.txt");
 
     let content = std::fs::read_to_string(&tv_in_path).unwrap_or_else(|error| {
         panic!("required SIMD-Spielman test vector {:?} is unavailable: {error}", tv_in_path)

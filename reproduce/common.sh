@@ -186,8 +186,8 @@ Options:
   --threads <n>       Number of worker threads (default: 1; e.g. 1 or 8)
   --logN <list>       Comma-separated log2(N) sizes (default: 16,18,20,22,24,26)
   --cores <list>      Core list for CPU pinning (e.g. 0,1,3-7; REQUIRED for threads > 1)
-  --runs <n>          Number of timed repetitions (default: 30)
-  --warmup <n>        Number of untimed warm-up repetitions (default: 5)
+  --runs <n>          Number of timed repetitions (default: 5)
+  --warmup <n>        Number of untimed warm-up repetitions (default: 2)
   --out <dir>         Output directory for results and manifests (default: results)
   --params <mode>     Code parameter mode: lcpc-sdig6 | lcpc-sdig3 | simd-spielman (default: lcpc-sdig6)
   --host <name>       Host profile name from reproduce/hosts/<name>.sh
@@ -607,6 +607,9 @@ simd_compilers = {
 # 8. Git SHAs and tags
 git_sha = run_cmd(["git", "-C", code_dir, "rev-parse", "HEAD"])
 git_tags = run_cmd(["git", "-C", code_dir, "describe", "--tags", "--always"])
+# Uncommitted changes to tracked files mean the SHA alone does not identify the source.
+git_changes = run_cmd(["git", "-C", code_dir, "status", "--porcelain", "--untracked-files=no"])
+git_changed_paths = [line.split(None, 1)[-1] for line in git_changes.splitlines()] if git_changes else []
 
 patch_file = os.path.join(code_dir, "external/simd_spielman/params.patch")
 patch_sha256 = None
@@ -617,6 +620,8 @@ if os.path.exists(patch_file):
 git_info = {
     "code_repo_sha": git_sha,
     "code_repo_tags": git_tags,
+    "code_repo_dirty": bool(git_changed_paths),
+    "code_repo_changed_paths": git_changed_paths,
     "pinned_lcpc_commit": lcpc_commit,
     "pinned_upstream_commit": upstream_commit,
     "simd_params_patch_sha256": patch_sha256

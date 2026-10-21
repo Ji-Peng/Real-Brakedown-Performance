@@ -126,6 +126,10 @@ def main():
         help="Run ONLY the portability build/test",
     )
     parser.add_argument(
+        "--portability-target-dir",
+        help="CARGO_TARGET_DIR for the portability build (default: <code>/target-portability)",
+    )
+    parser.add_argument(
         "--check-only",
         action="store_true",
         help="Run 'cargo check' instead of 'cargo test'",
@@ -193,7 +197,7 @@ def main():
     if args.portability or args.portability_only:
         port_env = base_env.copy()
         # Separate target directory for portability build
-        port_target = os.path.join(code_dir, "target-portability")
+        port_target = args.portability_target_dir or os.path.join(code_dir, "target-portability")
         port_env["CARGO_TARGET_DIR"] = port_target
         # RUSTFLAGS override: strictly omit -C target-cpu=native
         # Disable loop and SLP auto-vectorization across all crates

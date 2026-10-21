@@ -47,6 +47,22 @@ mkdir -p "$DEST"
 TARGET_BASE="${CARGO_TARGET_DIR:-$CODE_DIR/target-harness}"
 mkdir -p "$TARGET_BASE"
 
+# SIMD-Spielman test vectors for the step worktrees. Tags up to step/08-threads
+# skip their tv/ checks with only a message when the vectors are not found, and
+# their field test looks only at ../../SIMD-Spielman-for-ZKPs relative to the
+# crate, i.e. at $TARGET_BASE for a worktree created below. Provide both the
+# environment override and that path, and fail early if the vectors are absent.
+TV_SOURCE="$(dirname -- "$CODE_DIR")/SIMD-Spielman-for-ZKPs"
+if [ -z "${SIMD_SPIELMAN_TV_DIR:-}" ]; then
+    SIMD_SPIELMAN_TV_DIR="$TV_SOURCE/tv"
+fi
+if [ ! -f "$SIMD_SPIELMAN_TV_DIR/bd_spielman_extension_N12_in.txt" ]; then
+    log_error "SIMD-Spielman test vectors not found in $SIMD_SPIELMAN_TV_DIR (set SIMD_SPIELMAN_TV_DIR)"
+    exit 1
+fi
+export SIMD_SPIELMAN_TV_DIR
+ln -sfn "$(dirname -- "$SIMD_SPIELMAN_TV_DIR")" "$TARGET_BASE/SIMD-Spielman-for-ZKPs"
+
 # Collect list of step tags to evaluate
 TAGS_TO_RUN=""
 if [ -n "$SPECIFIC_TAGS" ]; then
@@ -196,6 +212,7 @@ python3 - <<'PY'
 import hashlib
 import json
 import os
+import subprocess
 
 manifest_path = os.environ["STEP_MANIFEST"]
 with open(manifest_path, "r", encoding="utf-8") as f:
@@ -207,6 +224,17 @@ if os.path.isfile(lockfile):
         m["rust_toolchain"]["cargo_lock_sha256"] = hashlib.sha256(f.read()).hexdigest()
 m["git"]["code_repo_sha"] = os.environ["STEP_COMMIT"]
 m["git"]["code_repo_tags"] = os.environ["STEP_TAG"]
+# The benchmarked source is the tag's worktree; the scripts driving the run
+# (steps.sh, check_codegen.py) come from the main checkout, whose state
+# write_manifest recorded. Keep both.
+m["git"]["harness_repo_dirty"] = m["git"].pop("code_repo_dirty", None)
+m["git"]["harness_repo_changed_paths"] = m["git"].pop("code_repo_changed_paths", None)
+status = subprocess.run(
+    ["git", "-C", worktree, "status", "--porcelain", "--untracked-files=no"],
+    stdout=subprocess.PIPE, text=True, check=True,
+).stdout
+m["git"]["code_repo_dirty"] = bool(status.strip())
+m["git"]["code_repo_changed_paths"] = [line[3:] for line in status.splitlines()]
 m["step_info"] = {
     "tag": os.environ["STEP_TAG"],
     "step_index": int(os.environ["STEP_INDEX"]),

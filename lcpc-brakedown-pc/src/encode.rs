@@ -1036,7 +1036,10 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
 
         let mut since_fold = 0;
 
-        if B == 4 {
+        // A blocked step of B edges after a fold (which leaves `since_fold == 1`)
+        // needs `MAX_ACCUMULATIONS >= B + 1`. Fields with less headroom use the
+        // one-edge loop below; the condition is a compile-time constant.
+        if B == 4 && F::MAX_ACCUMULATIONS > 4 {
             let left_chunks = lefts.chunks_exact(4);
             let weight_chunks = weights.chunks_exact(4);
 
@@ -1104,7 +1107,7 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
 
                 since_fold += 1;
             }
-        } else if B == 2 {
+        } else if B == 2 && F::MAX_ACCUMULATIONS > 2 {
             let left_chunks = lefts.chunks_exact(2);
             let weight_chunks = weights.chunks_exact(2);
 
@@ -1165,7 +1168,7 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
                 since_fold += 1;
             }
         } else {
-            // Remainder loop (or B == 1)
+            // Unblocked loop (B == 1, or a field with too little headroom for B)
             for (&l_idx, w_raw) in lefts.iter().zip(weights.iter()) {
                 if since_fold >= F::MAX_ACCUMULATIONS {
                     for acc in scratch_slice.iter_mut() {

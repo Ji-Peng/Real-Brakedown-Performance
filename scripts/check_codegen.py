@@ -89,6 +89,9 @@ X86_VEC_MOVES = {
     "vmovshdup", "vmovsldup",
 }
 
+# XOR forms that zero a vector register when all operands are the same register
+X86_ZERO_IDIOMS = {"xorps", "vxorps", "xorpd", "vxorpd", "pxor", "vpxor", "vpxord", "vpxorq"}
+
 # Vector arithmetic opcode prefixes / patterns
 X86_VEC_ARITH_PREFIXES = (
     # Addition / Subtraction
@@ -116,18 +119,22 @@ X86_VEC_ARITH_PREFIXES = (
 # -------------------------------------------------------------
 # AArch64 classification
 # -------------------------------------------------------------
-AARCH64_VEC_REG_RE = re.compile(r"\b(v[0-9]+(?:\.[0-9]+[bshd])?|z[0-9]+|p[0-9]+)\b", re.IGNORECASE)
+# SIMD&FP registers as they appear in operands: vector arrangements (v0.2d),
+# scalar views of the same register file used by vector loads and stores
+# (q0/d0/s0/h0/b0), and SVE z/p registers.
+AARCH64_SIMD_FP_REG_RE = re.compile(
+    r"\b(v[0-9]+(?:\.[0-9]*[bshdq])?|[qdshb][0-9]+|z[0-9]+|p[0-9]+)\b", re.IGNORECASE
+)
 
+# Data movement on SIMD&FP registers (loads, stores, register moves, immediates).
+# `ldr`/`str`/`ldp`/`stp`/`ldur`/`stur` count only when a SIMD&FP register is
+# involved; on general-purpose registers they are ordinary scalar accesses.
 AARCH64_VEC_MOVES = {
     "ld1", "st1", "ld2", "st2", "ld3", "st3", "ld4", "st4",
-    "ld1r", "ld2r", "ld3r", "ld4r", "ldr", "str",
+    "ld1r", "ld2r", "ld3r", "ld4r", "ldr", "str", "ldp", "stp", "ldur", "stur",
+    "mov", "movi", "mvni", "dup", "ins", "umov", "fmov",
 }
 
-AARCH64_VEC_ARITH_PREFIXES = (
-    "add", "sub", "mul", "mla", "mls", "umull", "smull", "uaddl", "usubl",
-    "fadd", "fsub", "fmul", "fmla", "fmls", "and", "orr", "eor", "bic",
-    "sshl", "ushl", "cmeq", "cmgt", "cmlt", "smax", "smin", "umax", "umin",
-)
 
 # -------------------------------------------------------------
 # RISC-V 64 classification
@@ -142,12 +149,6 @@ RISCV_VEC_MOVES = {
     "vmv.v.v", "vmv.v.x", "vmv.v.i", "vmv.x.s", "vmv.s.x",
 }
 
-RISCV_VEC_ARITH_PREFIXES = (
-    "vadd", "vsub", "vrsub", "vmul", "vmulh", "vmulhu", "vmacc", "vnmsac",
-    "vmadd", "vnmsub", "vred", "vsll", "vsrl", "vsra", "vand", "vor", "vxor",
-    "vmseq", "vmsne", "vmsltu", "vmslt", "vmsleu", "vmsle", "vmsgtu", "vmsgt",
-    "vmin", "vmax", "vdiv", "vrem", "vsetvli", "vsetivli", "vsetvl",
-)
 
 
 def demangle(symbol: str) -> str:
@@ -206,13 +207,27 @@ def classify_instruction(arch: str, mnemonic: str, operands: str) -> Tuple[str, 
         has_vec_reg = bool(X86_VEC_REG_RE.search(ops))
         is_vec_mnem = mnem.startswith("v") or mnem.startswith("p") or (mnem.endswith(("ps", "pd", "ss", "sd")) and len(mnem) in (4, 5, 6, 7))
 
-        if mnem in X86_VEC_MOVES:
+        # AT&T `movq`/`movd` are also the ordinary 64/32-bit general-purpose
+        # moves; they are vector moves only when a vector register is involved.
+        if mnem in X86_VEC_MOVES and (has_vec_reg or mnem not in ("movq", "movd")):
             return ("VEC_MOVE", f"{mnem} {ops}".strip())
+
+        # Register-zeroing idiom (`vxorps %xmm0, %xmm0, %xmm0`): it only
+        # materializes zeros for subsequent vector stores (memset-style moves).
+        if has_vec_reg and mnem in X86_ZERO_IDIOMS:
+            regs = [r.strip().lower() for r in ops.split(",")]
+            if len(regs) >= 2 and len(set(regs)) == 1 and X86_VEC_REG_RE.fullmatch(regs[0].lstrip("%")):
+                return ("VEC_MOVE", f"{mnem} {ops} (zero idiom)".strip())
 
         if has_vec_reg or is_vec_mnem:
             for pfx in X86_VEC_ARITH_PREFIXES:
                 if mnem.startswith(pfx):
                     return ("VEC_ARITH", f"{mnem} {ops}".strip())
+
+        # Conservative: any other instruction on a vector register is not
+        # known to be data movement, so it counts as vector arithmetic.
+        if has_vec_reg:
+            return ("VEC_ARITH", f"{mnem} {ops} (unclassified vector-register instruction)".strip())
 
         # Scalar classification & quality signals
         if mnem in ("mulx", "mulxq"):
@@ -233,15 +248,13 @@ def classify_instruction(arch: str, mnemonic: str, operands: str) -> Tuple[str, 
         return ("SCALAR", f"{mnem} {ops}".strip())
 
     elif arch == "aarch64":
-        has_vec_reg = bool(AARCH64_VEC_REG_RE.search(ops))
-        if mnem in AARCH64_VEC_MOVES:
-            return ("VEC_MOVE", f"{mnem} {ops}".strip())
-
+        has_vec_reg = bool(AARCH64_SIMD_FP_REG_RE.search(ops))
         if has_vec_reg:
-            for pfx in AARCH64_VEC_ARITH_PREFIXES:
-                if mnem.startswith(pfx):
-                    return ("VEC_ARITH", f"{mnem} {ops}".strip())
-            return ("VEC_MOVE", f"{mnem} {ops}".strip())
+            if mnem in AARCH64_VEC_MOVES:
+                return ("VEC_MOVE", f"{mnem} {ops}".strip())
+            # Conservative: arithmetic, permutes, conversions, and anything
+            # unrecognized on SIMD&FP registers count as vector arithmetic.
+            return ("VEC_ARITH", f"{mnem} {ops}".strip())
 
         # Scalar AArch64
         if mnem in ("umulh", "smulh"):
@@ -262,10 +275,9 @@ def classify_instruction(arch: str, mnemonic: str, operands: str) -> Tuple[str, 
             return ("VEC_MOVE", f"{mnem} {ops}".strip())
 
         if mnem.startswith("v") or has_vec_reg:
-            for pfx in RISCV_VEC_ARITH_PREFIXES:
-                if mnem.startswith(pfx):
-                    return ("VEC_ARITH", f"{mnem} {ops}".strip())
-            return ("VEC_MOVE", f"{mnem} {ops}".strip())
+            # Conservative: every RVV instruction other than the listed moves
+            # (including vsetvli and unrecognized ones) counts as vector arithmetic.
+            return ("VEC_ARITH", f"{mnem} {ops}".strip())
 
         # Scalar RISC-V
         if mnem in ("mulhu", "mulh", "mulhsu"):
@@ -537,6 +549,33 @@ def run_self_test(objdump_cmd: Optional[str] = None) -> bool:
     and proves that check_codegen.py flags vector arithmetic in the former and passes the latter.
     """
     print("[SELF-TEST] Running check_codegen.py verification suite...")
+
+    # Instruction-level classification cases: (arch, mnemonic, operands, expected class).
+    cases = [
+        ("x86_64", "movq", "%rcx, 0xa0(%rsp)", "STACK_SPILL"),  # GPR store, not a vector move
+        ("x86_64", "movq", "%r8, %r14", "SCALAR"),
+        ("x86_64", "movq", "%xmm0, %rax", "VEC_MOVE"),
+        ("x86_64", "vmovaps", "%ymm0, (%rcx)", "VEC_MOVE"),
+        ("x86_64", "vxorps", "%xmm0, %xmm0, %xmm0", "VEC_MOVE"),  # zero idiom
+        ("x86_64", "vxorps", "%xmm1, %xmm2, %xmm0", "VEC_ARITH"),
+        ("x86_64", "vpaddq", "%ymm1, %ymm2, %ymm0", "VEC_ARITH"),
+        ("x86_64", "vinserti128", "$0x1, %xmm1, %ymm0, %ymm0", "VEC_ARITH"),  # unlisted
+        ("x86_64", "mulxq", "%r8, %rax, %rdx", "SCALAR_MULX"),
+        ("aarch64", "ldr", "x8, [sp, #16]", "SCALAR"),
+        ("aarch64", "str", "x8, [sp, #16]", "STACK_SPILL"),
+        ("aarch64", "str", "q0, [x8]", "VEC_MOVE"),
+        ("aarch64", "movi", "v0.2d, #0000000000000000", "VEC_MOVE"),
+        ("aarch64", "ushr", "v0.2d, v1.2d, #3", "VEC_ARITH"),  # unlisted
+        ("aarch64", "umulh", "x9, x10, x11", "SCALAR_UMULH"),
+        ("riscv64", "vsetvli", "t0, a0, e64, m1, ta, ma", "VEC_ARITH"),
+        ("riscv64", "mulhu", "a0, a1, a2", "SCALAR_MULH"),
+    ]
+    for arch, mnem, ops, expected in cases:
+        got, _ = classify_instruction(arch, mnem, ops)
+        if got != expected:
+            print(f"[SELF-TEST FAILED] {arch} '{mnem} {ops}': expected {expected}, got {got}")
+            return False
+    print(f"[SELF-TEST] Instruction classification: {len(cases)} cases OK")
 
     rustc = shutil.which("rustc") or os.path.expanduser("~/.cargo/bin/rustc")
     if not (os.path.isfile(rustc) and os.access(rustc, os.X_OK)):

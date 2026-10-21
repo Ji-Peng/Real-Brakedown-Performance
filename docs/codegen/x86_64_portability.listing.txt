@@ -6,16 +6,16 @@ Hot Kernels Checked: 16 | Violations: 0
 
 SUMMARY METRICS (Hot Kernels):
   Vector Arithmetic (VIOLATIONS) : 0
-  Vector Moves (Data Movement)   : 2297
+  Vector Moves (Data Movement)   : 152
   Scalar BMI2 MULX               : 0
   Scalar Standard MUL            : 352
   Scalar Carry ADC / ADCX        : 391
-  Stack Pointer Spills           : 6
+  Stack Pointer Spills           : 767
   Total Instructions             : 6087
 
 SUMMARY METRICS (Outside Hot Kernels - e.g. stdlib / portable blake3):
-  Vector Arithmetic              : 1375
-  Vector Moves                   : 114900
+  Vector Arithmetic              : 1960
+  Vector Moves                   : 18579
 
 ================================================================================
 HOT KERNEL LISTINGS:
@@ -23,23 +23,9 @@ HOT KERNEL LISTINGS:
 
 [PASS] [HOT KERNEL] <lcpc_brakedown_pc::encode::encode_column_block::<lcpc_fields::fp2m61::Fp2M61>>
   Raw Symbol: lcpc_brakedown_pc::encode::encode_column_block::<lcpc_fields::fp2m61::Fp2M61>
-  Stats: mulx=0 mul=38 adc=36 spills=0 total_insns=894
+  Stats: mulx=0 mul=38 adc=36 spills=141 total_insns=894
   Vector Moves (Memory copies / helpers):
-        0x821f1: movq %rdx, %r13
-        0x821f4: movq %r9, %rbx
-        0x821fb: movq %r9, %rax
-        0x8221e: movq %r9, %r14
-        0x82221: movq %r8, %r15
-        0x82224: movq %rdi, %r12
-        0x82227: movq %rsi, 0x38(%rsp)
-        0x8222c: movq %rcx, 0x70(%rsp)
-        0x82231: movq $0x0, 0x40(%rsp)
-        0x82244: movq %rbp, %rdi
-        0x82247: movq %rbx, %rdx
-        0x82258: movq 0x40(%rsp), %r10
-        0x82266: movq %r10, %rcx
-        0x82280: movq %r10, %rcx
-        0x82294: movq %r10, %rcx
+        0x82291: xorps %xmm0, %xmm0 (zero idiom)
         0x822a0: movaps %xmm0, 0x10(%rcx)
         0x822a4: movaps %xmm0, (%rcx)
         0x822a7: movaps %xmm0, 0x20(%rcx)
@@ -56,58 +42,12 @@ HOT KERNEL LISTINGS:
         0x822e2: movaps %xmm0, 0xd0(%rcx)
         0x822e9: movaps %xmm0, 0xf0(%rcx)
         0x822f0: movaps %xmm0, 0xe0(%rcx)
+        0x82309: xorps %xmm0, %xmm0 (zero idiom)
         0x82310: movaps %xmm0, 0x10(%rcx)
         0x82314: movaps %xmm0, (%rcx)
+        0x82320: xorps %xmm0, %xmm0 (zero idiom)
         0x82323: movaps %xmm0, 0x10(%rcx)
         0x82327: movaps %xmm0, (%rcx)
-        0x8232a: movq 0x50(%r12), %r11
-        0x8232f: movq %r13, 0x80(%rsp)
-        0x82337: movq 0x48(%r12), %rax
-        0x82340: movq %rax, 0x40(%rsp)
-        0x82350: movq %r10, 0x8(%rsp)
-        0x8235b: movq %r15, 0x80(%rsp)
-        0x82363: movq %r11, %rax
-        0x8236a: movq %rax, 0x40(%rsp)
-        0x82378: movq %r15, %rax
-        0x82384: movq %r15, %rax
-        0x823bf: movq 0x8(%r12), %rax
-        0x823c4: movq %rax, 0xc8(%rsp)
-        0x823cc: movq 0x10(%r12), %r15
-        0x823d1: movq 0x20(%r12), %rax
-        0x823d6: movq %rax, 0xb0(%rsp)
-        0x823de: movq 0x28(%r12), %rdx
-        0x823e3: movq 0x40(%r12), %rax
-        0x823e8: movq %rax, 0x68(%rsp)
-        0x823ed: movq 0x38(%r12), %rax
-        0x823f2: movq %rax, 0xa8(%rsp)
-        0x823fd: movq %r14, %rax
-        0x82406: movq %r15, %rsi
-        0x82411: movq %rsi, 0xd0(%rsp)
-        0x82419: movq %rax, 0x78(%rsp)
-        0x82422: movq %rax, 0xa0(%rsp)
-        0x82434: movq 0x70(%rsp), %rax
-        0x8243d: movq %rax, 0x50(%rsp)
-        0x82442: movq %rsi, 0x98(%rsp)
-        0x8244d: movq %rsi, 0x88(%rsp)
-        0x8245c: movq %rax, 0x58(%rsp)
-        0x82461: movq %r13, 0x48(%rsp)
-        0x82466: movq %r14, (%rsp)
-        0x8246a: movq %rbx, 0x28(%rsp)
-        0x8246f: movq %rdx, 0xc0(%rsp)
-        0x82477: movq %r15, 0x60(%rsp)
-        0x8247c: movq %r11, 0x90(%rsp)
-        0x82490: movq 0x50(%rsp), %rax
-        0x8249a: movq %rax, 0x50(%rsp)
-        0x8249f: movq 0xd8(%rsp), %rcx
-        0x824aa: movq 0xc0(%rsp), %rdx
-        0x824c1: movq %rcx, %rax
-        0x824d0: movq 0x70(%rsp), %rcx
-        0x824db: movq 0xc8(%rsp), %rsi
-        0x8250a: movq %rdi, 0xd8(%rsp)
-        0x82523: movq %rax, %rcx
-        0x8252f: movq 0x8(%rsp), %r10
-        0x82536: movq 0x88(%rsp), %rdx
-        0x8253e: movq %rax, %rcx
         0x82550: movaps %xmm0, (%rcx)
         0x82580: movaps %xmm0, (%rcx)
         0x82583: movaps %xmm0, 0x10(%rcx)
@@ -117,296 +57,8 @@ HOT KERNEL LISTINGS:
         0x82593: movaps %xmm0, 0x50(%rcx)
         0x82597: movaps %xmm0, 0x60(%rcx)
         0x8259b: movaps %xmm0, 0x70(%rcx)
-        0x825b0: movq 0xb0(%rsp), %rax
-        0x825cb: movq %r10, 0x10(%rsp)
-        0x825da: movq %rcx, 0xe8(%rsp)
-        0x825e2: movq 0x8(%rsp), %r10
-        0x825ed: movq %rax, 0xb8(%rsp)
-        0x825f5: movq %rsi, 0x20(%rsp)
-        0x825fe: movq %r8, 0xe0(%rsp)
-        0x82620: movq (%r10), %rcx
-        0x82623: movq 0x8(%r10), %rdx
-        0x82627: movq %rcx, %rsi
-        0x82648: movq %rdx, (%r10)
-        0x8264b: movq $0x0, 0x8(%r10)
-        0x82653: movq 0x18(%r10), %rcx
-        0x82657: movq 0x10(%r10), %rdx
-        0x8265b: movq %rdx, %rsi
-        0x8267c: movq %rcx, 0x10(%r10)
-        0x82680: movq $0x0, 0x18(%r10)
-        0x826a6: movq %rsi, %rcx
-        0x826c4: movq %r15, %rcx
-        0x826e2: movq %r9, %rcx
-        0x82700: movq %rcx, %rax
-        0x82715: movq %rdx, 0x30(%rsp)
-        0x8271a: movq %rdi, %rax
-        0x82729: movq %rdi, 0xf0(%rsp)
-        0x82731: movq (%rax), %rdx
-        0x82734: movq %rdx, 0x160(%rsp)
-        0x8273c: movq 0x8(%rax), %rdx
-        0x82740: movq 0x10(%rax), %rdi
-        0x82744: movq %rdi, 0x150(%rsp)
-        0x8274c: movq 0x18(%rax), %rdi
-        0x82750: movq 0x20(%rax), %r8
-        0x82754: movq %r8, 0x140(%rsp)
-        0x8275c: movq 0x28(%rax), %r8
-        0x82760: movq 0x30(%rax), %r10
-        0x82764: movq %r10, 0x130(%rsp)
-        0x8276c: movq 0x38(%rax), %r10
-        0x82774: movq 0x38(%rsp), %rax
-        0x8278a: movq %r9, 0x100(%rsp)
-        0x82799: movq %rcx, 0xf8(%rsp)
-        0x827a1: movq %rdx, 0x158(%rsp)
-        0x827ac: movq %rdx, 0x120(%rsp)
-        0x827b4: movq %rdi, 0x148(%rsp)
-        0x827bf: movq %rdi, 0x118(%rsp)
-        0x827c7: movq %r8, 0x138(%rsp)
-        0x827d2: movq %r8, 0x110(%rsp)
-        0x827da: movq %r10, 0x128(%rsp)
-        0x827e5: movq %r10, 0x108(%rsp)
-        0x827f2: movq 0x8(%rsp), %r10
-        0x827f7: movq %rsi, 0x18(%rsp)
-        0x827fc: movq %r15, 0x168(%rsp)
-        0x82810: movq %r14, 0x200(%rsp)
-        0x82818: movq -0x8(%rsi,%rbx), %rcx
-        0x8281d: movq 0x18(%rsp), %rax
-        0x82822: movq (%rax,%rbx), %rsi
-        0x82826: movq %rcx, %rax
-        0x82829: movq 0x160(%rsp), %rdi
-        0x82834: movq %rdx, %r9
-        0x82837: movq %rax, %r12
-        0x8283a: movq %rsi, %rax
-        0x82845: movq %rdx, 0x1c8(%rsp)
-        0x8284d: movq %rax, 0x1c0(%rsp)
-        0x82855: movq %rcx, %rax
-        0x82860: movq %rdx, %r8
-        0x82863: movq %rax, %rcx
-        0x82866: movq %rsi, %rax
-        0x8286c: movq %rax, 0x1f0(%rsp)
-        0x82874: movq %rdx, 0x1f8(%rsp)
-        0x8287c: movq -0x8(%r15,%rbx), %rsi
-        0x82881: movq (%r15,%rbx), %rdi
-        0x82885: movq %rsi, %rax
-        0x82888: movq 0x150(%rsp), %r14
-        0x82893: movq %rdx, 0x198(%rsp)
-        0x8289b: movq %rax, 0x188(%rsp)
-        0x828a3: movq %rdi, %rax
-        0x828ae: movq %rdx, 0x190(%rsp)
-        0x828b6: movq %rax, 0x180(%rsp)
-        0x828be: movq %rsi, %rax
-        0x828c9: movq %rdx, 0x1e8(%rsp)
-        0x828d1: movq %rax, 0x1e0(%rsp)
-        0x828d9: movq %rdi, %rax
-        0x828df: movq %rax, 0x1d0(%rsp)
-        0x828e7: movq %rdx, 0x1d8(%rsp)
-        0x828ef: movq 0x100(%rsp), %rsi
-        0x828f7: movq -0x8(%rsi,%rbx), %r14
-        0x828fc: movq %r14, %rax
-        0x828ff: movq 0x140(%rsp), %r13
-        0x8290a: movq %rax, 0x170(%rsp)
-        0x82912: movq %rdx, 0x178(%rsp)
-        0x8291a: movq (%rsi,%rbx), %r15
-        0x8291e: movq %r15, %rax
-        0x82929: movq %rdx, %rdi
-        0x8292c: movq %rax, %rsi
-        0x8292f: movq %r14, %rax
-        0x8293a: movq %rdx, 0x1b8(%rsp)
-        0x82942: movq %rax, 0x1b0(%rsp)
-        0x8294a: movq %r15, %rax
-        0x82950: movq %rax, 0x1a0(%rsp)
-        0x82958: movq %rdx, 0x1a8(%rsp)
-        0x82960: movq 0xf8(%rsp), %r15
-        0x82968: movq -0x8(%r15,%rbx), %r14
-        0x8296d: movq %r14, %rax
-        0x82970: movq 0x130(%rsp), %r11
-        0x8297b: movq %rax, %r13
-        0x8297e: movq %rdx, %rbp
-        0x82981: movq (%r15,%rbx), %r15
-        0x82985: movq %r15, %rax
-        0x829ec: movq %r14, %rax
-        0x829f7: movq %rdx, %rsi
-        0x829fa: movq %rax, %rdi
-        0x829fd: movq %r15, %rax
-        0x82a00: movq 0x168(%rsp), %r15
-        0x82a6a: movq 0x18(%rsp), %rsi
-        0x82a72: movq 0x200(%rsp), %r14
-        0x82a7d: movq %r12, -0x10(%r10,%rbx,2)
-        0x82a82: movq %r9, -0x8(%r10,%rbx,2)
-        0x82a87: movq %rcx, (%r10,%rbx,2)
-        0x82a8b: movq %r8, 0x8(%r10,%rbx,2)
-        0x82a9d: movq 0x30(%rsp), %rdx
-        0x82aa6: movq 0xf0(%rsp), %rdi
-        0x82ab6: movq 0x48(%rsp), %r13
-        0x82abb: movq (%rsp), %r14
-        0x82abf: movq 0x28(%rsp), %rbx
-        0x82ace: movq 0xe0(%rsp), %r8
-        0x82adc: movq 0x20(%rsp), %rax
-        0x82ae5: movq %r10, %rbp
-        0x82ae8: movq 0xb8(%rsp), %rcx
-        0x82af6: movq %rax, 0x20(%rsp)
-        0x82b03: movq 0x10(%rsp), %r14
-        0x82b0b: movq %rax, 0x18(%rsp)
-        0x82b12: movq %rbp, %rcx
-        0x82b19: movq 0x28(%rsp), %r8
-        0x82b2a: movq (%rsp), %r10
-        0x82b40: movq (%rcx), %rdx
-        0x82b43: movq 0x8(%rcx), %rsi
-        0x82b47: movq %rdx, %rdi
-        0x82b68: movq %rsi, (%rcx)
-        0x82b6b: movq $0x0, 0x8(%rcx)
-        0x82b73: movq 0x18(%rcx), %rdx
-        0x82b77: movq 0x10(%rcx), %rsi
-        0x82b7b: movq %rsi, %rdi
-        0x82b9c: movq %rdx, 0x10(%rcx)
-        0x82ba0: movq $0x0, 0x18(%rcx)
-        0x82bb6: movq (%rsp), %r10
-        0x82bc0: movq %r10, %rbp
-        0x82bc9: movq %rsi, 0x20(%rsp)
-        0x82bd6: movq 0x10(%rsp), %r14
-        0x82bde: movq %rcx, 0x18(%rsp)
-        0x82be7: movq (%rsp), %r10
-        0x82bfc: movq %r11, %rax
-        0x82c11: movq %rdx, 0x30(%rsp)
-        0x82c16: movq (%r14), %rbx
-        0x82c19: movq %r14, 0x10(%rsp)
-        0x82c1e: movq 0x8(%r14), %r14
-        0x82c2b: movq %r14, %r15
-        0x82c3a: movq 0x8(%rsp), %rbp
-        0x82c43: movq -0x8(%r11,%r12), %rdi
-        0x82c48: movq %rdi, %rax
-        0x82c4e: movq %rax, %rcx
-        0x82c51: movq %rdx, %rsi
-        0x82c54: movq (%r11,%r12), %r8
-        0x82c58: movq %r8, %rax
-        0x82c6e: movq %rdi, %rax
-        0x82c74: movq %rdx, %rdi
-        0x82c77: movq %rax, %r9
-        0x82c7a: movq %r8, %rax
-        0x82c90: movq %rcx, -0x10(%rbp,%r12,2)
-        0x82c95: movq %rsi, -0x8(%rbp,%r12,2)
-        0x82c9a: movq %r9, (%rbp,%r12,2)
-        0x82c9f: movq %rdi, 0x8(%rbp,%r12,2)
-        0x82cb2: movq 0x48(%rsp), %r13
-        0x82cb7: movq 0x30(%rsp), %rsi
-        0x82cc2: movq 0x18(%rsp), %rax
-        0x82cd5: movq 0x8(%rsp), %rax
-        0x82cda: movq (%rsp), %r10
-        0x82cde: movq 0x28(%rsp), %rdi
-        0x82cf0: movq (%rax), %rcx
-        0x82cf3: movq 0x8(%rax), %rdx
-        0x82cf7: movq %rcx, %rsi
-        0x82d18: movq %rdx, (%rax)
-        0x82d1b: movq $0x0, 0x8(%rax)
-        0x82d23: movq 0x18(%rax), %rcx
-        0x82d27: movq 0x10(%rax), %rdx
-        0x82d2b: movq %rdx, %rsi
-        0x82d4c: movq %rcx, 0x10(%rax)
-        0x82d50: movq $0x0, 0x18(%rax)
-        0x82d6b: movq (%rsp), %r10
-        0x82d7d: movq %r11, %rax
-        0x82d83: movq 0x38(%rsp), %rcx
-        0x82d88: movq 0x10(%rsp), %rdx
-        0x82d9c: movq %rsi, 0x30(%rsp)
-        0x82da1: movq 0x10(%rdx), %rbx
-        0x82da5: movq 0x18(%rdx), %r14
-        0x82db0: movq %r14, %r15
-        0x82dbf: movq 0x8(%rsp), %rbp
-        0x82dd3: movq -0x8(%r11,%r12), %rdi
-        0x82dd8: movq %rdi, %rax
-        0x82dde: movq %rax, %rcx
-        0x82de1: movq %rdx, %rsi
-        0x82de4: movq (%r11,%r12), %r8
-        0x82de8: movq %r8, %rax
-        0x82dfe: movq %rdi, %rax
-        0x82e04: movq %rdx, %rdi
-        0x82e07: movq %rax, %r9
-        0x82e0a: movq %r8, %rax
-        0x82e20: movq %rcx, -0x10(%rbp,%r12,2)
-        0x82e25: movq %rsi, -0x8(%rbp,%r12,2)
-        0x82e2a: movq %r9, (%rbp,%r12,2)
-        0x82e2f: movq %rdi, 0x8(%rbp,%r12,2)
-        0x82e42: movq 0x48(%rsp), %r13
-        0x82e47: movq 0x30(%rsp), %rax
-        0x82e52: movq 0x18(%rsp), %rcx
-        0x82e5f: movq 0x28(%rsp), %rdi
-        0x82e74: movq %rbp, %rax
-        0x82e80: movq (%rax), %rcx
-        0x82e83: movq 0x8(%rax), %rdx
-        0x82e87: movq %rcx, %rsi
-        0x82ea8: movq %rdx, (%rax)
-        0x82eab: movq $0x0, 0x8(%rax)
-        0x82eb3: movq 0x18(%rax), %rcx
-        0x82eb7: movq 0x10(%rax), %rdx
-        0x82ebb: movq %rdx, %rsi
-        0x82edc: movq %rcx, 0x10(%rax)
-        0x82ee0: movq $0x0, 0x18(%rax)
-        0x82ef1: movq (%rsp), %r12
-        0x82ef9: movq %r10, %rsi
-        0x82f0e: movq 0x10(%rsp), %rax
-        0x82f13: movq 0x20(%rax), %r11
-        0x82f17: movq 0x28(%rax), %rbx
-        0x82f24: movq %rbx, %r14
-        0x82f3a: movq 0x8(%rsp), %rbp
-        0x82f40: movq -0x8(%r10,%r15), %rdi
-        0x82f45: movq %rdi, %rax
-        0x82f4b: movq %rax, %rcx
-        0x82f4e: movq %rdx, %rsi
-        0x82f51: movq (%r10,%r15), %r8
-        0x82f55: movq %r8, %rax
-        0x82f6b: movq %rdi, %rax
-        0x82f71: movq %rdx, %rdi
-        0x82f74: movq %rax, %r9
-        0x82f77: movq %r8, %rax
-        0x82f8d: movq %rcx, -0x10(%rbp,%r15,2)
-        0x82f92: movq %rsi, -0x8(%rbp,%r15,2)
-        0x82f97: movq %r9, (%rbp,%r15,2)
-        0x82f9c: movq %rdi, 0x8(%rbp,%r15,2)
-        0x82fb2: movq (%rsp), %r14
-        0x82fb6: movq %r14, %rcx
-        0x82fb9: movq %rbp, %r10
-        0x82fbc: movq 0x28(%rsp), %rbx
-        0x82fc1: movq 0x90(%rsp), %r11
-        0x82fc9: movq 0x60(%rsp), %r15
-        0x82ff0: movq (%r10,%rax,2), %rdx
-        0x82ff4: movq 0x8(%r10,%rax,2), %rsi
-        0x82ff9: movq %rsi, %rdi
-        0x83011: movq %rsi, %rdx
-        0x8302d: movq 0x10(%r10,%rax,2), %rsi
-        0x83032: movq 0x18(%r10,%rax,2), %r8
-        0x83037: movq %r8, %r9
-        0x8304f: movq %r8, %rsi
-        0x83067: movq 0x50(%rsp), %rdx
-        0x8306c: movq %rdi, -0x8(%rdx,%rax)
-        0x83071: movq %rsi, (%rdx,%rax)
         0x83075: movaps %xmm0, 0x10(%r10,%rax,2)
         0x8307b: movaps %xmm0, (%r10,%rax,2)
-        0x83092: movq %r10, %rdi
-        0x830ac: movq %rsi, %r10
-        0x830af: movq %rcx, %rsi
-        0x830b2: movq %r13, %rdx
-        0x830be: movq %r15, %r10
-        0x830c1: movq %rcx, %rsi
-        0x830c4: movq %r13, %rdx
-        0x830d0: movq %r9, %r10
-        0x830d3: movq %rcx, %rsi
-        0x830d6: movq %r13, %rdx
-        0x830e2: movq %rcx, %r10
-        0x830e5: movq %rax, %rsi
-        0x830e8: movq %r13, %rdx
-        0x830f2: movq %r10, %rdi
-        0x83105: movq 0x68(%rsp), %rdx
-        0x83113: movq %r11, %r10
-        0x83116: movq %rax, %rsi
-        0x83119: movq %r13, %rdx
-        0x83135: movq %rbp, %rsi
-        0x83148: movq %rax, 0x58(%rsp)
-        0x8314f: movq %r15, %rdi
-        0x83152: movq 0x60(%rsp), %rsi
-        0x83157: movq 0x58(%rsp), %rdx
-        0x83168: movq %rbx, %rsi
-        0x83170: movq %rax, %rbx
-        0x83173: movq 0x8(%rsp), %rdi
-        0x8317e: movq %rbx, %rdi
 
   Disassembly:
     821e0: pushq %rbp
@@ -1306,98 +958,31 @@ HOT KERNEL LISTINGS:
 
 [PASS] [HOT KERNEL] <lcpc_brakedown_pc::encode::encode_column_block::<lcpc_fields::mers127::Mers127>>
   Raw Symbol: lcpc_brakedown_pc::encode::encode_column_block::<lcpc_fields::mers127::Mers127>
-  Stats: mulx=0 mul=45 adc=59 spills=2 total_insns=747
+  Stats: mulx=0 mul=45 adc=59 spills=132 total_insns=747
   Vector Moves (Memory copies / helpers):
-        0x831a1: movq %rcx, 0x70(%rsp)
-        0x831a6: movq %rsi, 0x20(%rsp)
-        0x831b5: movq %r9, (%rsp)
-        0x831c3: movq %rdx, %rbp
-        0x831c6: movq %rdi, %r15
-        0x831c9: movq (%rsp), %rax
-        0x831de: movq %rbx, %rdi
-        0x831e1: movq %r8, %r14
-        0x831ea: movq %r14, %r8
-        0x831f6: movq %rax, 0x8(%rsp)
-        0x831fb: movq %rax, %rcx
-        0x8320f: movq %rax, 0x8(%rsp)
-        0x83214: movq %rax, %rcx
-        0x83222: movq (%rsp), %rax
-        0x83233: movq 0x8(%rsp), %rcx
-        0x83249: movq 0x8(%rsp), %rcx
+        0x83246: xorps %xmm0, %xmm0 (zero idiom)
         0x83250: movups %xmm0, 0x10(%rcx)
         0x83254: movups %xmm0, (%rcx)
-        0x83257: movq $0x0, 0x20(%rcx)
         0x8325f: movups %xmm0, 0x28(%rcx)
         0x83263: movups %xmm0, 0x38(%rcx)
-        0x83267: movq $0x0, 0x48(%rcx)
         0x8326f: movups %xmm0, 0x50(%rcx)
         0x83273: movups %xmm0, 0x60(%rcx)
-        0x83277: movq $0x0, 0x70(%rcx)
         0x8327f: movups %xmm0, 0x78(%rcx)
         0x83283: movups %xmm0, 0x88(%rcx)
-        0x8328a: movq $0x0, 0x98(%rcx)
         0x83295: movups %xmm0, 0xa0(%rcx)
         0x8329c: movups %xmm0, 0xb0(%rcx)
-        0x832a3: movq $0x0, 0xc0(%rcx)
         0x832ae: movups %xmm0, 0xd8(%rcx)
         0x832b5: movups %xmm0, 0xc8(%rcx)
-        0x832bc: movq $0x0, 0xe8(%rcx)
         0x832c7: movups %xmm0, 0x100(%rcx)
         0x832ce: movups %xmm0, 0xf0(%rcx)
-        0x832d5: movq $0x0, 0x110(%rcx)
         0x832e0: movups %xmm0, 0x118(%rcx)
         0x832e7: movups %xmm0, 0x128(%rcx)
-        0x832ee: movq $0x0, 0x138(%rcx)
+        0x8330f: xorps %xmm0, %xmm0 (zero idiom)
         0x83320: movups %xmm0, 0x10(%rcx)
         0x83324: movups %xmm0, (%rcx)
-        0x83327: movq $0x0, 0x20(%rcx)
+        0x83338: xorps %xmm0, %xmm0 (zero idiom)
         0x8333b: movups %xmm0, 0x10(%rcx)
         0x8333f: movups %xmm0, (%rcx)
-        0x83342: movq $0x0, 0x20(%rcx)
-        0x8334a: movq 0x50(%r15), %rcx
-        0x8334e: movq %rbp, 0x90(%rsp)
-        0x83356: movq 0x48(%r15), %rax
-        0x8335f: movq %rax, 0x98(%rsp)
-        0x83380: movq %r8, 0x90(%rsp)
-        0x83388: movq %rcx, %rax
-        0x83390: movq %rax, 0x98(%rsp)
-        0x833a1: movq %r8, %rax
-        0x833ae: movq %r8, %rax
-        0x833e0: movq 0x8(%r15), %rax
-        0x833e4: movq %rax, 0xd8(%rsp)
-        0x833ec: movq 0x10(%r15), %rax
-        0x833f0: movq 0x20(%r15), %rdx
-        0x833f4: movq %rdx, 0xc0(%rsp)
-        0x833fc: movq 0x28(%r15), %rdx
-        0x83400: movq 0x40(%r15), %rsi
-        0x83404: movq %rsi, 0x78(%rsp)
-        0x83409: movq (%rsp), %rdi
-        0x83413: movq %rax, 0x48(%rsp)
-        0x83420: movq %rax, 0xe0(%rsp)
-        0x83428: movq 0x38(%r15), %rax
-        0x8342c: movq %rax, 0xb8(%rsp)
-        0x83434: movq %rdi, 0x18(%rsp)
-        0x8343d: movq %rax, 0xb0(%rsp)
-        0x8344f: movq 0x8(%rsp), %rax
-        0x83458: movq %rax, 0x38(%rsp)
-        0x83463: movq %rdi, 0xa8(%rsp)
-        0x8346e: movq %rdi, 0xa0(%rsp)
-        0x83476: movq 0x70(%rsp), %rax
-        0x8347f: movq %rax, 0x10(%rsp)
-        0x8348b: movq %rax, 0x68(%rsp)
-        0x83490: movq %rdx, 0xd0(%rsp)
-        0x83498: movq %rcx, 0xc8(%rsp)
-        0x834a0: movq %rbp, 0x80(%rsp)
-        0x834b0: movq 0x10(%rsp), %rax
-        0x834ba: movq %rax, 0x10(%rsp)
-        0x834bf: movq 0xe8(%rsp), %rsi
-        0x834cf: movq 0xd0(%rsp), %rdx
-        0x834e8: movq %rsi, %rax
-        0x834fd: movq 0xd8(%rsp), %rcx
-        0x83528: movq %r8, 0xe8(%rsp)
-        0x83546: movq %rax, %rcx
-        0x83554: movq 0xa0(%rsp), %rdx
-        0x8355c: movq %rax, %rcx
         0x83560: movups %xmm0, (%rcx)
         0x83590: movups %xmm0, (%rcx)
         0x83593: movups %xmm0, 0x10(%rcx)
@@ -1407,254 +992,8 @@ HOT KERNEL LISTINGS:
         0x835a3: movups %xmm0, 0x50(%rcx)
         0x835a7: movups %xmm0, 0x60(%rcx)
         0x835ab: movups %xmm0, 0x70(%rcx)
-        0x835c0: movq 0xc0(%rsp), %rax
-        0x835db: movq %rsi, 0x50(%rsp)
-        0x835e0: movq %rsi, 0x30(%rsp)
-        0x835e8: movq %rsi, 0xf0(%rsp)
-        0x835f0: movq %r9, 0x58(%rsp)
-        0x835fd: movq %rdi, 0x40(%rsp)
-        0x83610: movq %rax, %rcx
-        0x8361b: movq (%rsp), %r8
-        0x8361f: movq %r8, %rdx
-        0x83626: movq %rdx, %rsi
-        0x83640: movq (%rsp), %r8
-        0x83644: movq %r8, %rdx
-        0x8364b: movq %rdx, %rsi
-        0x83665: movq (%rsp), %r8
-        0x83669: movq %r8, %rdx
-        0x83670: movq %rdx, %rsi
-        0x8368a: movq (%rsp), %rsi
-        0x8368e: movq %rsi, %rcx
-        0x83695: movq %rcx, %rdx
-        0x836ae: movq %rcx, 0xf8(%rsp)
-        0x836ba: movq (%rdi,%rax), %rcx
-        0x836be: movq %rcx, 0x148(%rsp)
-        0x836c6: movq 0x8(%rdi,%rax), %rcx
-        0x836cb: movq %rcx, 0x140(%rsp)
-        0x836d3: movq 0x10(%rdi,%rax), %rcx
-        0x836d8: movq %rcx, 0x138(%rsp)
-        0x836e0: movq 0x18(%rdi,%rax), %rcx
-        0x836e5: movq %rcx, 0x130(%rsp)
-        0x836ed: movq 0x20(%rdi,%rax), %rcx
-        0x836f2: movq %rcx, 0x128(%rsp)
-        0x836fa: movq 0x28(%rdi,%rax), %rcx
-        0x836ff: movq %rcx, 0x120(%rsp)
-        0x83707: movq 0x30(%rdi,%rax), %rcx
-        0x8370c: movq %rcx, 0x118(%rsp)
-        0x83714: movq 0x38(%rdi,%rax), %rax
-        0x83719: movq %rax, 0x110(%rsp)
-        0x83721: movq 0x18(%rsp), %rax
-        0x83732: movq %r11, 0x108(%rsp)
-        0x8373e: movq %r8, 0x100(%rsp)
-        0x83746: movq 0x20(%rsp), %r9
-        0x8374b: movq 0x38(%rsp), %rbp
-        0x83750: movq (%rsp), %rax
-        0x83754: movq %r10, 0x88(%rsp)
-        0x8375c: movq %r12, 0x150(%rsp)
-        0x83770: movq %rax, 0x160(%rsp)
-        0x83778: movq -0x8(%r9,%r10), %rcx
-        0x8377d: movq %rcx, %rax
-        0x83780: movq 0x148(%rsp), %rsi
-        0x8378b: movq %rax, %rdi
-        0x8378e: movq %rdx, %r8
-        0x83791: movq 0x88(%rsp), %rax
-        0x83799: movq (%r9,%rax), %r10
-        0x8379d: movq %r10, %rax
-        0x837a3: movq %rax, %r11
-        0x837a6: movq %rdx, %rbx
-        0x837a9: movq %rcx, %rax
-        0x837ac: movq 0x140(%rsp), %rcx
-        0x837b7: movq %rdx, %r15
-        0x837ba: movq %rax, %r13
-        0x837bd: movq %r10, %rax
-        0x837c3: movq %rax, %r10
-        0x837c6: movq %rdx, %rcx
-        0x837e1: movq %rdi, 0x28(%rsp)
-        0x837f7: movq -0x8(%r9,%r12), %rbx
-        0x837fc: movq %rbx, %rax
-        0x837ff: movq 0x138(%rsp), %rsi
-        0x8380a: movq %rax, %rdi
-        0x8380d: movq %rdx, %r14
-        0x83810: movq (%r9,%r12), %r13
-        0x83814: movq %r13, %rax
-        0x8381a: movq %rax, %r8
-        0x8381d: movq %rdx, %r12
-        0x83820: movq %rbx, %rax
-        0x83823: movq 0x130(%rsp), %rbx
-        0x8382e: movq %rdx, %r15
-        0x83831: movq %rax, %rsi
-        0x83834: movq %r13, %rax
-        0x8383a: movq %rax, %r13
-        0x8383d: movq %rdx, %rbx
-        0x83859: movq %rdi, 0x28(%rsp)
-        0x83870: movq %rax, 0x60(%rsp)
-        0x83875: movq 0x108(%rsp), %r10
-        0x8387d: movq -0x8(%r9,%r10), %rcx
-        0x83882: movq %rcx, %rax
-        0x83885: movq 0x128(%rsp), %r11
-        0x83890: movq %rax, %rdi
-        0x83893: movq %rdx, %rsi
-        0x83896: movq (%r9,%r10), %r10
-        0x8389a: movq %r10, %rax
-        0x838a0: movq %rax, %r11
-        0x838a3: movq %rdx, %r14
-        0x838a6: movq %rcx, %rax
-        0x838a9: movq 0x120(%rsp), %rcx
-        0x838b4: movq %rdx, %r15
-        0x838b7: movq %rax, %r12
-        0x838ba: movq %r10, %rax
-        0x838c0: movq %rax, %r10
-        0x838c3: movq %rdx, %rcx
-        0x838df: movq %rdi, 0x158(%rsp)
-        0x838f5: movq 0x100(%rsp), %rdi
-        0x838fd: movq -0x8(%r9,%rdi), %rsi
-        0x83902: movq %rsi, %rax
-        0x83905: movq 0x118(%rsp), %rbx
-        0x83910: movq %rax, %r8
-        0x83913: movq %rdx, %r13
-        0x83916: movq (%r9,%rdi), %r14
-        0x8391a: movq %r14, %rax
-        0x83920: movq %rax, %rbx
-        0x83923: movq %rdx, %r15
-        0x83926: movq %rsi, %rax
-        0x83929: movq 0x110(%rsp), %rdi
-        0x83934: movq %rdx, %rsi
-        0x83937: movq %rax, %r12
-        0x8393a: movq %r14, %rax
-        0x8394d: movq 0x150(%rsp), %r12
-        0x8396a: movq 0x88(%rsp), %r10
-        0x8397f: movq %r8, -0x20(%rbp)
-        0x83983: movq %rbx, -0x18(%rbp)
-        0x83987: movq %rax, -0x10(%rbp)
-        0x8398b: movq 0x160(%rsp), %rax
-        0x83993: movq %rdx, -0x8(%rbp)
-        0x83997: movq %rcx, (%rbp)
-        0x839ac: movq 0xf8(%rsp), %rcx
-        0x839b4: movq %rcx, %rax
-        0x839bf: movq 0x80(%rsp), %rbp
-        0x839c7: movq 0x40(%rsp), %rdi
-        0x839cc: movq 0x58(%rsp), %r9
-        0x839d7: movq 0x8(%rsp), %rax
-        0x839dc: movq 0x10(%rsp), %rcx
-        0x839e1: movq (%rsp), %rdx
-        0x839f1: movq 0x30(%rsp), %r8
-        0x839fe: movq (%rsp), %rdx
-        0x83a02: movq %rdx, %rax
-        0x83a09: movq %rax, %rcx
-        0x83a1e: movq %r8, 0x30(%rsp)
-        0x83a23: movq %r8, %rax
-        0x83a2d: movq (%rdi), %rbp
-        0x83a30: movq %rdi, 0x40(%rsp)
-        0x83a35: movq 0x8(%rdi), %r9
-        0x83a44: movq 0x38(%rsp), %r14
-        0x83a53: movq -0x8(%rsi), %r8
-        0x83a57: movq %r8, %rax
-        0x83a5d: movq %rax, %rcx
-        0x83a60: movq %rdx, %r10
-        0x83a63: movq (%rsi), %r11
-        0x83a66: movq %r11, %rax
-        0x83a6c: movq %rdx, %rbx
-        0x83a6f: movq %rax, %r15
-        0x83a72: movq %r8, %rax
-        0x83a78: movq %rdx, %r8
-        0x83a7b: movq %rax, %r13
-        0x83a7e: movq %r11, %rax
-        0x83aba: movq 0x8(%rsp), %rax
-        0x83abf: movq 0x10(%rsp), %rcx
-        0x83ac4: movq (%rsp), %rdx
-        0x83acd: movq 0x40(%rsp), %r8
-        0x83ad2: movq 0x80(%rsp), %rbp
-        0x83ada: movq 0x58(%rsp), %rsi
-        0x83ae5: movq 0x30(%rsp), %rax
-        0x83aee: movq (%rsp), %rdx
-        0x83af2: movq %rdx, %rax
-        0x83af9: movq %rax, %rcx
-        0x83b0e: movq 0x10(%r8), %rdi
-        0x83b12: movq 0x18(%r8), %r9
-        0x83b21: movq 0x38(%rsp), %r14
-        0x83b33: movq -0x8(%rsi), %r8
-        0x83b37: movq %r8, %rax
-        0x83b3d: movq %rax, %rcx
-        0x83b40: movq %rdx, %r10
-        0x83b43: movq (%rsi), %r11
-        0x83b46: movq %r11, %rax
-        0x83b4c: movq %rdx, %rbx
-        0x83b4f: movq %rax, %r15
-        0x83b52: movq %r8, %rax
-        0x83b58: movq %rdx, %r8
-        0x83b5b: movq %rax, %r13
-        0x83b5e: movq %r11, %rax
-        0x83b9a: movq 0x8(%rsp), %rax
-        0x83b9f: movq 0x10(%rsp), %rcx
-        0x83ba4: movq (%rsp), %rdx
-        0x83bad: movq 0x40(%rsp), %r8
-        0x83bb2: movq 0x58(%rsp), %rsi
-        0x83bbd: movq 0x30(%rsp), %rax
-        0x83bc6: movq (%rsp), %rcx
-        0x83bca: movq %rcx, %rax
-        0x83bd1: movq %rax, %rsi
-        0x83be6: movq 0x20(%r8), %r9
-        0x83bea: movq 0x28(%r8), %r14
-        0x83bf9: movq (%rsp), %r12
-        0x83bfd: movq 0x38(%rsp), %r13
-        0x83c10: movq -0x8(%rdi), %rsi
-        0x83c14: movq %rsi, %rax
-        0x83c1a: movq %rax, %rcx
-        0x83c1d: movq %rdx, %r8
-        0x83c20: movq (%rdi), %r10
-        0x83c23: movq %r10, %rax
-        0x83c29: movq %rdx, %r11
-        0x83c2c: movq %rax, %rbx
-        0x83c2f: movq %rsi, %rax
-        0x83c35: movq %rdx, %rsi
-        0x83c38: movq %rax, %r15
-        0x83c3b: movq %r10, %rax
-        0x83c77: movq 0x8(%rsp), %rax
-        0x83c7c: movq 0x10(%rsp), %rcx
-        0x83c81: movq (%rsp), %rdx
-        0x83c90: movq 0x8(%rax), %r9
-        0x83c94: movq 0x10(%rax), %r8
-        0x83c98: movq 0x18(%rax), %r10
-        0x83c9c: movq 0x20(%rax), %rdi
-        0x83ca0: movq %r10, %r11
-        0x83cb0: movq %r8, %rbx
-        0x83cb7: movq %rdi, %rsi
-        0x83cda: movq %r9, %r11
-        0x83ce0: movq $-0x1, %rbx
-        0x83d00: movq %rsi, %r8
-        0x83d14: movq %rsi, %rdi
-        0x83d1b: movq %r8, %r9
-        0x83d2b: movq $-0x2, %r10
-        0x83d35: movq %r14, %r10
-        0x83d43: movq %rdi, -0x8(%rcx)
-        0x83d47: movq %r9, (%rcx)
         0x83d4a: movups %xmm0, 0x10(%rax)
         0x83d4e: movups %xmm0, (%rax)
-        0x83d51: movq $0x0, 0x20(%rax)
-        0x83d6f: movq 0x8(%rsp), %rdi
-        0x83d8b: movq %rdx, %rdi
-        0x83d8e: movq %rbp, %rdx
-        0x83d9a: movq %rdx, %rdi
-        0x83d9d: movq %rbp, %rdx
-        0x83da9: movq %rdx, %rdi
-        0x83dac: movq %rbp, %rdx
-        0x83db8: movq %rcx, %rdi
-        0x83dbb: movq %rdx, %rsi
-        0x83dbe: movq %rbp, %rdx
-        0x83dd8: movq 0x78(%rsp), %rdx
-        0x83de6: movq %rax, %rdi
-        0x83de9: movq %rcx, %rsi
-        0x83dec: movq %rbp, %rdx
-        0x83df8: movq %rax, %rdi
-        0x83e16: movq %r8, %rdi
-        0x83e20: movq %rax, 0x68(%rsp)
-        0x83e27: movq 0x48(%rsp), %rdi
-        0x83e2c: movq 0x48(%rsp), %rsi
-        0x83e31: movq 0x68(%rsp), %rdx
-        0x83e42: movq %rbx, %rsi
-        0x83e4a: movq %rax, %rbx
-        0x83e4d: movq 0x8(%rsp), %rdi
-        0x83e58: movq %rbx, %rdi
 
   Disassembly:
     83190: pushq %rbp
@@ -2407,57 +1746,7 @@ HOT KERNEL LISTINGS:
 
 [PASS] [HOT KERNEL] <lcpc_brakedown_pc::encode::reed_solomon_column_block::<lcpc_fields::fp2m61::Fp2M61>>
   Raw Symbol: lcpc_brakedown_pc::encode::reed_solomon_column_block::<lcpc_fields::fp2m61::Fp2M61>
-  Stats: mulx=0 mul=3 adc=1 spills=0 total_insns=183
-  Vector Moves (Memory copies / helpers):
-        0x8573e: movq %rcx, %r9
-        0x85741: movq %rdx, %r15
-        0x85744: movq %rsi, %rbx
-        0x85747: movq %rdi, 0x18(%rsp)
-        0x8574c: movq %rcx, %rax
-        0x8575c: movq %r9, %rax
-        0x85764: movq %rdx, %rcx
-        0x85767: movq %rbx, %rax
-        0x85777: movq %rbx, %rax
-        0x8577f: movq %rdx, 0x40(%rsp)
-        0x85799: movq %r8, %rdx
-        0x857a3: movq %r8, 0x10(%rsp)
-        0x857a8: movq %rdx, 0x8(%rsp)
-        0x857b3: movq 0x139a6e(%rip), %rbx    # 0x1bf228 <writev+0x1bf228>
-        0x857c0: movq %r15, %rdi
-        0x857c5: movq 0x8(%rsp), %rdx
-        0x857ca: movq %r9, %r14
-        0x857cf: movq %r14, %r9
-        0x857d2: movq 0x10(%rsp), %rax
-        0x857f3: movq %rbx, %rax
-        0x8580a: movq %rdx, 0x40(%rsp)
-        0x85846: movq %rbx, %rax
-        0x85855: movq %rdx, %rax
-        0x8585b: movq %rax, 0x30(%rsp)
-        0x8586a: movq %rbx, 0x20(%rsp)
-        0x85870: movq %r9, 0x28(%rsp)
-        0x85875: movq %r15, %rdi
-        0x85880: movq 0x10(%rsp), %rdi
-        0x85885: movq 0x18(%rsp), %r10
-        0x85893: movq %rbx, 0x38(%rsp)
-        0x858a0: movq %r13, %rax
-        0x858a8: movq %rax, %rsi
-        0x858ab: movq %rdx, %rdi
-        0x858b1: movq (%r15,%r11), %r8
-        0x858b5: movq %r8, %rax
-        0x858bb: movq %rdx, %rcx
-        0x858be: movq %rax, %r9
-        0x858c7: movq %r8, %rax
-        0x858ca: movq 0x10(%rsp), %rdi
-        0x858d2: movq %rcx, %rsi
-        0x858ea: movq %rcx, %rsi
-        0x85902: movq %rdx, %rcx
-        0x8591a: movq %rdx, %rax
-        0x85951: movq %rcx, -0x8(%r15,%r11)
-        0x85956: movq %rdx, (%r15,%r11)
-        0x8596c: movq 0x38(%rsp), %rbx
-        0x8597a: movq 0x8(%rsp), %rdx
-        0x85982: movq 0x28(%rsp), %r9
-        0x8599d: movq 0x20(%rsp), %rbx
+  Stats: mulx=0 mul=3 adc=1 spills=18 total_insns=183
 
   Disassembly:
     85730: pushq %rbp
@@ -2646,78 +1935,7 @@ HOT KERNEL LISTINGS:
 
 [PASS] [HOT KERNEL] <lcpc_brakedown_pc::encode::reed_solomon_column_block::<lcpc_fields::mers127::Mers127>>
   Raw Symbol: lcpc_brakedown_pc::encode::reed_solomon_column_block::<lcpc_fields::mers127::Mers127>
-  Stats: mulx=0 mul=4 adc=11 spills=0 total_insns=205
-  Vector Moves (Memory copies / helpers):
-        0x859ce: movq %rcx, %r14
-        0x859d1: movq %rdx, %r15
-        0x859d4: movq %rsi, %rbp
-        0x859d7: movq %rdi, 0x8(%rsp)
-        0x859dc: movq %rcx, %rax
-        0x859e8: movq %r14, %rax
-        0x859f0: movq %rdx, %rcx
-        0x859f3: movq %rbp, %rax
-        0x859ff: movq %rbp, %rax
-        0x85a07: movq %rdx, 0x50(%rsp)
-        0x85a1d: movq %r8, %r12
-        0x85a27: movq %r8, (%rsp)
-        0x85a2d: movq 0x1397f4(%rip), %rbx    # 0x1bf228 <writev+0x1bf228>
-        0x85a40: movq %r15, %rdi
-        0x85a45: movq %r12, %rdx
-        0x85a4a: movq (%rsp), %rax
-        0x85a68: movq %rbp, %rax
-        0x85a7b: movq %rdx, 0x50(%rsp)
-        0x85a9f: movq %rbp, %rax
-        0x85aae: movq %r12, %rax
-        0x85ab4: movq %rax, 0x40(%rsp)
-        0x85ac1: movq %rbp, 0x30(%rsp)
-        0x85ac6: movq %r12, 0x28(%rsp)
-        0x85ae0: movq %r10, 0x18(%rsp)
-        0x85ae5: movq %rsi, 0x20(%rsp)
-        0x85aea: movq %r14, 0x38(%rsp)
-        0x85aef: movq %r15, 0x10(%rsp)
-        0x85af4: movq %r15, %rdi
-        0x85af9: movq %r12, %rdx
-        0x85b02: movq 0x18(%rsp), %r10
-        0x85b07: movq (%rsp), %r8
-        0x85b0b: movq 0x8(%rsp), %r9
-        0x85b13: movq %rbp, 0x48(%rsp)
-        0x85b20: movq 0x10(%rsp), %r12
-        0x85b33: movq -0x8(%r12,%r14), %rcx
-        0x85b38: movq %rcx, %rax
-        0x85b3e: movq %rax, %rsi
-        0x85b41: movq %rdx, %rdi
-        0x85b44: movq (%r12,%r14), %r8
-        0x85b48: movq %rcx, %rax
-        0x85b4b: movq 0x20(%rsp), %r15
-        0x85b53: movq %r9, %rbx
-        0x85b56: movq %rdx, %r9
-        0x85b59: movq %rax, %rcx
-        0x85b5c: movq %r8, %rax
-        0x85b62: movq %rdx, %r10
-        0x85b65: movq %rax, %r11
-        0x85b68: movq %r8, %rax
-        0x85b6b: movq (%rsp), %r8
-        0x85b78: movq %rbx, %r9
-        0x85b85: movq 0x18(%rsp), %r10
-        0x85ba1: movq %rcx, %rdx
-        0x85bb2: movq %rcx, %rax
-        0x85bbd: movq %rdx, %rsi
-        0x85bcd: movq $-0x2, %r15
-        0x85bd7: movq %r13, %rdi
-        0x85bee: movq %rax, %rcx
-        0x85bf4: movq %rsi, %rdx
-        0x85bfd: movq %r13, %rdi
-        0x85c0b: movq %rcx, -0x8(%r12,%r14)
-        0x85c10: movq %rdx, (%r12,%r14)
-        0x85c26: movq 0x48(%rsp), %rbp
-        0x85c34: movq 0x28(%rsp), %r12
-        0x85c39: movq 0x10(%rsp), %r15
-        0x85c41: movq 0x38(%rsp), %r14
-        0x85c49: movq %r10, %rax
-        0x85c50: movq 0x20(%rsp), %rsi
-        0x85c55: movq %rsi, %rcx
-        0x85c6d: movq $-0x2, %rdx
-        0x85c8f: movq 0x30(%rsp), %rbp
+  Stats: mulx=0 mul=4 adc=11 spills=26 total_insns=205
 
   Disassembly:
     859c0: pushq %rbp
@@ -2928,185 +2146,7 @@ HOT KERNEL LISTINGS:
 
 [PASS] [HOT KERNEL] <lcpc_brakedown_pc::encode::encode_column_block::<lcpc_test_fields::ft63::Ft63>>
   Raw Symbol: lcpc_brakedown_pc::encode::encode_column_block::<lcpc_test_fields::ft63::Ft63>
-  Stats: mulx=0 mul=31 adc=7 spills=0 total_insns=497
-  Vector Moves (Memory copies / helpers):
-        0xf5a11: movq %rcx, %r14
-        0xf5a14: movq %rdx, %r15
-        0xf5a4c: movq %r8, %rbp
-        0xf5a4f: movq %rdi, %r13
-        0xf5a52: movq %rdx, 0x48(%rsp)
-        0xf5a57: movq %rsi, 0x10(%rsp)
-        0xf5a5c: movq %r9, (%rsp)
-        0xf5a60: movq %r12, %rdi
-        0xf5a72: movq %rax, %rbx
-        0xf5a81: movq %rbx, %rdi
-        0xf5a94: movq $0x0, (%rax)
-        0xf5a9b: movq 0x50(%r13), %rdx
-        0xf5a9f: movq %r15, 0x70(%rsp)
-        0xf5aa4: movq 0x48(%r13), %rax
-        0xf5aa8: movq (%rsp), %rcx
-        0xf5ab0: movq %rax, 0x78(%rsp)
-        0xf5ac8: movq %rbp, 0x70(%rsp)
-        0xf5acd: movq %rdx, %rax
-        0xf5ad4: movq %rax, 0x78(%rsp)
-        0xf5ae2: movq %rdx, %rsi
-        0xf5ae5: movq %rbp, %rax
-        0xf5aef: movq %r14, 0x58(%rsp)
-        0xf5af4: movq %r12, 0x68(%rsp)
-        0xf5afb: movq %rbp, %rax
-        0xf5b12: movq %rsi, 0xb0(%rsp)
-        0xf5b37: movq 0x8(%r13), %rax
-        0xf5b3b: movq %rax, 0xa0(%rsp)
-        0xf5b43: movq 0x10(%r13), %rax
-        0xf5b47: movq 0x20(%r13), %rcx
-        0xf5b4b: movq %rcx, 0x88(%rsp)
-        0xf5b53: movq 0x28(%r13), %rdx
-        0xf5b57: movq 0x40(%r13), %rcx
-        0xf5b5b: movq %rcx, 0x60(%rsp)
-        0xf5b60: movq 0x38(%r13), %rcx
-        0xf5b64: movq %rcx, 0x80(%rsp)
-        0xf5b6e: movq %rax, 0x20(%rsp)
-        0xf5b7b: movq %rax, 0xa8(%rsp)
-        0xf5b83: movq 0x68(%rsp), %rax
-        0xf5b8c: movq %rax, 0x28(%rsp)
-        0xf5b91: movq (%rsp), %rax
-        0xf5b9f: movq 0x58(%rsp), %r9
-        0xf5baf: movq %rsi, 0x40(%rsp)
-        0xf5bb4: movq %rdx, 0x98(%rsp)
-        0xf5bbc: movq %r15, 0xc0(%rsp)
-        0xf5bc4: movq %rdi, 0x50(%rsp)
-        0xf5bd0: movq $0x0, (%r13,%rax)
-        0xf5bd9: movq 0x38(%rsp), %r8
-        0xf5bde: movq 0x30(%rsp), %r9
-        0xf5be3: movq 0x68(%rsp), %rax
-        0xf5bee: movq 0xb8(%rsp), %rcx
-        0xf5bfe: movq 0x98(%rsp), %rdx
-        0xf5c0c: movq %r9, 0x30(%rsp)
-        0xf5c11: movq %r8, 0x38(%rsp)
-        0xf5c21: movq %rcx, %rax
-        0xf5c30: movq (%rsp), %r13
-        0xf5c3a: movq 0xa0(%rsp), %rcx
-        0xf5c67: movq %r8, 0xb8(%rsp)
-        0xf5c75: movq 0x58(%rsp), %rcx
-        0xf5c7e: movq 0x28(%rsp), %rax
-        0xf5c8c: movq %r13, %rdi
-        0xf5c91: movq 0x28(%rsp), %rdx
-        0xf5c9c: movq 0x28(%rsp), %rax
-        0xf5cb0: movq 0x88(%rsp), %rax
-        0xf5cbf: movq 0x80(%rsp), %rax
-        0xf5ccb: movq %rax, 0x18(%rsp)
-        0xf5cd0: movq %rsi, 0x90(%rsp)
-        0xf5cd8: movq %rsi, 0x8(%rsp)
-        0xf5ce0: movq %rsi, 0xd0(%rsp)
-        0xf5cf0: movq %rbp, 0xc8(%rsp)
-        0xf5d00: movq %rax, %rdx
-        0xf5d0f: movq %rdi, %rcx
-        0xf5d2c: movq %rcx, %rsi
-        0xf5d4a: movq %r11, %rsi
-        0xf5d67: movq %rdx, %rsi
-        0xf5d80: movq %rsi, 0xd8(%rsp)
-        0xf5d8c: movq 0x18(%rsp), %rsi
-        0xf5d91: movq (%rsi,%rax), %r8
-        0xf5d95: movq %r8, 0xf0(%rsp)
-        0xf5d9d: movq 0x8(%rsi,%rax), %r8
-        0xf5da2: movq %r8, 0xe8(%rsp)
-        0xf5daa: movq 0x10(%rsi,%rax), %r8
-        0xf5daf: movq %r8, 0xe0(%rsp)
-        0xf5db7: movq 0x18(%rsi,%rax), %r10
-        0xf5dbc: movq 0x10(%rsp), %rax
-        0xf5de0: movq 0xf0(%rsp), %rax
-        0xf5ded: movq %rax, %r11
-        0xf5df0: movq %rdx, %r13
-        0xf5e1e: movq 0xe8(%rsp), %rax
-        0xf5e2a: movq %rdx, %r11
-        0xf5e2d: movq %rax, %r13
-        0xf5e56: movq 0xe0(%rsp), %rax
-        0xf5e62: movq %rdx, %r11
-        0xf5e65: movq %rax, %r13
-        0xf5e8e: movq %r10, %rax
-        0xf5e95: movq %rdx, %r11
-        0xf5e98: movq %rax, %r13
-        0xf5e9f: movq %rdi, %rax
-        0xf5ea8: movq (%rsp), %r13
-        0xf5ec8: movq %rdx, (%rbx,%rcx,8)
-        0xf5ed8: movq 0xd8(%rsp), %rcx
-        0xf5ee0: movq %rcx, %rax
-        0xf5eeb: movq 0xc0(%rsp), %r15
-        0xf5ef3: movq 0xc8(%rsp), %rbp
-        0xf5f01: movq 0x90(%rsp), %r11
-        0xf5f13: movq 0x8(%rsp), %rcx
-        0xf5f23: movq %rdi, %rax
-        0xf5f38: movq 0x18(%rsp), %rax
-        0xf5f3d: movq %rcx, 0x8(%rsp)
-        0xf5f42: movq (%rax,%rcx,8), %rcx
-        0xf5f46: movq 0x10(%rsp), %rax
-        0xf5f60: movq %rcx, %rax
-        0xf5f67: movq %rax, %rdi
-        0xf5f6a: movq %rdx, %r8
-        0xf5f98: movq %rdx, (%rbx,%r10,8)
-        0xf5fa4: movq %r11, %rax
-        0xf5fb0: movq 0x8(%rsp), %rcx
-        0xf5fbd: movq %rdi, %rax
-        0xf5fd2: movq 0x18(%rsp), %rax
-        0xf5fd7: movq 0x8(%rax,%rcx,8), %rcx
-        0xf5fdc: movq 0x10(%rsp), %rax
-        0xf5ff0: movq %rcx, %rax
-        0xf5ff7: movq %rdx, %rdi
-        0xf5ffa: movq %rax, %r8
-        0xf6024: movq %rdx, (%rbx,%r10,8)
-        0xf603a: movq %rbp, %rax
-        0xf603d: movq 0x8(%rsp), %rbp
-        0xf604a: movq %rdi, %rsi
-        0xf605f: movq 0x18(%rsp), %rax
-        0xf6064: movq 0x10(%rax,%rbp,8), %rcx
-        0xf6069: movq 0x10(%rsp), %rax
-        0xf6080: movq %rcx, %rax
-        0xf6087: movq %rdx, %rsi
-        0xf608a: movq %rax, %rdi
-        0xf60b4: movq %rdx, (%rbx,%r10,8)
-        0xf60c8: movq 0x50(%rsp), %rdi
-        0xf60cd: movq 0x38(%rsp), %r8
-        0xf60d2: movq 0x30(%rsp), %r9
-        0xf60e0: movq 0x48(%rsp), %rdx
-        0xf60e5: movq 0x50(%rsp), %rdi
-        0xf60ea: movq 0x38(%rsp), %r8
-        0xf60ef: movq 0x30(%rsp), %r9
-        0xf6100: movq (%rbx,%rax,8), %rcx
-        0xf6104: movq %rcx, -0x18(%r8,%rax,8)
-        0xf6109: movq $0x0, (%rbx,%rax,8)
-        0xf6111: movq 0x8(%rbx,%rax,8), %rcx
-        0xf6116: movq %rcx, -0x10(%r8,%rax,8)
-        0xf611b: movq $0x0, 0x8(%rbx,%rax,8)
-        0xf6124: movq 0x10(%rbx,%rax,8), %rcx
-        0xf6129: movq %rcx, -0x8(%r8,%rax,8)
-        0xf612e: movq $0x0, 0x10(%rbx,%rax,8)
-        0xf6137: movq 0x18(%rbx,%rax,8), %rcx
-        0xf613c: movq %rcx, (%r8,%rax,8)
-        0xf6140: movq $0x0, 0x18(%rbx,%rax,8)
-        0xf6170: movq (%rcx,%rdx,8), %rsi
-        0xf6174: movq %rsi, (%rax,%rdx,8)
-        0xf6178: movq $0x0, (%rcx,%rdx,8)
-        0xf618d: movq %rbx, %rdi
-        0xf61a7: movq %rcx, %rsi
-        0xf61aa: movq %r15, %rdx
-        0xf61b6: movq %rcx, %rdi
-        0xf61b9: movq %r15, %rdx
-        0xf61c5: movq %r11, %rdi
-        0xf61c8: movq %r15, %rdx
-        0xf61d4: movq %rdx, %rdi
-        0xf61d7: movq %r15, %rdx
-        0xf61f1: movq 0x60(%rsp), %rdx
-        0xf61ff: movq %rax, %rsi
-        0xf6202: movq %r15, %rdx
-        0xf6227: movq %r8, %rdi
-        0xf6231: movq %rax, 0x40(%rsp)
-        0xf6238: movq 0x20(%rsp), %rdi
-        0xf623d: movq 0x20(%rsp), %rsi
-        0xf6242: movq 0x40(%rsp), %rdx
-        0xf6253: movq %r12, %rsi
-        0xf625b: movq %rax, %r14
-        0xf625e: movq %rbx, %rdi
-        0xf6267: movq %r14, %rdi
+  Stats: mulx=0 mul=31 adc=7 spills=82 total_insns=497
 
   Disassembly:
     f5a00: pushq %rbp
@@ -3609,100 +2649,32 @@ HOT KERNEL LISTINGS:
 
 [PASS] [HOT KERNEL] <lcpc_brakedown_pc::encode::encode_column_block::<lcpc_test_fields::ft127::Ft127>>
   Raw Symbol: lcpc_brakedown_pc::encode::encode_column_block::<lcpc_test_fields::ft127::Ft127>
-  Stats: mulx=0 mul=92 adc=106 spills=2 total_insns=1118
+  Stats: mulx=0 mul=92 adc=106 spills=130 total_insns=1118
   Vector Moves (Memory copies / helpers):
-        0xf6281: movq %rcx, 0xa8(%rsp)
-        0xf6289: movq %rsi, 0x48(%rsp)
-        0xf6298: movq %r9, 0x8(%rsp)
-        0xf62a7: movq %rdx, 0x40(%rsp)
-        0xf62ac: movq 0x8(%rsp), %rax
-        0xf62c2: movq %rdi, %r14
-        0xf62c5: movq %rbx, %rdi
-        0xf62c8: movq %r8, %r15
-        0xf62d1: movq %r15, %r8
-        0xf62d4: movq %r14, %rdi
-        0xf62e0: movq %rax, 0x10(%rsp)
-        0xf62e5: movq %rax, %rcx
-        0xf62fa: movq %rax, 0x10(%rsp)
-        0xf62ff: movq %rax, %rcx
-        0xf630e: movq 0x8(%rsp), %rax
-        0xf6320: movq 0x10(%rsp), %rcx
-        0xf6336: movq 0x10(%rsp), %rcx
+        0xf6333: xorps %xmm0, %xmm0 (zero idiom)
         0xf6340: movups %xmm0, 0x10(%rcx)
         0xf6344: movups %xmm0, (%rcx)
-        0xf6347: movq $0x0, 0x20(%rcx)
         0xf634f: movups %xmm0, 0x28(%rcx)
         0xf6353: movups %xmm0, 0x38(%rcx)
-        0xf6357: movq $0x0, 0x48(%rcx)
         0xf635f: movups %xmm0, 0x50(%rcx)
         0xf6363: movups %xmm0, 0x60(%rcx)
-        0xf6367: movq $0x0, 0x70(%rcx)
         0xf636f: movups %xmm0, 0x78(%rcx)
         0xf6373: movups %xmm0, 0x88(%rcx)
-        0xf637a: movq $0x0, 0x98(%rcx)
         0xf6385: movups %xmm0, 0xa0(%rcx)
         0xf638c: movups %xmm0, 0xb0(%rcx)
-        0xf6393: movq $0x0, 0xc0(%rcx)
         0xf639e: movups %xmm0, 0xd8(%rcx)
         0xf63a5: movups %xmm0, 0xc8(%rcx)
-        0xf63ac: movq $0x0, 0xe8(%rcx)
         0xf63b7: movups %xmm0, 0x100(%rcx)
         0xf63be: movups %xmm0, 0xf0(%rcx)
-        0xf63c5: movq $0x0, 0x110(%rcx)
         0xf63d0: movups %xmm0, 0x118(%rcx)
         0xf63d7: movups %xmm0, 0x128(%rcx)
-        0xf63de: movq $0x0, 0x138(%rcx)
+        0xf63ff: xorps %xmm0, %xmm0 (zero idiom)
         0xf6410: movups %xmm0, 0x10(%rcx)
         0xf6414: movups %xmm0, (%rcx)
-        0xf6417: movq $0x0, 0x20(%rcx)
+        0xf6428: xorps %xmm0, %xmm0 (zero idiom)
         0xf642b: movups %xmm0, 0x10(%rcx)
         0xf642f: movups %xmm0, (%rcx)
-        0xf6432: movq $0x0, 0x20(%rcx)
-        0xf643a: movq 0x50(%rdi), %r9
-        0xf643e: movq 0x40(%rsp), %rdx
-        0xf6443: movq %rdx, 0xc8(%rsp)
-        0xf644b: movq 0x48(%rdi), %rcx
-        0xf6455: movq %rcx, 0xd0(%rsp)
-        0xf6476: movq %r8, 0xc8(%rsp)
-        0xf647e: movq %r9, %rcx
-        0xf6487: movq %rcx, 0xd0(%rsp)
-        0xf6498: movq %r8, %rax
-        0xf64a6: movq %r8, %rax
-        0xf64e4: movq 0x8(%rdi), %rax
-        0xf64e8: movq %rax, 0x120(%rsp)
-        0xf64f0: movq 0x10(%rdi), %rcx
-        0xf64f4: movq 0x20(%rdi), %rax
-        0xf64f8: movq %rax, 0x100(%rsp)
-        0xf6500: movq 0x28(%rdi), %rdx
-        0xf6504: movq 0x40(%rdi), %rax
-        0xf6508: movq %rax, 0xb0(%rsp)
-        0xf6510: movq 0x38(%rdi), %rax
-        0xf6514: movq %rax, 0xf8(%rsp)
-        0xf651c: movq 0x8(%rsp), %rsi
-        0xf6527: movq %rcx, 0x30(%rsp)
-        0xf6534: movq %rcx, 0x128(%rsp)
-        0xf6540: movq %rcx, 0xe8(%rsp)
-        0xf6556: movq %rcx, 0xe0(%rsp)
-        0xf6561: movq %rcx, 0xd8(%rsp)
-        0xf6569: movq %rsi, 0x58(%rsp)
-        0xf6572: movq %rcx, 0xf0(%rsp)
-        0xf657a: movq 0x10(%rsp), %rcx
-        0xf6583: movq %rcx, 0xc0(%rsp)
-        0xf658b: movq 0xa8(%rsp), %rcx
-        0xf6597: movq %rcx, 0x28(%rsp)
-        0xf65a3: movq %rcx, 0xa0(%rsp)
-        0xf65ab: movq %r9, 0x118(%rsp)
-        0xf65b3: movq %rdx, 0x110(%rsp)
         0xf65c0: movups %xmm0, (%rcx)
-        0xf65c3: movq 0x28(%rsp), %rax
-        0xf65cd: movq %rax, 0x28(%rsp)
-        0xf65d2: movq 0x130(%rsp), %rcx
-        0xf65da: movq %rcx, %rax
-        0xf65e5: movq 0x110(%rsp), %rdx
-        0xf6610: movq 0x120(%rsp), %rcx
-        0xf6640: movq %r8, 0x130(%rsp)
-        0xf6660: movq 0xf0(%rsp), %rdx
-        0xf6680: movq 0xd8(%rsp), %rdx
         0xf6690: movups %xmm0, (%rax)
         0xf66b0: movups %xmm0, (%rax)
         0xf66b3: movups %xmm0, 0x10(%rax)
@@ -3712,368 +2684,8 @@ HOT KERNEL LISTINGS:
         0xf66c3: movups %xmm0, 0x50(%rax)
         0xf66c7: movups %xmm0, 0x60(%rax)
         0xf66cb: movups %xmm0, 0x70(%rax)
-        0xf66e0: movq 0x100(%rsp), %rax
-        0xf66ec: movq %rax, 0xb8(%rsp)
-        0xf6703: movq %rdi, 0x50(%rsp)
-        0xf6708: movq %rsi, 0x38(%rsp)
-        0xf670d: movq %rsi, 0x108(%rsp)
-        0xf6718: movq %rsi, 0x138(%rsp)
-        0xf6730: movq %rax, 0x60(%rsp)
-        0xf6735: movq %rax, %rbp
-        0xf673c: movq 0x50(%rsp), %r12
-        0xf6741: movq (%r12,%rbp), %rcx
-        0xf6745: movq %rcx, %rax
-        0xf6755: movq %rdx, %r8
-        0xf6758: movq %rax, %rsi
-        0xf675b: movq %rcx, %rax
-        0xf676b: movq %rax, %rcx
-        0xf676e: movq %rdx, %rbx
-        0xf6771: movq 0x8(%r12,%rbp), %rdi
-        0xf6776: movq %rdi, %rax
-        0xf677c: movq %rdx, %r10
-        0xf677f: movq %rax, %r11
-        0xf6782: movq %rdi, %rax
-        0xf6788: movq %rax, %r9
-        0xf678b: movq %rdx, %rdi
-        0xf6798: movq %rsi, %r8
-        0xf67a9: movq %r8, %rax
-        0xf67b9: movq %rdx, %rbx
-        0xf67bc: movq %rax, %r14
-        0xf67bf: movq %r8, %rax
-        0xf67cf: movq %rdx, %r8
-        0xf6803: movq %rbp, 0x18(%rsp)
-        0xf6812: movq %rcx, %rsi
-        0xf6819: movq %rsi, %rax
-        0xf681f: movq %rdx, %rdi
-        0xf6822: movq %rax, %r9
-        0xf6825: movq %rsi, %rax
-        0xf682b: movq %rdx, %rsi
-        0xf682e: movq %rax, %rbx
-        0xf685c: movq %rsi, %rcx
-        0xf6898: movq %rsi, 0x90(%rsp)
-        0xf68a0: movq %rax, 0x88(%rsp)
-        0xf68b0: movq %rbx, 0x88(%rsp)
-        0xf68b8: movq %rsi, 0x90(%rsp)
-        0xf68c0: movq 0x18(%rsp), %rdi
-        0xf68c5: movq 0x10(%rdi), %rcx
-        0xf68c9: movq %rcx, %rax
-        0xf68d9: movq %rax, %rsi
-        0xf68dc: movq %rdx, %r8
-        0xf68df: movq 0x18(%rdi), %rdi
-        0xf68e3: movq %rcx, %rax
-        0xf68f3: movq %rdx, %rbx
-        0xf68f6: movq %rax, %rcx
-        0xf68f9: movq %rdi, %rax
-        0xf68ff: movq %rdx, %r10
-        0xf6902: movq %rax, %r11
-        0xf6905: movq %rdi, %rax
-        0xf690b: movq %rax, %r9
-        0xf690e: movq %rdx, %rdi
-        0xf691b: movq %rsi, %r8
-        0xf6922: movq %r8, %rax
-        0xf6928: movq %rdx, %rbx
-        0xf692b: movq %rax, %r14
-        0xf692e: movq %r8, %rax
-        0xf6934: movq %rdx, %r8
-        0xf6965: movq %rcx, %rsi
-        0xf696c: movq %rsi, %rax
-        0xf6972: movq %rdx, %rdi
-        0xf6975: movq %rax, %r9
-        0xf6978: movq %rsi, %rax
-        0xf697e: movq %rdx, %rsi
-        0xf6981: movq %rax, %rbx
-        0xf69af: movq %rsi, %rcx
-        0xf69eb: movq %rsi, 0x80(%rsp)
-        0xf69f3: movq %rax, 0x78(%rsp)
-        0xf6a00: movq %rbx, 0x78(%rsp)
-        0xf6a05: movq %rsi, 0x80(%rsp)
-        0xf6a0d: movq 0x18(%rsp), %rdi
-        0xf6a12: movq 0x20(%rdi), %rsi
-        0xf6a16: movq %rsi, %rax
-        0xf6a26: movq %rax, %rcx
-        0xf6a29: movq %rdx, %r9
-        0xf6a2c: movq 0x28(%rdi), %rdi
-        0xf6a30: movq %rsi, %rax
-        0xf6a40: movq %rdx, %r14
-        0xf6a43: movq %rax, %rsi
-        0xf6a46: movq %rdi, %rax
-        0xf6a4c: movq %rdx, %r10
-        0xf6a4f: movq %rax, %rbx
-        0xf6a52: movq %rdi, %rax
-        0xf6a58: movq %rax, %r8
-        0xf6a5b: movq %rdx, %rdi
-        0xf6a68: movq %rcx, %r9
-        0xf6a6f: movq %r9, %rax
-        0xf6a7f: movq %rdx, %r14
-        0xf6a82: movq %rax, %r15
-        0xf6a85: movq %r9, %rax
-        0xf6a95: movq %rdx, %r9
-        0xf6ac6: movq %rsi, %rcx
-        0xf6acd: movq %rcx, %rax
-        0xf6ad3: movq %rdx, %rdi
-        0xf6ad6: movq %rax, %r10
-        0xf6ad9: movq %rcx, %rax
-        0xf6adf: movq %rdx, %rbx
-        0xf6ae2: movq %rax, %r14
-        0xf6b10: movq %rbx, %rcx
-        0xf6b4c: movq %rbx, 0x70(%rsp)
-        0xf6b51: movq %rax, 0x68(%rsp)
-        0xf6b60: movq %r14, 0x68(%rsp)
-        0xf6b65: movq %rbx, 0x70(%rsp)
-        0xf6b6a: movq %r12, %rbp
-        0xf6b6d: movq 0x18(%rsp), %r8
-        0xf6b72: movq 0x30(%r8), %rsi
-        0xf6b76: movq %rsi, %rax
-        0xf6b86: movq %rax, %rdi
-        0xf6b89: movq %rdx, %rbx
-        0xf6b8c: movq 0x38(%r8), %r9
-        0xf6b90: movq %rsi, %rax
-        0xf6ba0: movq %rdx, %r12
-        0xf6ba3: movq %rax, %rsi
-        0xf6ba6: movq %r9, %rax
-        0xf6bac: movq %rdx, %r14
-        0xf6baf: movq %rax, %r15
-        0xf6bb2: movq %r9, %rax
-        0xf6bb8: movq %rax, %r10
-        0xf6bbb: movq %rdx, %r9
-        0xf6bc8: movq %rdi, %rbx
-        0xf6bcf: movq %rbx, %rax
-        0xf6bdf: movq %rdx, %r12
-        0xf6be2: movq %rax, %r13
-        0xf6be5: movq %rbx, %rax
-        0xf6bf5: movq %rdx, %rbx
-        0xf6c24: movq %rsi, %rdi
-        0xf6c2b: movq %rdi, %rax
-        0xf6c3b: movq %rdx, %r9
-        0xf6c3e: movq %rax, %r14
-        0xf6c41: movq %rdi, %rax
-        0xf6c47: movq %rdx, %r10
-        0xf6c4a: movq %rax, %r15
-        0xf6c6c: movq 0x40(%rsp), %r8
-        0xf6c71: movq 0xb8(%rsp), %rdi
-        0xf6c79: movq 0x60(%rsp), %r9
-        0xf6c89: movq %r10, %rcx
-        0xf6cc4: movq %r9, %rax
-        0xf6ccf: movq 0x8(%rsp), %rsi
-        0xf6cd4: movq %rsi, %rcx
-        0xf6cdb: movq %rcx, %rdx
-        0xf6cf5: movq 0x8(%rsp), %rsi
-        0xf6cfa: movq %rsi, %rcx
-        0xf6d01: movq %rcx, %rdx
-        0xf6d1a: movq 0x8(%rsp), %rsi
-        0xf6d1f: movq %rsi, %rcx
-        0xf6d26: movq %rcx, %rdx
-        0xf6d3f: movq 0x8(%rsp), %rdx
-        0xf6d44: movq %rdx, %rax
-        0xf6d4b: movq %rax, %rcx
-        0xf6d63: movq %r9, 0x60(%rsp)
-        0xf6d68: movq 0x58(%rsp), %rax
-        0xf6d71: movq %rsi, 0x140(%rsp)
-        0xf6d7d: movq %rbx, 0x148(%rsp)
-        0xf6d8d: movq 0x8(%rsp), %rax
-        0xf6d92: movq %r10, 0x158(%rsp)
-        0xf6d9a: movq 0xc0(%rsp), %r10
-        0xf6da2: movq 0x48(%rsp), %r14
-        0xf6da7: movq %r15, 0x150(%rsp)
-        0xf6daf: movq %r11, 0x168(%rsp)
-        0xf6db7: movq %r13, 0x160(%rsp)
-        0xf6dc0: movq %rax, 0x18(%rsp)
-        0xf6dc5: movq -0x8(%r14,%r11), %rsi
-        0xf6dca: movq %rsi, %rax
-        0xf6dcd: movq 0x88(%rsp), %rcx
-        0xf6dd8: movq %rax, %r8
-        0xf6ddb: movq %rdx, %r9
-        0xf6dde: movq (%r14,%r11), %rdi
-        0xf6de2: movq %rdi, %rax
-        0xf6de8: movq %rax, %r15
-        0xf6deb: movq %rdx, %rbx
-        0xf6dee: movq %rsi, %rax
-        0xf6df1: movq 0x90(%rsp), %rcx
-        0xf6dfc: movq %rdx, %rsi
-        0xf6dff: movq %rax, %r12
-        0xf6e02: movq %rdi, %rax
-        0xf6e08: movq %rax, %rbp
-        0xf6e0b: movq %rdx, %rdi
-        0xf6e26: movq %r8, 0x20(%rsp)
-        0xf6e3f: movq -0x8(%r14,%r13), %r9
-        0xf6e44: movq %r9, %rax
-        0xf6e47: movq 0x78(%rsp), %rcx
-        0xf6e4f: movq %rax, %r12
-        0xf6e52: movq %rdx, %r11
-        0xf6e55: movq (%r14,%r13), %rbx
-        0xf6e59: movq %rbx, %rax
-        0xf6e5f: movq %rax, %rsi
-        0xf6e62: movq %rdx, %rcx
-        0xf6e65: movq %r9, %rax
-        0xf6e68: movq 0x80(%rsp), %r9
-        0xf6e73: movq %rdx, %r8
-        0xf6e76: movq %rax, %r13
-        0xf6e79: movq %rbx, %rax
-        0xf6e7f: movq %rax, %rbx
-        0xf6e82: movq %rdx, %r9
-        0xf6e9e: movq %r12, 0x20(%rsp)
-        0xf6eb7: movq %rax, 0x98(%rsp)
-        0xf6ebf: movq 0x148(%rsp), %rdi
-        0xf6ec7: movq -0x8(%r14,%rdi), %rcx
-        0xf6ecc: movq %rcx, %rax
-        0xf6ecf: movq 0x68(%rsp), %r11
-        0xf6ed7: movq %rax, %r12
-        0xf6eda: movq %rdx, %r8
-        0xf6edd: movq (%r14,%rdi), %rdi
-        0xf6ee1: movq %rdi, %rax
-        0xf6ee7: movq %rax, %r15
-        0xf6eea: movq %rdx, %r11
-        0xf6eed: movq %rcx, %rax
-        0xf6ef0: movq 0x70(%rsp), %rbp
-        0xf6ef8: movq %rdx, %rcx
-        0xf6efb: movq %rax, %r13
-        0xf6efe: movq %rdi, %rax
-        0xf6f04: movq %rax, %rbp
-        0xf6f07: movq %rdx, %rdi
-        0xf6f23: movq %r12, 0x170(%rsp)
-        0xf6f39: movq 0x140(%rsp), %r9
-        0xf6f41: movq -0x8(%r14,%r9), %rcx
-        0xf6f46: movq %rcx, %rax
-        0xf6f49: movq 0x150(%rsp), %r8
-        0xf6f54: movq %rax, %rsi
-        0xf6f57: movq %rdx, %r13
-        0xf6f5a: movq (%r14,%r9), %r11
-        0xf6f5e: movq %r11, %rax
-        0xf6f64: movq %rax, %r9
-        0xf6f67: movq %rdx, %rbx
-        0xf6f6a: movq %rcx, %rax
-        0xf6f6d: movq 0x158(%rsp), %rcx
-        0xf6f78: movq %rdx, %r8
-        0xf6f7b: movq %rax, %r12
-        0xf6f7e: movq %r11, %rax
-        0xf6f81: movq 0x168(%rsp), %r11
-        0xf6fb6: movq 0x160(%rsp), %r13
-        0xf6fc6: movq %rsi, -0x20(%r10)
-        0xf6fca: movq %r9, -0x18(%r10)
-        0xf6fce: movq %rax, -0x10(%r10)
-        0xf6fd2: movq 0x18(%rsp), %rax
-        0xf6fd7: movq %rdx, -0x8(%r10)
-        0xf6fdb: movq %rcx, (%r10)
-        0xf6fef: movq 0x60(%rsp), %rax
-        0xf700c: movq 0x8(%rsp), %r11
-        0xf7011: movq 0x28(%rsp), %rbx
-        0xf7016: movq 0x10(%rsp), %r14
-        0xf701b: movq 0x38(%rsp), %rax
-        0xf702a: movq 0x108(%rsp), %rdx
-        0xf7035: movq 0xb8(%rsp), %rcx
-        0xf7041: movq %rcx, 0x18(%rsp)
-        0xf7052: movq %rax, 0x38(%rsp)
-        0xf7060: movq %r12, %rdi
-        0xf7067: movq 0x50(%rsp), %r10
-        0xf706c: movq (%r10,%rdi), %rsi
-        0xf7070: movq %rsi, %rax
-        0xf7080: movq %rax, %rcx
-        0xf7083: movq %rdx, %r9
-        0xf7086: movq 0x8(%r10,%rdi), %rdi
-        0xf708b: movq %rsi, %rax
-        0xf709b: movq %rdx, %rbx
-        0xf709e: movq %rax, %rsi
-        0xf70a1: movq %rdi, %rax
-        0xf70a7: movq %rdx, %r10
-        0xf70aa: movq %rax, %r11
-        0xf70ad: movq %rdi, %rax
-        0xf70b3: movq %rax, %r8
-        0xf70b6: movq %rdx, %rdi
-        0xf70c3: movq %rcx, %r9
-        0xf70ca: movq %r9, %rax
-        0xf70da: movq %rdx, %rbx
-        0xf70dd: movq %rax, %r14
-        0xf70e0: movq %r9, %rax
-        0xf70f0: movq %rdx, %r9
-        0xf7120: movq %rsi, %rcx
-        0xf7127: movq %rcx, %rax
-        0xf712d: movq %rdx, %rdi
-        0xf7130: movq %rax, %r10
-        0xf7133: movq %rcx, %rax
-        0xf7139: movq %rdx, %rcx
-        0xf713c: movq %rax, %r8
-        0xf715d: movq 0x40(%rsp), %r9
-        0xf716d: movq %rcx, %rdx
-        0xf71a8: movq 0x18(%rsp), %rax
-        0xf71b1: movq 0x8(%rsp), %rsi
-        0xf71b6: movq %rsi, %rax
-        0xf71bd: movq %rax, %rdx
-        0xf71e0: movq 0x8(%rsp), %rbp
-        0xf71e5: movq 0xc0(%rsp), %r15
-        0xf71f0: movq -0x8(%r13), %rdi
-        0xf71f4: movq %rdi, %rax
-        0xf71fa: movq %rax, %rsi
-        0xf71fd: movq %rdx, %r9
-        0xf7200: movq (%r13), %r10
-        0xf7204: movq %r10, %rax
-        0xf720a: movq %rdx, %r11
-        0xf720d: movq %rax, %rbx
-        0xf7210: movq %rdi, %rax
-        0xf7216: movq %rdx, %rdi
-        0xf7219: movq %rax, %r14
-        0xf721c: movq %r10, %rax
-        0xf7257: movq 0x38(%rsp), %rax
-        0xf726f: movq 0x8(%rsp), %r11
-        0xf7274: movq 0x28(%rsp), %rbx
-        0xf7279: movq 0x10(%rsp), %r14
-        0xf72a6: movq %rax, -0x8(%rbx)
-        0xf72aa: movq %rdx, (%rbx)
         0xf72ad: movups %xmm0, 0x10(%r14)
         0xf72b2: movups %xmm0, (%r14)
-        0xf72b6: movq $0x0, 0x20(%r14)
-        0xf72cf: movq (%r14), %r9
-        0xf72d2: movq %r9, %rcx
-        0xf72d9: movq %rcx, %rax
-        0xf72e9: movq %rdx, %rsi
-        0xf72ec: movq %rax, %rdi
-        0xf72ef: movq %rcx, %rax
-        0xf72ff: movq %rdx, %rcx
-        0xf7302: movq %rax, %r8
-        0xf730d: movq 0x18(%r14), %r15
-        0xf731b: movq 0x10(%r14), %r12
-        0xf731f: movq %rcx, %rbp
-        0xf7325: movq %r15, %r13
-        0xf732c: movq %r8, %rsi
-        0xf733d: movq %rsi, %rax
-        0xf7343: movq %rdx, %r9
-        0xf7346: movq %rax, %r10
-        0xf7349: movq %rsi, %rax
-        0xf7359: movq %rdx, %rdi
-        0xf735c: movq %rax, %rsi
-        0xf7379: movq %rdi, %rdx
-        0xf7388: movq 0x20(%r14), %r10
-        0xf7393: movq %rsi, %rcx
-        0xf739a: movq %rcx, %rax
-        0xf73aa: movq %rdx, %r8
-        0xf73ad: movq %rax, %r9
-        0xf73b0: movq %rcx, %rax
-        0xf73fe: movq 0x10(%rsp), %rdi
-        0xf741a: movq %rax, %rdi
-        0xf741d: movq %rdx, %rsi
-        0xf7420: movq %r9, %rdx
-        0xf742c: movq %rcx, %rdi
-        0xf742f: movq %rdx, %rsi
-        0xf7432: movq %r8, %rdx
-        0xf743e: movq %rcx, %rdi
-        0xf7441: movq %rdx, %rsi
-        0xf7444: movq %r8, %rdx
-        0xf7450: movq %rcx, %rdi
-        0xf7453: movq %rdx, %rsi
-        0xf7456: movq %r8, %rdx
-        0xf7462: movq %rax, %rdi
-        0xf7465: movq %rcx, %rsi
-        0xf7468: movq %r8, %rdx
-        0xf7482: movq 0xb0(%rsp), %rdx
-        0xf74a3: movq %rax, %rdi
-        0xf74af: movq %r8, %rdi
-        0xf74b9: movq %rax, 0xa0(%rsp)
-        0xf74c3: movq 0x30(%rsp), %rdi
-        0xf74c8: movq 0x30(%rsp), %rsi
-        0xf74cd: movq 0xa0(%rsp), %rdx
-        0xf74e1: movq %rbx, %rsi
-        0xf74e9: movq %rax, %rbx
-        0xf74ec: movq 0x10(%rsp), %rdi
-        0xf74f7: movq %rbx, %rdi
 
   Disassembly:
     f6270: pushq %rbp
@@ -5197,99 +3809,31 @@ HOT KERNEL LISTINGS:
 
 [PASS] [HOT KERNEL] <lcpc_brakedown_pc::encode::encode_column_block::<lcpc_fields::mont127::Mont127>>
   Raw Symbol: lcpc_brakedown_pc::encode::encode_column_block::<lcpc_fields::mont127::Mont127>
-  Stats: mulx=0 mul=92 adc=106 spills=2 total_insns=1115
+  Stats: mulx=0 mul=92 adc=106 spills=128 total_insns=1115
   Vector Moves (Memory copies / helpers):
-        0xf7511: movq %rcx, 0xa0(%rsp)
-        0xf7519: movq %rsi, 0x48(%rsp)
-        0xf7528: movq %r9, (%rsp)
-        0xf7536: movq %rdx, 0x40(%rsp)
-        0xf753b: movq (%rsp), %rax
-        0xf7550: movq %rdi, %r14
-        0xf7553: movq %rbx, %rdi
-        0xf7556: movq %r8, %r15
-        0xf755f: movq %r15, %r8
-        0xf7562: movq %r14, %rdi
-        0xf756e: movq %rax, 0x8(%rsp)
-        0xf7573: movq %rax, %rcx
-        0xf7587: movq %rax, 0x8(%rsp)
-        0xf758c: movq %rax, %rcx
-        0xf759a: movq (%rsp), %rax
-        0xf75ab: movq 0x8(%rsp), %rcx
-        0xf75c1: movq 0x8(%rsp), %rcx
+        0xf75be: xorps %xmm0, %xmm0 (zero idiom)
         0xf75d0: movups %xmm0, 0x10(%rcx)
         0xf75d4: movups %xmm0, (%rcx)
-        0xf75d7: movq $0x0, 0x20(%rcx)
         0xf75df: movups %xmm0, 0x28(%rcx)
         0xf75e3: movups %xmm0, 0x38(%rcx)
-        0xf75e7: movq $0x0, 0x48(%rcx)
         0xf75ef: movups %xmm0, 0x50(%rcx)
         0xf75f3: movups %xmm0, 0x60(%rcx)
-        0xf75f7: movq $0x0, 0x70(%rcx)
         0xf75ff: movups %xmm0, 0x78(%rcx)
         0xf7603: movups %xmm0, 0x88(%rcx)
-        0xf760a: movq $0x0, 0x98(%rcx)
         0xf7615: movups %xmm0, 0xa0(%rcx)
         0xf761c: movups %xmm0, 0xb0(%rcx)
-        0xf7623: movq $0x0, 0xc0(%rcx)
         0xf762e: movups %xmm0, 0xd8(%rcx)
         0xf7635: movups %xmm0, 0xc8(%rcx)
-        0xf763c: movq $0x0, 0xe8(%rcx)
         0xf7647: movups %xmm0, 0x100(%rcx)
         0xf764e: movups %xmm0, 0xf0(%rcx)
-        0xf7655: movq $0x0, 0x110(%rcx)
         0xf7660: movups %xmm0, 0x118(%rcx)
         0xf7667: movups %xmm0, 0x128(%rcx)
-        0xf766e: movq $0x0, 0x138(%rcx)
+        0xf768f: xorps %xmm0, %xmm0 (zero idiom)
         0xf76a0: movups %xmm0, 0x10(%rcx)
         0xf76a4: movups %xmm0, (%rcx)
-        0xf76a7: movq $0x0, 0x20(%rcx)
+        0xf76b8: xorps %xmm0, %xmm0 (zero idiom)
         0xf76bb: movups %xmm0, 0x10(%rcx)
         0xf76bf: movups %xmm0, (%rcx)
-        0xf76c2: movq $0x0, 0x20(%rcx)
-        0xf76ca: movq 0x50(%rdi), %r9
-        0xf76ce: movq 0x40(%rsp), %rdx
-        0xf76d3: movq %rdx, 0xc0(%rsp)
-        0xf76db: movq 0x48(%rdi), %rcx
-        0xf76e4: movq %rcx, 0xc8(%rsp)
-        0xf7705: movq %r8, 0xc0(%rsp)
-        0xf770d: movq %r9, %rcx
-        0xf7715: movq %rcx, 0xc8(%rsp)
-        0xf7726: movq %r8, %rax
-        0xf7733: movq %r8, %rax
-        0xf776f: movq 0x8(%rdi), %rax
-        0xf7773: movq %rax, 0x110(%rsp)
-        0xf777b: movq 0x10(%rdi), %rax
-        0xf777f: movq 0x20(%rdi), %rcx
-        0xf7783: movq %rcx, 0xf0(%rsp)
-        0xf778b: movq 0x28(%rdi), %rdx
-        0xf778f: movq 0x40(%rdi), %rcx
-        0xf7793: movq %rcx, 0xa8(%rsp)
-        0xf779b: movq 0x38(%rdi), %rcx
-        0xf779f: movq %rcx, 0xe8(%rsp)
-        0xf77a7: movq (%rsp), %rsi
-        0xf77b1: movq %rax, 0x30(%rsp)
-        0xf77be: movq %rax, 0x118(%rsp)
-        0xf77c6: movq %rsi, 0x28(%rsp)
-        0xf77cf: movq %rax, 0xe0(%rsp)
-        0xf77e5: movq %rax, 0xd8(%rsp)
-        0xf77f0: movq %rax, 0xd0(%rsp)
-        0xf77f8: movq 0x8(%rsp), %rax
-        0xf7801: movq %rax, 0xb8(%rsp)
-        0xf7809: movq 0xa0(%rsp), %rax
-        0xf7815: movq %rax, 0x20(%rsp)
-        0xf7821: movq %rax, 0x98(%rsp)
-        0xf7829: movq %r9, 0x108(%rsp)
-        0xf7831: movq %rdx, 0x100(%rsp)
-        0xf7840: movq 0x20(%rsp), %rax
-        0xf784a: movq %rax, 0x20(%rsp)
-        0xf784f: movq 0x120(%rsp), %rcx
-        0xf785f: movq 0x100(%rsp), %rdx
-        0xf7878: movq %rcx, %rax
-        0xf788d: movq 0x110(%rsp), %rcx
-        0xf78bd: movq %r8, 0x120(%rsp)
-        0xf78dc: movq %rax, %rcx
-        0xf78ea: movq 0xd0(%rsp), %rdx
-        0xf78f2: movq %rax, %rcx
         0xf7900: movups %xmm0, (%rcx)
         0xf7930: movups %xmm0, (%rcx)
         0xf7933: movups %xmm0, 0x10(%rcx)
@@ -5299,368 +3843,8 @@ HOT KERNEL LISTINGS:
         0xf7943: movups %xmm0, 0x50(%rcx)
         0xf7947: movups %xmm0, 0x60(%rcx)
         0xf794b: movups %xmm0, 0x70(%rcx)
-        0xf7960: movq 0xf0(%rsp), %rax
-        0xf796c: movq %rax, 0xb0(%rsp)
-        0xf7983: movq %rdi, 0x50(%rsp)
-        0xf7988: movq %rsi, 0x38(%rsp)
-        0xf798d: movq %rsi, 0xf8(%rsp)
-        0xf7998: movq %rsi, 0x128(%rsp)
-        0xf79b0: movq %rax, 0x58(%rsp)
-        0xf79b5: movq %rax, %rbp
-        0xf79bc: movq 0x50(%rsp), %r12
-        0xf79c1: movq (%r12,%rbp), %rcx
-        0xf79c5: movq %rcx, %rax
-        0xf79d5: movq %rdx, %r8
-        0xf79d8: movq %rax, %rsi
-        0xf79db: movq %rcx, %rax
-        0xf79eb: movq %rax, %rcx
-        0xf79ee: movq %rdx, %rbx
-        0xf79f1: movq 0x8(%r12,%rbp), %rdi
-        0xf79f6: movq %rdi, %rax
-        0xf79fc: movq %rdx, %r10
-        0xf79ff: movq %rax, %r11
-        0xf7a02: movq %rdi, %rax
-        0xf7a08: movq %rax, %r9
-        0xf7a0b: movq %rdx, %rdi
-        0xf7a18: movq %rsi, %r8
-        0xf7a29: movq %r8, %rax
-        0xf7a39: movq %rdx, %rbx
-        0xf7a3c: movq %rax, %r14
-        0xf7a3f: movq %r8, %rax
-        0xf7a4f: movq %rdx, %r8
-        0xf7a83: movq %rbp, 0x10(%rsp)
-        0xf7a92: movq %rcx, %rsi
-        0xf7a99: movq %rsi, %rax
-        0xf7a9f: movq %rdx, %rdi
-        0xf7aa2: movq %rax, %r9
-        0xf7aa5: movq %rsi, %rax
-        0xf7aab: movq %rdx, %rsi
-        0xf7aae: movq %rax, %rbx
-        0xf7adc: movq %rsi, %rcx
-        0xf7b18: movq %rsi, 0x88(%rsp)
-        0xf7b20: movq %rax, 0x80(%rsp)
-        0xf7b30: movq %rbx, 0x80(%rsp)
-        0xf7b38: movq %rsi, 0x88(%rsp)
-        0xf7b40: movq 0x10(%rsp), %rdi
-        0xf7b45: movq 0x10(%rdi), %rcx
-        0xf7b49: movq %rcx, %rax
-        0xf7b59: movq %rax, %rsi
-        0xf7b5c: movq %rdx, %r8
-        0xf7b5f: movq 0x18(%rdi), %rdi
-        0xf7b63: movq %rcx, %rax
-        0xf7b73: movq %rdx, %rbx
-        0xf7b76: movq %rax, %rcx
-        0xf7b79: movq %rdi, %rax
-        0xf7b7f: movq %rdx, %r10
-        0xf7b82: movq %rax, %r11
-        0xf7b85: movq %rdi, %rax
-        0xf7b8b: movq %rax, %r9
-        0xf7b8e: movq %rdx, %rdi
-        0xf7b9b: movq %rsi, %r8
-        0xf7ba2: movq %r8, %rax
-        0xf7ba8: movq %rdx, %rbx
-        0xf7bab: movq %rax, %r14
-        0xf7bae: movq %r8, %rax
-        0xf7bb4: movq %rdx, %r8
-        0xf7be5: movq %rcx, %rsi
-        0xf7bec: movq %rsi, %rax
-        0xf7bf2: movq %rdx, %rdi
-        0xf7bf5: movq %rax, %r9
-        0xf7bf8: movq %rsi, %rax
-        0xf7bfe: movq %rdx, %rsi
-        0xf7c01: movq %rax, %rbx
-        0xf7c2f: movq %rsi, %rcx
-        0xf7c6b: movq %rsi, 0x78(%rsp)
-        0xf7c70: movq %rax, 0x70(%rsp)
-        0xf7c80: movq %rbx, 0x70(%rsp)
-        0xf7c85: movq %rsi, 0x78(%rsp)
-        0xf7c8a: movq 0x10(%rsp), %rdi
-        0xf7c8f: movq 0x20(%rdi), %rsi
-        0xf7c93: movq %rsi, %rax
-        0xf7ca3: movq %rax, %rcx
-        0xf7ca6: movq %rdx, %r9
-        0xf7ca9: movq 0x28(%rdi), %rdi
-        0xf7cad: movq %rsi, %rax
-        0xf7cbd: movq %rdx, %r14
-        0xf7cc0: movq %rax, %rsi
-        0xf7cc3: movq %rdi, %rax
-        0xf7cc9: movq %rdx, %r10
-        0xf7ccc: movq %rax, %rbx
-        0xf7ccf: movq %rdi, %rax
-        0xf7cd5: movq %rax, %r8
-        0xf7cd8: movq %rdx, %rdi
-        0xf7ce5: movq %rcx, %r9
-        0xf7cec: movq %r9, %rax
-        0xf7cfc: movq %rdx, %r14
-        0xf7cff: movq %rax, %r15
-        0xf7d02: movq %r9, %rax
-        0xf7d12: movq %rdx, %r9
-        0xf7d43: movq %rsi, %rcx
-        0xf7d4a: movq %rcx, %rax
-        0xf7d50: movq %rdx, %rdi
-        0xf7d53: movq %rax, %r10
-        0xf7d56: movq %rcx, %rax
-        0xf7d5c: movq %rdx, %rbx
-        0xf7d5f: movq %rax, %r14
-        0xf7d8d: movq %rbx, %rcx
-        0xf7dc9: movq %rbx, 0x68(%rsp)
-        0xf7dce: movq %rax, 0x60(%rsp)
-        0xf7de0: movq %r14, 0x60(%rsp)
-        0xf7de5: movq %rbx, 0x68(%rsp)
-        0xf7dea: movq %r12, %rbp
-        0xf7ded: movq 0x10(%rsp), %r8
-        0xf7df2: movq 0x30(%r8), %rsi
-        0xf7df6: movq %rsi, %rax
-        0xf7e06: movq %rax, %rdi
-        0xf7e09: movq %rdx, %rbx
-        0xf7e0c: movq 0x38(%r8), %r9
-        0xf7e10: movq %rsi, %rax
-        0xf7e20: movq %rdx, %r12
-        0xf7e23: movq %rax, %rsi
-        0xf7e26: movq %r9, %rax
-        0xf7e2c: movq %rdx, %r14
-        0xf7e2f: movq %rax, %r15
-        0xf7e32: movq %r9, %rax
-        0xf7e38: movq %rax, %r10
-        0xf7e3b: movq %rdx, %r9
-        0xf7e48: movq %rdi, %rbx
-        0xf7e4f: movq %rbx, %rax
-        0xf7e5f: movq %rdx, %r12
-        0xf7e62: movq %rax, %r13
-        0xf7e65: movq %rbx, %rax
-        0xf7e75: movq %rdx, %rbx
-        0xf7ea4: movq %rsi, %rdi
-        0xf7eab: movq %rdi, %rax
-        0xf7ebb: movq %rdx, %r9
-        0xf7ebe: movq %rax, %r14
-        0xf7ec1: movq %rdi, %rax
-        0xf7ec7: movq %rdx, %r10
-        0xf7eca: movq %rax, %r15
-        0xf7eec: movq 0x40(%rsp), %r8
-        0xf7ef1: movq 0xb0(%rsp), %rdi
-        0xf7ef9: movq 0x58(%rsp), %r9
-        0xf7f09: movq %r10, %rcx
-        0xf7f44: movq %r9, %rax
-        0xf7f4f: movq (%rsp), %rsi
-        0xf7f53: movq %rsi, %rcx
-        0xf7f5a: movq %rcx, %rdx
-        0xf7f74: movq (%rsp), %rsi
-        0xf7f78: movq %rsi, %rcx
-        0xf7f7f: movq %rcx, %rdx
-        0xf7f98: movq (%rsp), %rsi
-        0xf7f9c: movq %rsi, %rcx
-        0xf7fa3: movq %rcx, %rdx
-        0xf7fbc: movq (%rsp), %rdx
-        0xf7fc0: movq %rdx, %rax
-        0xf7fc7: movq %rax, %rcx
-        0xf7fdf: movq %r9, 0x58(%rsp)
-        0xf7fe4: movq 0x28(%rsp), %rax
-        0xf7fed: movq %rsi, 0x130(%rsp)
-        0xf7ff9: movq %rbx, 0x138(%rsp)
-        0xf8009: movq (%rsp), %rax
-        0xf800d: movq %r10, 0x148(%rsp)
-        0xf8015: movq 0xb8(%rsp), %r10
-        0xf801d: movq 0x48(%rsp), %r14
-        0xf8022: movq %r15, 0x140(%rsp)
-        0xf802a: movq %r11, 0x158(%rsp)
-        0xf8032: movq %r13, 0x150(%rsp)
-        0xf8040: movq %rax, 0x10(%rsp)
-        0xf8045: movq -0x8(%r14,%r11), %rsi
-        0xf804a: movq %rsi, %rax
-        0xf804d: movq 0x80(%rsp), %rcx
-        0xf8058: movq %rax, %r8
-        0xf805b: movq %rdx, %r9
-        0xf805e: movq (%r14,%r11), %rdi
-        0xf8062: movq %rdi, %rax
-        0xf8068: movq %rax, %r15
-        0xf806b: movq %rdx, %rbx
-        0xf806e: movq %rsi, %rax
-        0xf8071: movq 0x88(%rsp), %rcx
-        0xf807c: movq %rdx, %rsi
-        0xf807f: movq %rax, %r12
-        0xf8082: movq %rdi, %rax
-        0xf8088: movq %rax, %rbp
-        0xf808b: movq %rdx, %rdi
-        0xf80a6: movq %r8, 0x18(%rsp)
-        0xf80bf: movq -0x8(%r14,%r13), %r9
-        0xf80c4: movq %r9, %rax
-        0xf80c7: movq 0x70(%rsp), %rcx
-        0xf80cf: movq %rax, %r12
-        0xf80d2: movq %rdx, %r11
-        0xf80d5: movq (%r14,%r13), %rbx
-        0xf80d9: movq %rbx, %rax
-        0xf80df: movq %rax, %rsi
-        0xf80e2: movq %rdx, %rcx
-        0xf80e5: movq %r9, %rax
-        0xf80e8: movq 0x78(%rsp), %r9
-        0xf80f0: movq %rdx, %r8
-        0xf80f3: movq %rax, %r13
-        0xf80f6: movq %rbx, %rax
-        0xf80fc: movq %rax, %rbx
-        0xf80ff: movq %rdx, %r9
-        0xf811b: movq %r12, 0x18(%rsp)
-        0xf8134: movq %rax, 0x90(%rsp)
-        0xf813c: movq 0x138(%rsp), %rdi
-        0xf8144: movq -0x8(%r14,%rdi), %rcx
-        0xf8149: movq %rcx, %rax
-        0xf814c: movq 0x60(%rsp), %r11
-        0xf8154: movq %rax, %r12
-        0xf8157: movq %rdx, %r8
-        0xf815a: movq (%r14,%rdi), %rdi
-        0xf815e: movq %rdi, %rax
-        0xf8164: movq %rax, %r15
-        0xf8167: movq %rdx, %r11
-        0xf816a: movq %rcx, %rax
-        0xf816d: movq 0x68(%rsp), %rbp
-        0xf8175: movq %rdx, %rcx
-        0xf8178: movq %rax, %r13
-        0xf817b: movq %rdi, %rax
-        0xf8181: movq %rax, %rbp
-        0xf8184: movq %rdx, %rdi
-        0xf81a0: movq %r12, 0x160(%rsp)
-        0xf81b6: movq 0x130(%rsp), %r9
-        0xf81be: movq -0x8(%r14,%r9), %rcx
-        0xf81c3: movq %rcx, %rax
-        0xf81c6: movq 0x140(%rsp), %r8
-        0xf81d1: movq %rax, %rsi
-        0xf81d4: movq %rdx, %r13
-        0xf81d7: movq (%r14,%r9), %r11
-        0xf81db: movq %r11, %rax
-        0xf81e1: movq %rax, %r9
-        0xf81e4: movq %rdx, %rbx
-        0xf81e7: movq %rcx, %rax
-        0xf81ea: movq 0x148(%rsp), %rcx
-        0xf81f5: movq %rdx, %r8
-        0xf81f8: movq %rax, %r12
-        0xf81fb: movq %r11, %rax
-        0xf81fe: movq 0x158(%rsp), %r11
-        0xf8233: movq 0x150(%rsp), %r13
-        0xf8243: movq %rsi, -0x20(%r10)
-        0xf8247: movq %r9, -0x18(%r10)
-        0xf824b: movq %rax, -0x10(%r10)
-        0xf824f: movq 0x10(%rsp), %rax
-        0xf8254: movq %rdx, -0x8(%r10)
-        0xf8258: movq %rcx, (%r10)
-        0xf826c: movq 0x58(%rsp), %rax
-        0xf8289: movq (%rsp), %r11
-        0xf828d: movq 0x20(%rsp), %rbx
-        0xf8292: movq 0x8(%rsp), %r14
-        0xf8297: movq 0x38(%rsp), %rax
-        0xf82a6: movq 0xf8(%rsp), %rdx
-        0xf82b1: movq 0xb0(%rsp), %rcx
-        0xf82bd: movq %rcx, 0x10(%rsp)
-        0xf82ce: movq %rax, 0x38(%rsp)
-        0xf82e0: movq %r12, %rdi
-        0xf82e7: movq 0x50(%rsp), %r10
-        0xf82ec: movq (%r10,%rdi), %rsi
-        0xf82f0: movq %rsi, %rax
-        0xf8300: movq %rax, %rcx
-        0xf8303: movq %rdx, %r9
-        0xf8306: movq 0x8(%r10,%rdi), %rdi
-        0xf830b: movq %rsi, %rax
-        0xf831b: movq %rdx, %rbx
-        0xf831e: movq %rax, %rsi
-        0xf8321: movq %rdi, %rax
-        0xf8327: movq %rdx, %r10
-        0xf832a: movq %rax, %r11
-        0xf832d: movq %rdi, %rax
-        0xf8333: movq %rax, %r8
-        0xf8336: movq %rdx, %rdi
-        0xf8343: movq %rcx, %r9
-        0xf834a: movq %r9, %rax
-        0xf835a: movq %rdx, %rbx
-        0xf835d: movq %rax, %r14
-        0xf8360: movq %r9, %rax
-        0xf8370: movq %rdx, %r9
-        0xf83a0: movq %rsi, %rcx
-        0xf83a7: movq %rcx, %rax
-        0xf83ad: movq %rdx, %rdi
-        0xf83b0: movq %rax, %r10
-        0xf83b3: movq %rcx, %rax
-        0xf83b9: movq %rdx, %rcx
-        0xf83bc: movq %rax, %r8
-        0xf83dd: movq 0x40(%rsp), %r9
-        0xf83ed: movq %rcx, %rdx
-        0xf8428: movq 0x10(%rsp), %rax
-        0xf8431: movq (%rsp), %rsi
-        0xf8435: movq %rsi, %rax
-        0xf843c: movq %rax, %rdx
-        0xf845f: movq (%rsp), %rbp
-        0xf8463: movq 0xb8(%rsp), %r15
-        0xf8470: movq -0x8(%r13), %rdi
-        0xf8474: movq %rdi, %rax
-        0xf847a: movq %rax, %rsi
-        0xf847d: movq %rdx, %r9
-        0xf8480: movq (%r13), %r10
-        0xf8484: movq %r10, %rax
-        0xf848a: movq %rdx, %r11
-        0xf848d: movq %rax, %rbx
-        0xf8490: movq %rdi, %rax
-        0xf8496: movq %rdx, %rdi
-        0xf8499: movq %rax, %r14
-        0xf849c: movq %r10, %rax
-        0xf84d7: movq 0x38(%rsp), %rax
-        0xf84ef: movq (%rsp), %r11
-        0xf84f3: movq 0x20(%rsp), %rbx
-        0xf84f8: movq 0x8(%rsp), %r14
-        0xf8526: movq %rax, -0x8(%rbx)
-        0xf852a: movq %rdx, (%rbx)
         0xf852d: movups %xmm0, 0x10(%r14)
         0xf8532: movups %xmm0, (%r14)
-        0xf8536: movq $0x0, 0x20(%r14)
-        0xf854f: movq (%r14), %r9
-        0xf8552: movq %r9, %rcx
-        0xf8559: movq %rcx, %rax
-        0xf8569: movq %rdx, %rsi
-        0xf856c: movq %rax, %rdi
-        0xf856f: movq %rcx, %rax
-        0xf857f: movq %rdx, %rcx
-        0xf8582: movq %rax, %r8
-        0xf858d: movq 0x18(%r14), %r15
-        0xf859b: movq 0x10(%r14), %r12
-        0xf859f: movq %rcx, %rbp
-        0xf85a5: movq %r15, %r13
-        0xf85ac: movq %r8, %rsi
-        0xf85bd: movq %rsi, %rax
-        0xf85c3: movq %rdx, %r9
-        0xf85c6: movq %rax, %r10
-        0xf85c9: movq %rsi, %rax
-        0xf85d9: movq %rdx, %rdi
-        0xf85dc: movq %rax, %rsi
-        0xf85f9: movq %rdi, %rdx
-        0xf8608: movq 0x20(%r14), %r10
-        0xf8613: movq %rsi, %rcx
-        0xf861a: movq %rcx, %rax
-        0xf862a: movq %rdx, %r8
-        0xf862d: movq %rax, %r9
-        0xf8630: movq %rcx, %rax
-        0xf867e: movq 0x8(%rsp), %rdi
-        0xf869a: movq %rax, %rdi
-        0xf869d: movq %rdx, %rsi
-        0xf86a0: movq %r9, %rdx
-        0xf86ac: movq %rcx, %rdi
-        0xf86af: movq %rdx, %rsi
-        0xf86b2: movq %r8, %rdx
-        0xf86be: movq %rcx, %rdi
-        0xf86c1: movq %rdx, %rsi
-        0xf86c4: movq %r8, %rdx
-        0xf86d0: movq %rcx, %rdi
-        0xf86d3: movq %rdx, %rsi
-        0xf86d6: movq %r8, %rdx
-        0xf86e2: movq %rax, %rdi
-        0xf86e5: movq %rcx, %rsi
-        0xf86e8: movq %r8, %rdx
-        0xf8702: movq 0xa8(%rsp), %rdx
-        0xf8723: movq %rax, %rdi
-        0xf872f: movq %r8, %rdi
-        0xf8739: movq %rax, 0x98(%rsp)
-        0xf8743: movq 0x30(%rsp), %rdi
-        0xf8748: movq 0x30(%rsp), %rsi
-        0xf874d: movq 0x98(%rsp), %rdx
-        0xf8761: movq %rbx, %rsi
-        0xf8769: movq %rax, %rbx
-        0xf876c: movq 0x8(%rsp), %rdi
-        0xf8777: movq %rbx, %rdi
 
   Disassembly:
     f7500: pushq %rbp
@@ -6781,52 +4965,7 @@ HOT KERNEL LISTINGS:
 
 [PASS] [HOT KERNEL] <lcpc_brakedown_pc::encode::reed_solomon_column_block::<lcpc_test_fields::ft63::Ft63>>
   Raw Symbol: lcpc_brakedown_pc::encode::reed_solomon_column_block::<lcpc_test_fields::ft63::Ft63>
-  Stats: mulx=0 mul=6 adc=2 spills=0 total_insns=210
-  Vector Moves (Memory copies / helpers):
-        0xf878e: movq %r8, %rbx
-        0xf8791: movq %rcx, %r11
-        0xf8794: movq %rdx, %r15
-        0xf8797: movq %rcx, %rax
-        0xf87a7: movq %r11, %rax
-        0xf87af: movq %rdx, %rcx
-        0xf87b2: movq %rsi, %rax
-        0xf87c2: movq %rsi, %rax
-        0xf87ca: movq %rdx, 0x20(%rsp)
-        0xf87d8: movq %rsi, (%rsp)
-        0xf87f8: movq (%rsp), %rax
-        0xf880a: movq 0xc6a17(%rip), %r14     # 0x1bf228 <writev+0x1bf228>
-        0xf8823: movq %r15, %rdi
-        0xf8828: movq %r10, %rdx
-        0xf882b: movq %r11, %r12
-        0xf8839: movq %r12, %r11
-        0xf883c: movq $0x0, -0x8(%r15,%rbx,8)
-        0xf8863: movq $0x0, (%r15)
-        0xf8880: movq %rsi, %rax
-        0xf8896: movq %rdx, 0x20(%rsp)
-        0xf88ec: movq %rax, 0x10(%rsp)
-        0xf88f4: movq %r9, 0x8(%rsp)
-        0xf8900: movq %r11, 0x18(%rsp)
-        0xf8905: movq %r15, %rdi
-        0xf890a: movq %r10, %rdx
-        0xf891b: movq 0x18(%rsp), %r11
-        0xf8920: movq $0x0, (%r15,%r10)
-        0xf8928: movq 0x10(%rsp), %rdi
-        0xf892d: movq (%rsp), %r8
-        0xf8950: movq %rbp, %rax
-        0xf8957: movq %rdx, %rcx
-        0xf895a: movq %rax, %rsi
-        0xf8984: movq %rcx, (%r15,%r9,8)
-        0xf89d7: movq %rax, 0x8(%rsp)
-        0xf89e3: movq %rbp, %rcx
-        0xf89f0: movq %r11, %r8
-        0xf89f3: movq $0x0, (%r15)
-        0xf89fa: movq 0x8(%rsp), %r11
-        0xf89ff: movq (%rsp), %r14
-        0xf8a20: movq %rcx, %rax
-        0xf8a27: movq %rdx, %rsi
-        0xf8a2a: movq %rax, %rdi
-        0xf8a54: movq %rdx, (%r15,%rbp,8)
-        0xf8a73: movq %r8, %r11
+  Stats: mulx=0 mul=6 adc=2 spills=13 total_insns=210
 
   Disassembly:
     f8780: pushq %rbp
@@ -7042,109 +5181,13 @@ HOT KERNEL LISTINGS:
 
 [PASS] [HOT KERNEL] <lcpc_brakedown_pc::encode::reed_solomon_column_block::<lcpc_test_fields::ft127::Ft127>>
   Raw Symbol: lcpc_brakedown_pc::encode::reed_solomon_column_block::<lcpc_test_fields::ft127::Ft127>
-  Stats: mulx=0 mul=10 adc=14 spills=0 total_insns=315
+  Stats: mulx=0 mul=10 adc=14 spills=47 total_insns=315
   Vector Moves (Memory copies / helpers):
-        0xf8ad1: movq %r8, %r12
-        0xf8ad4: movq %rcx, %r14
-        0xf8ad7: movq %rdx, %r15
-        0xf8ada: movq %rsi, %rbx
-        0xf8add: movq %rdi, 0x50(%rsp)
-        0xf8ae2: movq %rcx, %rax
-        0xf8af2: movq %r14, %rax
-        0xf8afa: movq %rdx, %rcx
-        0xf8afd: movq %rbx, %rax
-        0xf8b0d: movq %rbx, %rax
-        0xf8b15: movq %rdx, 0x80(%rsp)
-        0xf8b32: movq %r12, %r13
-        0xf8b40: movq %rdx, 0x20(%rsp)
-        0xf8b54: movq 0xc66cd(%rip), %rbx     # 0x1bf228 <writev+0x1bf228>
-        0xf8b60: movq %r15, %rdi
+        0xf8b6e: xorps %xmm0, %xmm0 (zero idiom)
         0xf8b71: movups %xmm0, (%r15,%rdx)
-        0xf8b8d: movq %rbx, %rax
-        0xf8ba4: movq %rdx, 0x80(%rsp)
-        0xf8bf0: movq %rbx, %rax
-        0xf8bff: movq %r13, %rax
-        0xf8c05: movq %rax, 0x60(%rsp)
-        0xf8c0e: movq %rax, 0x70(%rsp)
-        0xf8c13: movq %rsi, 0x40(%rsp)
-        0xf8c18: movq %rcx, 0x8(%rsp)
-        0xf8c1d: movq %r12, 0x30(%rsp)
-        0xf8c22: movq %rbx, 0x18(%rsp)
-        0xf8c27: movq %r13, 0x10(%rsp)
-        0xf8c30: movq 0x28(%rsp), %r14
-        0xf8c35: movq 0x58(%rsp), %r15
-        0xf8c3a: movq 0x18(%rsp), %rbx
-        0xf8c3f: movq 0x10(%rsp), %r13
-        0xf8c44: movq 0x20(%rsp), %rdx
-        0xf8c49: movq %rax, 0x40(%rsp)
-        0xf8c5c: movq %r15, %rdi
-        0xf8c67: movq 0x20(%rsp), %rdx
-        0xf8c70: movq %rax, 0x58(%rsp)
-        0xf8c78: movq %r14, 0x28(%rsp)
+        0xf8c81: xorps %xmm0, %xmm0 (zero idiom)
         0xf8c84: movups %xmm0, (%rax)
-        0xf8c87: movq 0x50(%rsp), %rax
-        0xf8c8c: movq %rax, 0x48(%rsp)
-        0xf8c91: movq %rbx, %rax
-        0xf8c9e: movq %r15, 0x38(%rsp)
-        0xf8cb0: movq 0x48(%rsp), %rax
-        0xf8cba: movq %rax, 0x48(%rsp)
-        0xf8cbf: movq 0x68(%rsp), %rax
-        0xf8cd0: movq %rax, 0x68(%rsp)
-        0xf8ced: movq $-0x1, %rcx
-        0xf8cf8: movq %rax, -0x8(%r15,%r13)
-        0xf8d11: movq %r11, (%r15,%r13)
-        0xf8d21: movq %rdx, 0x78(%rsp)
-        0xf8d26: movq -0x8(%r15,%r13), %rcx
-        0xf8d2b: movq %rcx, %rax
-        0xf8d2e: movq 0x40(%rsp), %r10
-        0xf8d36: movq %rax, %rdi
-        0xf8d39: movq %rdx, %r9
-        0xf8d3c: movq (%r15,%r13), %rsi
-        0xf8d40: movq %rcx, %rax
-        0xf8d43: movq 0x8(%rsp), %r8
-        0xf8d4b: movq %rdx, %r12
-        0xf8d4e: movq %rax, %rcx
-        0xf8d51: movq %rsi, %rax
-        0xf8d57: movq %rdx, %r10
-        0xf8d5a: movq %rax, %r11
-        0xf8d5d: movq %rsi, %rax
-        0xf8d63: movq %rax, %r8
-        0xf8d66: movq %rdx, %rsi
-        0xf8d73: movq %rdi, %r9
-        0xf8d76: movq 0x70(%rsp), %r14
-        0xf8d7f: movq %r9, %rax
-        0xf8d85: movq %rdx, %r12
-        0xf8d88: movq %rbp, %r15
-        0xf8d8b: movq %rax, %rbp
-        0xf8d8e: movq %r9, %rax
-        0xf8d94: movq %rdx, %r9
-        0xf8daa: movq %r15, %rbp
-        0xf8dbe: movq %rcx, %rdi
-        0xf8dc5: movq %rdi, %rax
-        0xf8dcb: movq %rdx, %r8
-        0xf8dce: movq %rax, %r10
-        0xf8dd1: movq %rdi, %rax
-        0xf8e16: movq %rbx, %r11
-        0xf8e2d: movq $-0x1, %rcx
-        0xf8e4c: movq 0x30(%rsp), %r12
-        0xf8e51: movq 0x38(%rsp), %r15
-        0xf8e56: movq 0x48(%rsp), %rcx
-        0xf8e64: movq %rax, -0x8(%r15,%r13)
-        0xf8e69: movq %r11, (%r15,%r13)
-        0xf8e70: movq 0x78(%rsp), %rdx
-        0xf8eac: movq 0x40(%rsp), %rdx
-        0xf8ece: movq 0x8(%rsp), %rsi
-        0xf8ed9: movq %rsi, 0x8(%rsp)
-        0xf8eea: movq 0x58(%rsp), %r15
-        0xf8eef: movq 0x20(%rsp), %rdx
-        0xf8efd: movq %rbx, 0x8(%rsp)
-        0xf8f1d: movq $-0x1, %rcx
-        0xf8f36: movq 0x8(%rsp), %rdi
-        0xf8f41: movq %rdi, 0x8(%rsp)
-        0xf8f46: movq 0x28(%rsp), %r14
-        0xf8f4b: movq 0x18(%rsp), %rbx
-        0xf8f50: movq 0x10(%rsp), %r13
-        0xf8f55: movq %rax, 0x40(%rsp)
+        0xf8f65: xorps %xmm0, %xmm0 (zero idiom)
         0xf8f73: movups %xmm0, (%r15)
 
   Disassembly:
@@ -7466,85 +5509,7 @@ HOT KERNEL LISTINGS:
 
 [PASS] [HOT KERNEL] <lcpc_brakedown_pc::encode::reed_solomon_column_block::<lcpc_fields::mont127::Mont127>>
   Raw Symbol: lcpc_brakedown_pc::encode::reed_solomon_column_block::<lcpc_fields::mont127::Mont127>
-  Stats: mulx=0 mul=10 adc=11 spills=0 total_insns=273
-  Vector Moves (Memory copies / helpers):
-        0xf8fae: movq %r8, %r15
-        0xf8fb1: movq %rcx, %r14
-        0xf8fb4: movq %rdx, %r13
-        0xf8fb7: movq %rsi, %rbx
-        0xf8fba: movq %rdi, 0x20(%rsp)
-        0xf8fbf: movq %rcx, %rax
-        0xf8fcb: movq %r14, %rax
-        0xf8fd3: movq %rdx, %rcx
-        0xf8fd6: movq %rbx, %rax
-        0xf8fe2: movq %rbx, %rax
-        0xf8fea: movq %rdx, 0x60(%rsp)
-        0xf8ffc: movq %r15, %rdx
-        0xf9006: movq %rdx, 0x10(%rsp)
-        0xf900d: movq 0xc6214(%rip), %rbx     # 0x1bf228 <writev+0x1bf228>
-        0xf9020: movq %r13, %rdi
-        0xf9025: movq 0x10(%rsp), %rdx
-        0xf9052: movq %rbx, %rax
-        0xf9065: movq %rdx, 0x60(%rsp)
-        0xf90a7: movq %rbx, %rax
-        0xf90b6: movq %rdx, %rax
-        0xf90bc: movq %rax, 0x30(%rsp)
-        0xf90c5: movq %rax, 0x40(%rsp)
-        0xf90ca: movq %rdi, (%rsp)
-        0xf90ce: movq %rbx, 0x8(%rsp)
-        0xf90d3: movq %r15, 0x48(%rsp)
-        0xf90d8: movq 0x40(%rsp), %rbp
-        0xf90ea: movq (%rsp), %rdi
-        0xf9108: movq %rdi, %rax
-        0xf910b: movq 0x8(%rsp), %rbx
-        0xf9116: movq %rax, (%rsp)
-        0xf9123: movq %r14, 0x28(%rsp)
-        0xf9128: movq %r13, %rdi
-        0xf9133: movq 0x20(%rsp), %rax
-        0xf9138: movq %rax, 0x18(%rsp)
-        0xf913d: movq %r13, 0x58(%rsp)
-        0xf9142: movq %r12, 0x50(%rsp)
-        0xf9150: movq 0x18(%rsp), %rax
-        0xf915a: movq %rax, 0x18(%rsp)
-        0xf915f: movq 0x38(%rsp), %rbx
-        0xf9170: movq %rbx, 0x38(%rsp)
-        0xf91ad: movq %rax, -0x8(%r13,%r14)
-        0xf91b2: movq %rdx, (%r13,%r14)
-        0xf91c0: movq -0x8(%r13,%r14), %rcx
-        0xf91c5: movq %rcx, %rax
-        0xf91c8: movq (%rsp), %r9
-        0xf91cf: movq %rax, %rsi
-        0xf91d2: movq %rdx, %r8
-        0xf91d5: movq (%r13,%r14), %rdi
-        0xf91da: movq %rcx, %rax
-        0xf91e0: movq %rdx, %r13
-        0xf91e3: movq %rax, %rcx
-        0xf91e6: movq %rdi, %rax
-        0xf91ec: movq %rdx, %r10
-        0xf91ef: movq %rax, %r11
-        0xf91f2: movq %rdi, %rax
-        0xf91f8: movq %rax, %r9
-        0xf91fb: movq %rdx, %rdi
-        0xf9208: movq %rsi, %r8
-        0xf920f: movq %r8, %rax
-        0xf921f: movq %rdx, %r13
-        0xf9222: movq %rax, %r12
-        0xf9225: movq %r8, %rax
-        0xf9235: movq %rdx, %r8
-        0xf9262: movq %rcx, %rsi
-        0xf9269: movq %rsi, %rax
-        0xf9279: movq %rdx, %rdi
-        0xf927c: movq %rax, %r9
-        0xf927f: movq %rsi, %rax
-        0xf92de: movq 0x18(%rsp), %rcx
-        0xf92f9: movq 0x48(%rsp), %r15
-        0xf92fe: movq 0x58(%rsp), %r13
-        0xf9303: movq 0x50(%rsp), %r12
-        0xf933a: movq (%rsp), %rdi
-        0xf9341: movq %r12, %rcx
-        0xf9363: movq %rdx, %r12
-        0xf9376: movq 0x28(%rsp), %r14
-        0xf937b: movq 0x10(%rsp), %rdx
+  Stats: mulx=0 mul=10 adc=11 spills=31 total_insns=273
 
   Disassembly:
     f8fa0: pushq %rbp
@@ -7823,24 +5788,7 @@ HOT KERNEL LISTINGS:
 
 [PASS] [HOT KERNEL] <lcpc_fields::fp2m61::mac_column_fp2_m61>
   Raw Symbol: lcpc_fields::fp2m61::mac_column_fp2_m61
-  Stats: mulx=0 mul=4 adc=4 spills=0 total_insns=70
-  Vector Moves (Memory copies / helpers):
-        0x178aab: movq %rsi, 0x8(%rsp)
-        0x178ab0: movq %r8, 0x10(%rsp)
-        0x178ac3: movq (%rdx), %rbx
-        0x178ac6: movq 0x8(%rdx), %r14
-        0x178ae0: movq (%rcx,%r12), %r9
-        0x178ae4: movq %r9, %rax
-        0x178aea: movq %rax, %r10
-        0x178aed: movq %rdx, %r8
-        0x178af0: movq 0x8(%rcx,%r12), %r11
-        0x178af5: movq %r11, %rax
-        0x178b0a: movq %r10, (%rdi,%r12,2)
-        0x178b0e: movq %r9, %rax
-        0x178b14: movq %rdx, %r9
-        0x178b17: movq %rax, %r10
-        0x178b1a: movq %r11, %rax
-        0x178b26: movq %r8, 0x8(%rdi,%r12,2)
+  Stats: mulx=0 mul=4 adc=4 spills=2 total_insns=70
 
   Disassembly:
     178aa0: pushq %r15
@@ -7916,22 +5864,11 @@ HOT KERNEL LISTINGS:
 
 [PASS] [HOT KERNEL] <lcpc_fields::fp2m61::reduce_column_fp2_m61>
   Raw Symbol: lcpc_fields::fp2m61::reduce_column_fp2_m61
-  Stats: mulx=0 mul=0 adc=0 spills=0 total_insns=76
+  Stats: mulx=0 mul=0 adc=0 spills=2 total_insns=76
   Vector Moves (Memory copies / helpers):
-        0x178b77: movq %rsi, 0x8(%rsp)
-        0x178b7c: movq %rcx, 0x10(%rsp)
-        0x178bc0: movq (%rdx,%r8,2), %r10
-        0x178bc4: movq 0x8(%rdx,%r8,2), %r11
-        0x178bc9: movq %r11, %rbx
-        0x178be1: movq %r11, %r10
-        0x178bf9: movq 0x10(%rdx,%r8,2), %r11
-        0x178bfe: movq 0x18(%rdx,%r8,2), %rbx
-        0x178c03: movq %rbx, %r14
-        0x178c1b: movq %rbx, %r11
+        0x178bb2: xorps %xmm0, %xmm0 (zero idiom)
         0x178c33: movaps %xmm0, (%rdx,%r8,2)
         0x178c38: movaps %xmm0, 0x10(%rdx,%r8,2)
-        0x178c3e: movq %r10, (%rdi,%r8)
-        0x178c42: movq %r11, 0x8(%rdi,%r8)
 
   Disassembly:
     178b70: pushq %r14
@@ -8013,24 +5950,7 @@ HOT KERNEL LISTINGS:
 
 [PASS] [HOT KERNEL] <lcpc_fields::mers127::mac_column_mers127>
   Raw Symbol: lcpc_fields::mers127::mac_column_mers127
-  Stats: mulx=0 mul=4 adc=8 spills=0 total_insns=78
-  Vector Moves (Memory copies / helpers):
-        0x178c8e: movq %rsi, 0x8(%rsp)
-        0x178c93: movq %r8, 0x10(%rsp)
-        0x178caa: movq (%rdx), %r15
-        0x178cad: movq 0x8(%rdx), %r12
-        0x178cc0: movq -0x8(%rcx), %r8
-        0x178cc4: movq %r8, %rax
-        0x178cca: movq %rax, %rsi
-        0x178ccd: movq %rdx, %r9
-        0x178cd0: movq (%rcx), %r10
-        0x178cd3: movq %r10, %rax
-        0x178cd9: movq %rdx, %r11
-        0x178cdc: movq %rax, %rbx
-        0x178cdf: movq %r8, %rax
-        0x178ce5: movq %rdx, %r8
-        0x178ce8: movq %rax, %r14
-        0x178ceb: movq %r10, %rax
+  Stats: mulx=0 mul=4 adc=8 spills=2 total_insns=78
 
   Disassembly:
     178c80: pushq %rbp
@@ -8114,29 +6034,11 @@ HOT KERNEL LISTINGS:
 
 [PASS] [HOT KERNEL] <lcpc_fields::mers127::reduce_column_mers127>
   Raw Symbol: lcpc_fields::mers127::reduce_column_mers127
-  Stats: mulx=0 mul=0 adc=5 spills=0 total_insns=98
+  Stats: mulx=0 mul=0 adc=5 spills=2 total_insns=98
   Vector Moves (Memory copies / helpers):
-        0x178d6e: movq %rsi, 0x8(%rsp)
-        0x178d73: movq %rcx, 0x10(%rsp)
-        0x178d94: movq $-0x1, %rcx
-        0x178daf: movq $-0x2, %r11
-        0x178dc0: movq 0x8(%rdx), %r12
-        0x178dc4: movq 0x10(%rdx), %r15
-        0x178dc8: movq 0x18(%rdx), %r13
-        0x178dcc: movq 0x20(%rdx), %r14
-        0x178dd0: movq %r13, %rbp
-        0x178de0: movq %r15, %r9
-        0x178de7: movq %r14, %rbx
-        0x178e05: movq %r9, %r12
-        0x178e1f: movq %rbx, %r9
-        0x178e33: movq %rbx, %r14
-        0x178e3a: movq %r9, %r15
-        0x178e43: movq %rax, %r12
-        0x178e51: movq %r14, (%rdi,%r8)
-        0x178e55: movq %r15, 0x8(%rdi,%r8)
+        0x178da2: xorps %xmm0, %xmm0 (zero idiom)
         0x178e5a: movups %xmm0, 0x10(%rdx)
         0x178e5e: movups %xmm0, (%rdx)
-        0x178e61: movq $0x0, 0x20(%rdx)
 
   Disassembly:
     178d60: pushq %rbp
@@ -8240,24 +6142,7 @@ HOT KERNEL LISTINGS:
 
 [PASS] [HOT KERNEL] <lcpc_fields::mont127::mac_column_mont127>
   Raw Symbol: lcpc_fields::mont127::mac_column_mont127
-  Stats: mulx=0 mul=4 adc=8 spills=0 total_insns=78
-  Vector Moves (Memory copies / helpers):
-        0x178ebe: movq %rsi, 0x8(%rsp)
-        0x178ec3: movq %r8, 0x10(%rsp)
-        0x178eda: movq (%rdx), %r15
-        0x178edd: movq 0x8(%rdx), %r12
-        0x178ef0: movq -0x8(%rcx), %r8
-        0x178ef4: movq %r8, %rax
-        0x178efa: movq %rax, %rsi
-        0x178efd: movq %rdx, %r9
-        0x178f00: movq (%rcx), %r10
-        0x178f03: movq %r10, %rax
-        0x178f09: movq %rdx, %r11
-        0x178f0c: movq %rax, %rbx
-        0x178f0f: movq %r8, %rax
-        0x178f15: movq %rdx, %r8
-        0x178f18: movq %rax, %r14
-        0x178f1b: movq %r10, %rax
+  Stats: mulx=0 mul=4 adc=8 spills=2 total_insns=78
 
   Disassembly:
     178eb0: pushq %rbp
@@ -8341,49 +6226,11 @@ HOT KERNEL LISTINGS:
 
 [PASS] [HOT KERNEL] <lcpc_fields::mont127::reduce_column_mont127>
   Raw Symbol: lcpc_fields::mont127::reduce_column_mont127
-  Stats: mulx=0 mul=9 adc=13 spills=0 total_insns=130
+  Stats: mulx=0 mul=9 adc=13 spills=9 total_insns=130
   Vector Moves (Memory copies / helpers):
-        0x178f9e: movq %rdi, 0x18(%rsp)
-        0x178fa3: movq %rsi, 0x28(%rsp)
-        0x178fa8: movq %rcx, 0x30(%rsp)
-        0x178fbf: movq %rdx, %rbx
-        0x178fe3: movq %rcx, 0x8(%rsp)
-        0x178feb: movq %rax, (%rsp)
-        0x178fef: movq %rsi, 0x10(%rsp)
-        0x179016: movq 0x18(%rsp), %rcx
-        0x17901b: movq %rax, (%rcx,%rbp)
-        0x17901f: movq %rdx, 0x8(%rcx,%rbp)
-        0x17902c: movq 0x10(%rsp), %rsi
-        0x17903a: movq (%rbx), %rsi
-        0x17903d: movq %rsi, %rcx
-        0x17904e: movq %rcx, %rax
-        0x17905e: movq %rdx, %r9
-        0x179061: movq %rax, %r10
-        0x179064: movq %rcx, %rax
-        0x17906a: movq %rdx, %r8
-        0x17906d: movq %rax, %r11
-        0x179078: movq 0x18(%rbx), %rax
-        0x17907c: movq %rax, 0x20(%rsp)
-        0x17908b: movq 0x10(%rbx), %r12
-        0x17908f: movq %r8, %rdi
-        0x179095: movq %rax, %rsi
-        0x17909c: movq %r11, %rcx
-        0x1790a3: movq %rcx, %rax
-        0x1790a9: movq %rdx, %r14
-        0x1790ac: movq %rax, %r15
-        0x1790af: movq %rcx, %rax
-        0x1790b5: movq %rdx, %r10
-        0x1790b8: movq %rax, %r9
-        0x1790cb: movq %r10, %rcx
-        0x1790da: movq 0x20(%rbx), %r14
+        0x178fdc: xorps %xmm0, %xmm0 (zero idiom)
         0x1790e7: movups %xmm0, (%rbx)
-        0x1790ea: movq %r9, %rcx
-        0x1790fb: movq %rcx, %rax
-        0x17910b: movq %rdx, %r8
-        0x17910e: movq %rax, %r11
-        0x179111: movq %rcx, %rax
         0x17911e: movups %xmm0, 0x10(%rbx)
-        0x179128: movq $0x0, 0x20(%rbx)
 
   Disassembly:
     178f90: pushq %rbp
