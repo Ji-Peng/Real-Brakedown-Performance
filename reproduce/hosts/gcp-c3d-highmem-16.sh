@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Host profile: GCP c3d-highmem-30. Core IDs are discovered from Linux sysfs;
+# Host profile: GCP c3d-highmem-16. Core IDs are discovered from Linux sysfs;
 # no core number or L3 sharing layout is assumed.
 
-HOST_NAME=gcp-c3d-highmem-30
+HOST_NAME=gcp-c3d-highmem-16
 HOST_IS_TEST_ONLY=0
 HOST_FORBIDDEN_CORES=
 HOST_DEFAULT_CORES=
@@ -24,7 +24,7 @@ HOST_DEFAULT_SINGLE_CORE=
 HOST_ALLOWED_CORES=
 
 _gcp_load_host_profile() {
-_gcp_profile_manifest="$CODE_DIR/results/gcp-c3d-highmem-30/host-profile.json"
+_gcp_profile_manifest="$CODE_DIR/results/gcp-c3d-highmem-16/host-profile.json"
 mkdir -p "$(dirname -- "$_gcp_profile_manifest")"
 
 _gcp_profile_info=$(
@@ -130,7 +130,7 @@ domain_record = {
 manifest = {
     "schema_version": "1.0.0",
     "created_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-    "host_profile": "gcp-c3d-highmem-30",
+    "host_profile": "gcp-c3d-highmem-16",
     "source": "Linux sysfs at profile load time",
     "online_cpus": sorted(online),
     "all_l3_domains": [

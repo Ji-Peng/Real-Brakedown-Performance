@@ -20,7 +20,7 @@ set -eu
 GCLOUD=${GCLOUD:-gcloud}
 MACHINE=${MACHINE:-c3d}
 INSTANCE=${INSTANCE:-}
-ZONE=${ZONE:-us-central1-a}
+ZONE=${ZONE:-}  # default per machine: c3d -> us-central1-c, c4a -> us-central1-a
 ACTION=delete
 QUIET=0
 
@@ -32,7 +32,7 @@ By default, deletes the VM and boot disk.
   --stop              Stops the VM and retains its boot disk (prevents CPU/RAM billing)
   --machine c3d|c4a   Target machine family (default: c3d; selects rbd-bench-c3d or rbd-bench-c4a)
   --instance NAME     Override instance name
-  --zone ZONE         GCP zone (default: us-central1-a)
+  --zone ZONE         GCP zone (default: us-central1-c for c3d, us-central1-a for c4a)
   --yes               Passes --quiet to gcloud to skip interactive confirmation
   -h, --help          Show this help message
 
@@ -79,6 +79,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ -z "$INSTANCE" ]; then
+    [ -n "$ZONE" ] || { if [ "$MACHINE" = c3d ]; then ZONE=us-central1-c; else ZONE=us-central1-a; fi; }
     case "$MACHINE" in
         c3d) INSTANCE=rbd-bench-c3d ;;
         c4a) INSTANCE=rbd-bench-c4a ;;

@@ -97,7 +97,7 @@ export CORES
 
 # Auto-detect profile if not provided
 if [ -z "$PROFILE" ]; then
-    if [ "$HOST_NAME" = "gcp-c3d-highmem-30" ]; then
+    if [ "$HOST_NAME" = "gcp-c3d-highmem-16" ]; then
         PROFILE="full"
     elif [ "$HOST_NAME" = "gcp-c4a-highmem-16" ]; then
         PROFILE="arm"
@@ -241,22 +241,22 @@ if profile == "smoke":
         blocks.append({
             "id": f"smoke_this_work_mode_b_{smoke_field}_t1",
             "description": f"This Work mode (b) {smoke_field} smoke T=1",
-            "cmd": f"'{script_dir}/this_work.sh' --params simd-spielman --field {smoke_field} --logN 20 --threads 1 --runs 2 --warmup 1 --slices adaptive --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_mode_b_{smoke_field}_t1'"
+            "cmd": f"'{script_dir}/this_work.sh' --params simd-spielman --field {smoke_field} --logN 20 --threads 1 --runs 2 --warmup 1 --slices adaptive --shape both --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_mode_b_{smoke_field}_t1'"
         })
     blocks.append({
         "id": "smoke_steps",
         "description": "All tagged steps progression smoke",
-        "cmd": f"'{script_dir}/steps.sh' --logN 20 --threads 1 --runs 2 --warmup 1 {step_tags_flag} --cores '{smoke_cores}' --session-id '{session_id}' --smoke --host '{host}' --out '{session_dir}/smoke_steps'"
+        "cmd": f"'{script_dir}/steps.sh' --logN 16,20,24 --threads 1 --runs 2 --warmup 1 {step_tags_flag} --cores '{smoke_cores}' --session-id '{session_id}' --smoke --host '{host}' --out '{session_dir}/smoke_steps'"
     })
     blocks.append({
         "id": "smoke_simd_spielman",
         "description": "SIMD-Spielman baseline smoke (Brakedown and Orion)",
-        "cmd": f"'{script_dir}/simd_spielman.sh' --field mont127 --shape both --logN 16,20 --threads 1 --runs 2 --warmup 1 --cores '{smoke_cores}' --host '{host}' --out '{session_dir}/smoke_simd_spielman'"
+        "cmd": f"'{script_dir}/simd_spielman.sh' --shape both --logN 16,20 --threads 1 --runs 2 --warmup 1 --cores '{smoke_cores}' --host '{host}' --out '{session_dir}/smoke_simd_spielman'"
     })
     blocks.append({
         "id": "smoke_polycommit",
         "description": "PolyCommit baseline smoke",
-        "cmd": f"sh '{script_dir}/polycommit.sh' --field mont127 --logN 20 --threads 1 --runs 2 --warmup 1 --cores '{smoke_cores}' --host '{host}' --out '{session_dir}/smoke_polycommit'"
+        "cmd": f"sh '{script_dir}/polycommit.sh' --field mont127 --logN 16,20 --threads 1 --runs 2 --warmup 1 --cores '{smoke_cores}' --host '{host}' --out '{session_dir}/smoke_polycommit'"
     })
     for smoke_threads in [2, 4, 7]:
         blocks.append({
@@ -304,7 +304,7 @@ elif profile == "arm":
         "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 8 --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/arm_lcpc_orig_t8'"
     })
 else:
-    # full: x86-64 primary campaign (c3d-highmem-30, E1-E13, logN 16..28)
+    # full: x86-64 primary campaign (c3d-highmem-16, E1-E13, logN 16..28)
     # E1: Headline comparison mode (a) Mont127 T=1 and T=8
     blocks.append({
         "id": "full_this_work_mode_a_t1",
@@ -372,8 +372,22 @@ else:
             "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,22,24,26,28 --threads {t_count} --slices {slice_val} --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_slice_sweep_s{slice_val}_t{t_count}'"
         })
 
-    # E6: Thread scaling T in {1, 2, 4, 8, 15} at logN 20, 24, 28
-    for t_count in [1, 2, 4, 8, 15]:
+    # E6: Thread scaling T in {1, 2, 4, 8, 15} at logN 20, 24, 28, limited to the
+    # physical cores the host profile exposes (c3d-highmem-16: 8 cores -> T <= 8).
+    def _ncores(spec):
+        n = 0
+        for part in str(spec).split(','):
+            part = part.strip()
+            if not part:
+                continue
+            if '-' in part:
+                lo, hi = part.split('-', 1)
+                n += int(hi) - int(lo) + 1
+            else:
+                n += 1
+        return n
+    _avail = _ncores(os.environ.get('CORES', '0'))
+    for t_count in [t for t in [1, 2, 4, 8, 15] if t <= max(1, _avail)]:
         blocks.append({
             "id": f"full_thread_scaling_this_work_t{t_count}",
             "description": f"E6: Thread scaling This Work T={t_count}",
@@ -498,6 +512,24 @@ if [ "$PROFILE" = "smoke" ]; then
     MPLCONFIGDIR="$CARGO_TARGET_DIR/matplotlib" python3 "$CODE_DIR/scripts/analyze.py" \
         --results-dir "$SESSION_DIR" \
         --out-dir "$ANALYSIS_DIR" \
+        --allow 'T2|Mers127|*Reported (ms)' \
+        --allow 'T2|Mers127|*LCPC Speedup' \
+        --allow 'T2|Mers127|E15 Cross-Check' \
+        --allow 'T2|Fp2M61|*Reported (ms)' \
+        --allow 'T2|Fp2M61|*LCPC Speedup' \
+        --allow 'T2|Fp2M61|E15 Cross-Check' \
+        --allow 'T5|Ft127|Encode N=2^20 (ms)' \
+        --allow 'T5|Ft127|Encode N=2^24 (ms)' \
+        --allow 'T5|Ft127|Cost (ns/MAC)' \
+        --allow 'T5|*|Encode N=2^24 (ms)' \
+        --allow 'T8|SIMD-Spielman|Setup (ms)' \
+        --allow 'T8|SIMD-Spielman|Setup / Encode' \
+        --allow 'T8|SIMD-Spielman|Peak RSS (MB)' \
+        --allow 'T9|Mont127|*Orion Table 3 (ms)' \
+        --allow 'T9|Mers127|*Orion Table 3 (ms)' \
+        --allow 'T12|*|This Work Arm (ms)' \
+        --allow 'T12|*|Original LCPC Arm (ms)' \
+        --allow 'T12|*|Arm Speedup' \
         --check
 else
     MPLCONFIGDIR="$CARGO_TARGET_DIR/matplotlib" python3 "$CODE_DIR/scripts/analyze.py" \

@@ -21,7 +21,7 @@ GCLOUD=${GCLOUD:-gcloud}
 MACHINE=${MACHINE:-c3d}
 SESSION_ID=${SESSION_ID:-}
 PROFILE=${PROFILE:-}
-ZONE=${ZONE:-us-central1-a}
+ZONE=${ZONE:-}  # default per machine: c3d -> us-central1-c, c4a -> us-central1-a
 INSTANCE=${INSTANCE:-}
 REMOTE_CODE_DIR=${REMOTE_CODE_DIR:-}
 SEED=${SEED:-}
@@ -58,7 +58,7 @@ Options:
   --machine c3d|c4a        Machine family (default: c3d)
   --session <id>           Session identifier (e.g. s1, s2; default: session-YYYYMMDD-HHMMSS)
   --profile full|arm|smoke Benchmark workload profile (default: full for c3d, arm for c4a)
-  --zone ZONE              GCP zone (default: us-central1-a)
+  --zone ZONE              GCP zone (default: us-central1-c for c3d, us-central1-a for c4a)
   --instance NAME          Override VM instance name
   --remote-dir PATH        Remote checkout directory (default: ~/RealBrakedownPerf/code)
   --seed INT               Random seed for block interleaving order
@@ -123,6 +123,7 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+[ -n "$ZONE" ] || { if [ "$MACHINE" = c3d ]; then ZONE=us-central1-c; else ZONE=us-central1-a; fi; }
 case "$MACHINE" in
     c3d)
         DEFAULT_INSTANCE=rbd-bench-c3d

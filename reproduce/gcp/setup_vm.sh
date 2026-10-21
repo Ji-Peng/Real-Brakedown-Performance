@@ -20,7 +20,7 @@ set -eu
 GCLOUD=${GCLOUD:-gcloud}
 MACHINE=${MACHINE:-c3d}
 INSTANCE=${INSTANCE:-}
-ZONE=${ZONE:-us-central1-a}
+ZONE=${ZONE:-}  # default per machine: c3d -> us-central1-c, c4a -> us-central1-a
 REMOTE_CODE_DIR=${REMOTE_CODE_DIR:-}
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 CODE_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
@@ -41,10 +41,10 @@ code/results/<host>/ on the VM. It does not create a VM.
 
 Options:
   --machine c3d|c4a   Target machine family (default: c3d)
-                        c3d: rbd-bench-c3d (results/gcp-c3d-highmem-30)
+                        c3d: rbd-bench-c3d (results/gcp-c3d-highmem-16)
                         c4a: rbd-bench-c4a (results/gcp-c4a-highmem-16)
   --instance NAME     Override instance name
-  --zone ZONE         GCP zone (default: us-central1-a)
+  --zone ZONE         GCP zone (default: us-central1-c for c3d, us-central1-a for c4a)
   --remote-dir PATH   Remote checkout path (default: ~/RealBrakedownPerf/code)
   -h, --help          Show this help message
 
@@ -87,10 +87,11 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+[ -n "$ZONE" ] || { if [ "$MACHINE" = c3d ]; then ZONE=us-central1-c; else ZONE=us-central1-a; fi; }
 case "$MACHINE" in
     c3d)
         DEFAULT_INSTANCE=rbd-bench-c3d
-        HOST_PROFILE_NAME=gcp-c3d-highmem-30
+        HOST_PROFILE_NAME=gcp-c3d-highmem-16
         ;;
     c4a)
         DEFAULT_INSTANCE=rbd-bench-c4a
@@ -160,8 +161,8 @@ MACHINE=$5
 HOST_PROFILE_NAME=$6
 REMOTE_CODE_DIR=${7:-}
 REMOTE_STAGE=/tmp/realbrakedownperf-gcp-setup
-BUNDLE=$REMOTE_STAGE/code.bundle
-SOURCE_ARCHIVE=$REMOTE_STAGE/code-working-tree.tar.gz
+BUNDLE=/tmp/code.bundle            # copied by gcloud compute scp into /tmp/
+SOURCE_ARCHIVE=/tmp/code-working-tree.tar.gz
 
 if [ -z "$REMOTE_CODE_DIR" ]; then
     REMOTE_CODE_DIR=$HOME/RealBrakedownPerf/code
@@ -378,18 +379,18 @@ avx512ifma_present = avx512ifma_grep.returncode == 0 and bool(avx512ifma_grep_ou
 expected_machine = os.environ["EXPECTED_MACHINE"]
 if expected_machine == "c3d":
     checks = {
-        "gcp_machine_type_c3d_highmem_30": metadata_machine_type == "c3d-highmem-30",
+        "gcp_machine_type_c3d_highmem_16": metadata_machine_type == "c3d-highmem-16",
         "gcp_zone_matches_selection": metadata_zone == os.environ["EXPECTED_ZONE"],
         "gcp_instance_name_matches_selection": metadata_name == os.environ["EXPECTED_INSTANCE"],
         "debian_12": os_release_values.get("ID") == "debian" and os_release_values.get("VERSION_ID") == "12",
         "amd_epyc_9xx4_model": "AMD EPYC 9" in model_name.upper(),
-        "fifteen_physical_cores": len(physical_core_ids) == 15 and reported_core_count == 15,
-        "one_thread_per_core": cpu_count == 15 and threads_per_core == 1 and all_siblings_are_singletons and len(online_cpus) == 15,
+        "eight_physical_cores": len(physical_core_ids) == 8 and reported_core_count == 8,
+        "one_thread_per_core": cpu_count == 8 and threads_per_core == 1 and all_siblings_are_singletons and len(online_cpus) == 8,
         "avx512ifma_present": avx512ifma_present,
         "l3_cache_topology_available": bool(l3_domains),
         "eight_distinct_cores_in_one_l3_domain": any(domain["physical_core_count"] >= 8 for domain in l3_domains),
     }
-    expected_machine_type = "c3d-highmem-30"
+    expected_machine_type = "c3d-highmem-16"
     expected_boot_disk = {"size": "100GB", "type": "pd-balanced"}
     expected_threads_per_core = 1
 else:

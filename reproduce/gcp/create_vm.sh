@@ -20,7 +20,7 @@ set -eu
 GCLOUD=${GCLOUD:-gcloud}
 MACHINE=${MACHINE:-c3d}
 INSTANCE=${INSTANCE:-}
-ZONE=${ZONE:-us-central1-a}
+ZONE=${ZONE:-}  # default per machine: c3d -> us-central1-c, c4a -> us-central1-a
 PMU=0
 CONFIRMED=0
 
@@ -33,10 +33,10 @@ By default, prints the planned GCP command. The VM is created only when --yes is
 
 Options:
   --machine c3d|c4a   Target machine family (default: c3d)
-                        c3d: rbd-bench-c3d (c3d-highmem-30, pd-balanced, --threads-per-core=1)
+                        c3d: rbd-bench-c3d (c3d-highmem-16, pd-balanced, --threads-per-core=1)
                         c4a: rbd-bench-c4a (c4a-highmem-16, hyperdisk-balanced)
   --instance NAME     Override instance name
-  --zone ZONE         GCP zone (default: us-central1-a)
+  --zone ZONE         GCP zone (default: us-central1-c for c3d, us-central1-a for c4a)
   --pmu               Enable guest hardware performance monitoring (--performance-monitoring-unit=enhanced)
                       with automatic fallback retry if unsupported
   --yes               Execute the gcloud command to create the VM
@@ -84,10 +84,11 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
+[ -n "$ZONE" ] || { if [ "$MACHINE" = c3d ]; then ZONE=us-central1-c; else ZONE=us-central1-a; fi; }
 case "$MACHINE" in
     c3d)
         DEFAULT_INSTANCE=rbd-bench-c3d
-        MACHINE_TYPE=c3d-highmem-30
+        MACHINE_TYPE=c3d-highmem-16
         IMAGE_FAMILY=debian-12
         IMAGE_PROJECT=debian-cloud
         BOOT_DISK_SIZE=100GB

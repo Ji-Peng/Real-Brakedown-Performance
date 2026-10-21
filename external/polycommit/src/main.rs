@@ -15,10 +15,10 @@ use std::time::Instant;
 use ark_crypto_primitives::crh::{CRHScheme, TwoToOneCRHScheme};
 use ark_crypto_primitives::merkle_tree::{Config as MerkleConfig, IdentityDigestConverter};
 use ark_crypto_primitives::sponge::Absorb;
-use ark_ff::{fields::Fp256, MontBackend, MontConfig, PrimeField, UniformRand};
+use ark_ff::{fields::Fp128, MontBackend, MontConfig, PrimeField, UniformRand};
 use ark_poly::evaluations::multivariate::multilinear::DenseMultilinearExtension;
 use ark_poly_commit::linear_codes::{
-    BrakedownPCParams, LinCodeParametersInfo, LinearEncode, MultilinearBrakedown,
+    BrakedownPCParams, LinearEncode, MultilinearBrakedown,
 };
 use ark_std::rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
@@ -27,19 +27,16 @@ use rayon::ThreadPool;
 use serde::Serialize;
 
 const POLY_COMMIT_COMMIT: &str = "1eaec5090ba5bc87d75a69570ed38f6fcf8b9417";
-const FIELD_MODULUS: &str = "21888242871839275222246405745257275088548364400416034343698204186575808495617";
+const FIELD_MODULUS: &str = "146823888364060453008360742206866194433";
 const SEED: u64 = 0x504f_4c59_434f_4d4d;
+const DEFAULT_SEC_PARAM: usize = 80;
 
-// The pinned arkworks Brakedown parameters target 128-bit soundness. Its
-// soundness bound rejects LCPC's 127-bit field, even for the smallest planned
-// benchmark sizes, so use the nearest standard arkworks field with enough
-// capacity and report that mismatch explicitly in every result.
 #[derive(MontConfig)]
-#[modulus = "21888242871839275222246405745257275088548364400416034343698204186575808495617"]
-#[generator = "5"]
-pub struct Bn254FrConfig;
+#[modulus = "146823888364060453008360742206866194433"]
+#[generator = "3"]
+pub struct Mont127Config;
 
-type Bn254Fr = Fp256<MontBackend<Bn254FrConfig, 4>>;
+type Mont127 = Fp128<MontBackend<Mont127Config, 2>>;
 
 /// A marker CRH used only to satisfy the generic PCS parameter type.
 ///
@@ -105,11 +102,11 @@ impl<F: PrimeField + Absorb> MerkleConfig for EncodingOnlyMerkleConfig<F> {
     type TwoToOneHash = EncodingOnlyPairHash<F>;
 }
 
-type Tree = EncodingOnlyMerkleConfig<Bn254Fr>;
-type Polynomial = DenseMultilinearExtension<Bn254Fr>;
-type ColumnHash = EncodingOnlySliceHash<Bn254Fr>;
-type Code = MultilinearBrakedown<Bn254Fr, Tree, Polynomial, ColumnHash>;
-type Parameters = BrakedownPCParams<Bn254Fr, Tree, ColumnHash>;
+type Tree = EncodingOnlyMerkleConfig<Mont127>;
+type Polynomial = DenseMultilinearExtension<Mont127>;
+type ColumnHash = EncodingOnlySliceHash<Mont127>;
+type Code = MultilinearBrakedown<Mont127, Tree, Polynomial, ColumnHash>;
+type Parameters = BrakedownPCParams<Mont127, Tree, ColumnHash>;
 
 #[derive(Debug)]
 struct Args {
@@ -118,6 +115,7 @@ struct Args {
     warmup: usize,
     threads: usize,
     cores: String,
+    sec_param: usize,
     output: Option<String>,
     check: bool,
 }
@@ -185,6 +183,9 @@ struct BenchReport {
     hash_mode: &'static str,
     field: &'static str,
     field_modulus: &'static str,
+    patched: bool,
+    patch_sha256: &'static str,
+    sec_param: usize,
     params: &'static str,
     shape: &'static str,
     log_n: u32,
@@ -235,7 +236,7 @@ fn run() -> Result<(), String> {
     let mut reports = Vec::with_capacity(args.logn.len());
     for &log_n in &args.logn {
         if args.check {
-            check_configuration(log_n, &pool)?;
+            check_configuration(log_n, args.sec_param, &pool)?;
             println!("linearity check passed for logN={log_n}");
         } else {
             reports.push(benchmark(&args, log_n, &pool)?);
@@ -261,6 +262,7 @@ fn parse_args() -> Result<Args, String> {
         warmup: 2,
         threads: 1,
         cores: "0".to_owned(),
+        sec_param: DEFAULT_SEC_PARAM,
         output: None,
         check: false,
     };
@@ -292,12 +294,15 @@ fn parse_args() -> Result<Args, String> {
                 args.threads = parse_positive(&next_value(&mut it, "--threads")?, "--threads")?;
             }
             "--cores" => args.cores = next_value(&mut it, "--cores")?,
+            "--sec-param" => {
+                args.sec_param = parse_positive(&next_value(&mut it, "--sec-param")?, "--sec-param")?;
+            }
             "--output" => args.output = Some(next_value(&mut it, "--output")?),
             "--check" => args.check = true,
             "-h" | "--help" => {
                 println!(
                     "Usage: polycommit-bench [--logN 16,18] [--runs N] [--warmup N] \
-                     [--threads N] [--cores LIST] [--output PATH] [--check]"
+                     [--threads N] [--cores LIST] [--sec-param N] [--output PATH] [--check]"
                 );
                 std::process::exit(0);
             }
@@ -330,11 +335,20 @@ fn benchmark(args: &Args, log_n: u32, pool: &ThreadPool) -> Result<BenchReport, 
         .checked_shl(log_n)
         .ok_or_else(|| format!("logN={log_n} exceeds this platform's address space"))?;
 
+    let (n_rows, n_per_row) = square_dimensions(coefficient_count, log_n)?;
     let setup_start = Instant::now();
     let mut graph_rng = ChaCha20Rng::seed_from_u64(SEED.wrapping_add(u64::from(log_n)));
-    let parameters = Parameters::default(&mut graph_rng, coefficient_count, true, (), (), ());
+    let parameters = Parameters::with_dims(
+        &mut graph_rng,
+        n_rows,
+        n_per_row,
+        args.sec_param,
+        true,
+        (),
+        (),
+        (),
+    );
     let graph_sampling_ns = setup_start.elapsed().as_nanos();
-    let (n_rows, n_per_row) = parameters.compute_dimensions(coefficient_count);
     if n_rows.checked_mul(n_per_row) != Some(coefficient_count) {
         return Err(format!(
             "arkworks returned matrix dimensions {n_rows}x{n_per_row} for {coefficient_count} coefficients"
@@ -389,9 +403,12 @@ fn benchmark(args: &Args, log_n: u32, pool: &ThreadPool) -> Result<BenchReport, 
         hash_algorithm: "not invoked (encoding-only)",
         hash_crate_version: None,
         hash_mode: "not-invoked",
-        field: "BN254-Fr",
+        field: "Mont127",
         field_modulus: FIELD_MODULUS,
-        params: "arkworks-brakedown-default",
+        patched: option_env!("POLYCOMMIT_PATCH_SHA256").is_some(),
+        patch_sha256: option_env!("POLYCOMMIT_PATCH_SHA256").unwrap_or("unpatched-direct-build"),
+        sec_param: args.sec_param,
+        params: "arkworks-brakedown-explicit-square",
         shape: "brakedown",
         log_n: log_n,
         seed: SEED,
@@ -448,13 +465,22 @@ fn benchmark(args: &Args, log_n: u32, pool: &ThreadPool) -> Result<BenchReport, 
     })
 }
 
-fn check_configuration(log_n: u32, pool: &ThreadPool) -> Result<(), String> {
+fn check_configuration(log_n: u32, sec_param: usize, pool: &ThreadPool) -> Result<(), String> {
     let coefficient_count = 1usize
         .checked_shl(log_n)
         .ok_or_else(|| format!("logN={log_n} exceeds this platform's address space"))?;
+    let (n_rows, n_per_row) = square_dimensions(coefficient_count, log_n)?;
     let mut graph_rng = ChaCha20Rng::seed_from_u64(SEED.wrapping_add(u64::from(log_n)));
-    let parameters = Parameters::default(&mut graph_rng, coefficient_count, true, (), (), ());
-    let (_, n_per_row) = parameters.compute_dimensions(coefficient_count);
+    let parameters = Parameters::with_dims(
+        &mut graph_rng,
+        n_rows,
+        n_per_row,
+        sec_param,
+        true,
+        (),
+        (),
+        (),
+    );
     if check_linearity(n_per_row, &parameters, pool)? {
         Ok(())
     } else {
@@ -462,22 +488,34 @@ fn check_configuration(log_n: u32, pool: &ThreadPool) -> Result<(), String> {
     }
 }
 
-fn generate_input(length: usize, seed: u64) -> Vec<Bn254Fr> {
+fn square_dimensions(coefficient_count: usize, log_n: u32) -> Result<(usize, usize), String> {
+    if log_n % 2 != 0 {
+        return Err(format!("logN={log_n} must be even for the square benchmark shape"));
+    }
+    let n_rows = 1usize << (log_n / 2);
+    let n_cols = coefficient_count / n_rows;
+    if n_rows.checked_mul(n_cols) != Some(coefficient_count) {
+        return Err(format!("cannot form a square matrix shape for N={coefficient_count}"));
+    }
+    Ok((n_rows, n_cols))
+}
+
+fn generate_input(length: usize, seed: u64) -> Vec<Mont127> {
     let mut rng = ChaCha20Rng::seed_from_u64(seed);
-    (0..length).map(|_| Bn254Fr::rand(&mut rng)).collect()
+    (0..length).map(|_| Mont127::rand(&mut rng)).collect()
 }
 
 fn encode_matrix(
-    input: &[Bn254Fr],
+    input: &[Mont127],
     n_per_row: usize,
     parameters: &Parameters,
     pool: &ThreadPool,
-) -> Result<Vec<Vec<Bn254Fr>>, String> {
+) -> Result<Vec<Vec<Mont127>>, String> {
     pool.install(|| {
         input
             .par_chunks(n_per_row)
             .map(|row| {
-                <Code as LinearEncode<Bn254Fr, Tree, Polynomial, ColumnHash>>::encode(
+                <Code as LinearEncode<Mont127, Tree, Polynomial, ColumnHash>>::encode(
                     row, parameters,
                 )
                 .map_err(|error| error.to_string())
@@ -494,9 +532,9 @@ fn check_linearity(
     let left = generate_input(n_per_row, SEED ^ 0x1111_1111_1111_1111);
     let right = generate_input(n_per_row, SEED ^ 0x2222_2222_2222_2222);
     let sum: Vec<_> = left.iter().zip(&right).map(|(a, b)| *a + *b).collect();
-    let encode_one = |message: &[Bn254Fr]| {
+    let encode_one = |message: &[Mont127]| {
         pool.install(|| {
-            <Code as LinearEncode<Bn254Fr, Tree, Polynomial, ColumnHash>>::encode(
+            <Code as LinearEncode<Mont127, Tree, Polynomial, ColumnHash>>::encode(
                 message, parameters,
             )
         })

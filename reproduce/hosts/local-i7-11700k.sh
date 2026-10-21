@@ -27,6 +27,14 @@ HOST_DEFAULT_CORES="0,1,3-7"
 HOST_DEFAULT_SINGLE_CORE="0"
 HOST_ALLOWED_CORES="0,1,3-7"
 
+# Local-only Boost headers used by reproduce/simd_spielman.sh when the system
+# does not provide libboost-all-dev. The wrapper supplies the standard header
+# <atomic>, which the upstream source assumes Boost includes transitively.
+# Debian/GCP campaign hosts install libboost-all-dev and need neither override.
+SIMD_SPIELMAN_EXTRA_INCLUDE=${SIMD_SPIELMAN_EXTRA_INCLUDE:-"$CODE_DIR/target-verify/deps/multiprecision/include:$CODE_DIR/target-verify/deps/config/include"}
+SIMD_SPIELMAN_CXX_WRAPPER=${SIMD_SPIELMAN_CXX_WRAPPER:-"$CODE_DIR/target-verify/deps/gxx-include-atomic"}
+export SIMD_SPIELMAN_EXTRA_INCLUDE SIMD_SPIELMAN_CXX_WRAPPER
+
 host_validate_cores() {
     _cores_to_check="${1:-}"
     if [ -z "$_cores_to_check" ]; then

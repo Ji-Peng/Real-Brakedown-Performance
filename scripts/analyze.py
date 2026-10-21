@@ -24,6 +24,7 @@ Key Statistical and Reporting Rules (Plan 06 §1, §3, §5):
 
 import argparse
 import csv
+import fnmatch
 import glob
 import json
 import math
@@ -40,6 +41,52 @@ try:
     HAS_MATPLOTLIB = True
 except ImportError:
     HAS_MATPLOTLIB = False
+
+
+def cell_missing_reason(value: Any, header: str, row_values: List[str]) -> Optional[str]:
+    """Return why a generated table cell is missing, unless the plan allows it."""
+    text = "" if value is None else str(value).strip()
+    normalized = text.casefold()
+    column = header.casefold()
+    row_context = " ".join(row_values).casefold()
+
+    if normalized in {"timeout", "oom"} and "status" in column:
+        return None
+    if normalized in {"n/a", "na"} and "mode b" in row_context:
+        match = re.search(r"step[/_ ]0?(\d+)", row_context)
+        if match and int(match.group(1)) < 4:
+            return None
+
+    if not text:
+        return "empty"
+    if normalized in {"-", "nan", "+nan", "-nan", "null", "none", "n/a", "na", "timeout", "oom"}:
+        return text
+    if normalized.startswith("skipped"):
+        return text
+    if normalized.startswith("n/a"):
+        return text
+    return None
+
+
+def parse_allow_pattern(raw: str) -> str:
+    """Validate an allow selector formatted as TABLE|ROW|COLUMN (glob syntax)."""
+    if len(raw.split("|")) != 3 or any(part == "" for part in raw.split("|")):
+        raise argparse.ArgumentTypeError("--allow must be TABLE|ROW|COLUMN (each part may use * globs)")
+    return raw
+
+
+def run_self_test() -> None:
+    assert cell_missing_reason("", "Latency", ["20"]) == "empty"
+    assert cell_missing_reason("NaN", "Latency", ["20"]) == "NaN"
+    assert cell_missing_reason("SKIPPED", "Latency", ["20"]) == "SKIPPED"
+    assert cell_missing_reason("-", "Latency", ["20"]) == "-"
+    assert cell_missing_reason("timeout", "Status", ["20"]) is None
+    assert cell_missing_reason("oom", "Status", ["20"]) is None
+    assert cell_missing_reason("timeout", "Latency", ["20"]) == "timeout"
+    assert cell_missing_reason("N/A", "Latency", ["mode b", "step/03-fields"]) is None
+    assert cell_missing_reason("N/A", "Latency", ["mode b", "step/04-r2l"]) == "N/A"
+    assert fnmatch.fnmatchcase("T12|18|This Work Arm (ms)", "T12|*|This Work Arm (ms)")
+    print("[PASS] analyze.py --check cell-validation self-test")
 
 
 def safe_float(val: Any) -> Optional[float]:
@@ -468,19 +515,20 @@ class BenchmarkAnalyzer:
         require(self._has_case(self.reports_lcpc_orig, field={"Ft127", "Mont127"}, params="lcpc-sdig6",
                                shape="brakedown", log_n=20, threads=1),
                 "T1 original LCPC mode (a), logN=20, T=1")
-        polycommit_skip = self.skipped_baselines.get("PolyCommit")
-        require(self._has_case(self.reports_polycommit, log_n=20, threads=1)
-                or (self.profile == "smoke" and bool(polycommit_skip)),
-                "T1 PolyCommit logN=20, T=1 (or recorded smoke skip)")
+        require(self._has_case(self.reports_polycommit, field={"Mont127"}, log_n=20, threads=1),
+                "T1 PolyCommit Mont127 logN=20, T=1")
+        require(any(r.get("patched") is True and len(str(r.get("patch_sha256", ""))) == 64
+                    and int(r.get("sec_param", 0)) > 0
+                    for r in self.reports_polycommit if int(r.get("log_n", -1)) == 20
+                    and int(r.get("threads", 1)) == 1),
+                "T1 PolyCommit patched-source hash and opening sec_param")
 
         require(self._has_case(self.reports_this_work, field={"Mont127"}, params="simd-spielman",
                                shape="brakedown", log_n=20, threads=1),
                 "T2 This Work mode (b), Mont127, logN=20, T=1")
-        simd_skip = self.skipped_baselines.get("SIMD-Spielman")
         require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman",
-                               shape="brakedown", log_n=20, threads=1)
-                or (self.profile == "smoke" and bool(simd_skip)),
-                "T2 SIMD-Spielman, Mont127, logN=20, T=1 (or recorded smoke skip)")
+                               shape="brakedown", log_n=20, threads=1),
+                "T2 SIMD-Spielman, Mont127, logN=20, T=1")
 
         step_tags = {tag for tag, reports in self.reports_steps.items()
                      if any(r.get("mode", "a") == "a" and int(r.get("log_n", -1)) == 20
@@ -528,21 +576,18 @@ class BenchmarkAnalyzer:
                              or self._has_measurement(r, "verifier_encode")) for r in matching),
                     f"T7 This Work verifier v=1 and v=2, params={params}")
         require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman",
-                               shape="brakedown", log_n=20, threads=1, operation="verifier_encode_2")
-                or (self.profile == "smoke" and bool(simd_skip)),
-                "T7 SIMD-Spielman verifier v=2 at logN=20 (or recorded smoke skip)")
+                               shape="brakedown", log_n=20, threads=1, operation="verifier_encode_2"),
+                "T7 SIMD-Spielman verifier v=2 at logN=20")
 
         require(self._has_case(self.reports_this_work, field={"Mont127"}, params="simd-spielman",
                                shape="orion", log_n=20, threads=1),
                 "T9 This Work mode (b) Orion sample at logN=20")
         require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman",
-                               shape="orion", log_n=20, threads=1)
-                or (self.profile == "smoke" and bool(simd_skip)),
-                "T9 SIMD-Spielman Orion sample at logN=20 (or recorded smoke skip)")
+                               shape="orion", log_n=20, threads=1),
+                "T9 SIMD-Spielman Orion sample at logN=20")
         require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman",
-                               shape="brakedown", log_n=20, threads=1)
-                or (self.profile == "smoke" and bool(simd_skip)),
-                "T8 SIMD-Spielman Brakedown sample at logN=20 (or recorded smoke skip)")
+                               shape="brakedown", log_n=20, threads=1),
+                "T8 SIMD-Spielman Brakedown sample at logN=20")
         require(self._has_case(self.reports_this_work, field={"Mont127"}, params="lcpc-sdig6",
                                shape="brakedown", log_n=20, threads=1),
                 "T10 Brakedown encode sample at logN=20")
@@ -697,7 +742,7 @@ class BenchmarkAnalyzer:
             "log2(N)", "N", "k x n", "T",
             "This Work (ms)", "TW (ns/MAC)",
             "LCPC Orig (ms)", "Speedup over LCPC", "Significance",
-            "PolyCommit BN254-Fr (ms)", "Speedup over PolyCommit (field differs)"
+            "PolyCommit Mont127 (sec=80) (ms)", "Speedup over PolyCommit"
         ]
         tw_by_nt = defaultdict(list)
         for r in self.reports_this_work:
@@ -717,6 +762,8 @@ class BenchmarkAnalyzer:
         rows = []
         for key in all_keys:
             log_n, threads = key
+            if threads not in (1, 8):
+                continue
 
             tw_reps = tw_by_nt.get(key, [])
             lcpc_reps = lcpc_by_nt.get(key, [])
@@ -772,7 +819,7 @@ class BenchmarkAnalyzer:
 
         notes = [
             "Mode (a) SdigCode6 parameter set over Mont127 field.",
-            "PolyCommit uses BN254-Fr because the pinned arkworks default's 128-bit soundness check rejects the 127-bit LCPC field; its result is a field-mismatched comparison.",
+            "PolyCommit uses the same Mont127 prime with the pinned default graph constants and an explicit square shape; its patched opening sec_param is 80.",
             "Reported values are mean of session medians with [min-max] across runs.",
             "Significance: 'faster' denotes non-overlapping sample ranges (max(TW) < min(Base)); else 'comparable'."
         ]
@@ -808,6 +855,11 @@ class BenchmarkAnalyzer:
             tw_reps = tw_grouped.get(key, [])
             simd_reps = simd_grouped.get(key, [])
 
+            if self.has_smoke_watermark and not tw_reps:
+                # The smoke profile pairs mode (b) at N=2^20; baseline-only
+                # N=2^16 rows stay in raw JSON but are outside the table subset.
+                continue
+
             tw_stats = self._compute_stat_across_sessions(tw_reps)
             simd_stats = self._compute_stat_across_sessions(simd_reps)
 
@@ -823,9 +875,9 @@ class BenchmarkAnalyzer:
                 gap_recovered = f"{ratio:.2f}x"
 
             # KDHR26 Reported values
-            reported_ms = "-"
-            reported_spd = "-"
-            e15_check = "-"
+            reported_ms = "N/A (KDHR26 Table 2 reports Mont127 only)"
+            reported_spd = "N/A (KDHR26 Table 2 reports Mont127 only)"
+            e15_check = "N/A (KDHR26 cross-check reports Mont127 only)"
             kd_entry = kdhr26_table2.get(log_n)
             if kd_entry and field == "Mont127":
                 if threads == 1:
@@ -848,6 +900,8 @@ class BenchmarkAnalyzer:
             "SIMD Gap Recovered = T_SIMD / T_ThisWork. Values >= 1.0x indicate This Work matches or exceeds AVX-512.",
             "[KDHR26] reported numbers quoted verbatim from SIMD-Spielman paper Table 2 (page 11) on AMD EPYC 9754."
         ]
+        if self.has_smoke_watermark:
+            notes.append("Local smoke shows paired mode (b) rows at N=2^20; baseline-only N=2^16 records remain in raw JSON.")
         if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
             notes.append("SIMD-Spielman cells marked SKIPPED for this local smoke: "
                          + self.skipped_baselines["SIMD-Spielman"])
@@ -873,7 +927,7 @@ class BenchmarkAnalyzer:
         }
 
         # Sort tags by step index
-        sorted_tags = sorted(self.reports_steps.keys(), key=lambda t: t)
+        sorted_tags = sorted(self.reports_steps.keys(), key=lambda tag: (tag == "HEAD", tag))
         prev_ms_by_size: Dict[int, float] = {}
         step01_ms_by_size: Dict[int, float] = {}
         rows = []
@@ -891,7 +945,7 @@ class BenchmarkAnalyzer:
 
             # Use 20 as primary for step speedup
             primary_val = val_20 or val_16 or val_24
-            step_spd_str = "-"
+            step_spd_str = "baseline" if tag == "step/01-modernize" else "-"
             cum_spd_str = "-"
             if primary_val:
                 ref_size = 20 if val_20 else (16 if val_16 else 24)
@@ -1003,6 +1057,21 @@ class BenchmarkAnalyzer:
         rows = []
         fields = ["Mont127", "Mers127", "Fp2M61", "Ft127"]
 
+        def encoding_stat(field_name: str, log_n: int) -> Optional[float]:
+            for params in ("lcpc-sdig6", "simd-spielman"):
+                matching = [
+                    report for report in self.reports_this_work
+                    if report.get("field") == field_name
+                    and report.get("params") == params
+                    and report.get("shape", "brakedown") == "brakedown"
+                    and int(report.get("log_n", -1)) == log_n
+                    and int(report.get("threads", 1)) == 1
+                ]
+                value = self._compute_stat_across_sessions(matching)["mean_median_ns"]
+                if value is not None:
+                    return value
+            return None
+
         for f in fields:
             fb = field_micro_map.get(f, {})
             mul_ns = fb.get("mul", {}).get("ns_per_op")
@@ -1011,13 +1080,8 @@ class BenchmarkAnalyzer:
             sec_bits = 122 if f == "Fp2M61" else 127
 
             # Look for N=20 and N=24 encodings
-            enc_20 = self._compute_stat_across_sessions(tw_grouped.get((f, "lcpc-sdig6", "brakedown", 20, 1, 1), []))["mean_median_ns"]
-            if not enc_20:
-                enc_20 = self._compute_stat_across_sessions(tw_grouped.get((f, "simd-spielman", "brakedown", 20, 1, 1), []))["mean_median_ns"]
-
-            enc_24 = self._compute_stat_across_sessions(tw_grouped.get((f, "lcpc-sdig6", "brakedown", 24, 1, 1), []))["mean_median_ns"]
-            if not enc_24:
-                enc_24 = self._compute_stat_across_sessions(tw_grouped.get((f, "simd-spielman", "brakedown", 24, 1, 1), []))["mean_median_ns"]
+            enc_20 = encoding_stat(f, 20)
+            enc_24 = encoding_stat(f, 24)
 
             ns_mac = None
             for key, reps in tw_grouped.items():
@@ -1025,19 +1089,32 @@ class BenchmarkAnalyzer:
                     ns_mac = reps[0].get("ns_per_mac")
                     break
 
+            if f == "Ft127":
+                enc_20_text = "N/A (test-only oracle field)"
+                enc_24_text = "N/A (test-only oracle field)"
+                cost_text = "N/A (no production encode)"
+            else:
+                enc_20_text = format_ns_to_ms(enc_20)
+                enc_24_text = format_ns_to_ms(enc_24)
+                cost_text = f"{ns_mac:.2f}" if ns_mac else "-"
+            if self.has_smoke_watermark:
+                enc_24_text = "N/A (N=2^24 omitted from local smoke)"
+
             rows.append([
                 f, sec_bits,
                 f"{mul_ns:.2f}" if mul_ns else "-",
                 f"{mac_ns:.2f}" if mac_ns else "-",
                 f"{red_ns:.2f}" if red_ns else "-",
-                format_ns_to_ms(enc_20), format_ns_to_ms(enc_24),
-                f"{ns_mac:.2f}" if ns_mac else "-"
+                enc_20_text, enc_24_text, cost_text
             ])
 
         notes = [
             "Field microbenchmarks report isolated arithmetic operation latencies in nanoseconds.",
-            "Security caveat: Fp2M61 operates over F_{(2^61-1)^2}, providing 122 bits of security rather than 127 bits."
+            "Security caveat: Fp2M61 operates over F_{(2^61-1)^2}, providing 122 bits of security rather than 127 bits.",
+            "Ft127 is retained as a test-only oracle field, not a production fork field."
         ]
+        if self.has_smoke_watermark:
+            notes.append("Local smoke omits N=2^24 field encodings; N/A cells are explicitly permitted by the smoke check allow-list.")
         self._write_artefact("table_T5_field_comparison",
                              "Field Arithmetic Microbenchmarks and Encoding Comparison",
                              "tab:field_comparison", headers, rows, notes)
@@ -1098,7 +1175,7 @@ class BenchmarkAnalyzer:
         ]
         kdhr26_table6 = {}
         for entry in self.kdhr26_data.get("table_6", {}).get("entries", []):
-            kdhr26_table6[entry.get("k")] = entry
+            kdhr26_table6[entry.get("log_n")] = entry
 
         rows = []
         tw_grouped = self._group_by_config(self.reports_this_work)
@@ -1106,11 +1183,21 @@ class BenchmarkAnalyzer:
 
         for key in sorted(set(list(tw_grouped.keys()) + list(simd_grouped.keys()))):
             field, params, shape, log_n, threads, slices = key
-            if threads != 1 or shape != "brakedown":
+            if threads != 1 or shape != "brakedown" or field != "Mont127":
                 continue
 
             tw_reps = tw_grouped.get(key, [])
-            simd_reps = simd_grouped.get(key, [])
+            simd_reps = [
+                report for report in self.reports_simd_spielman
+                if report.get("field") == field
+                and report.get("shape", "brakedown") == shape
+                and int(report.get("log_n", -1)) == log_n
+                and int(report.get("threads", 1)) == threads
+            ]
+            if self.has_smoke_watermark and not tw_reps:
+                # The mode-(b) baseline also runs N=2^16, but the smoke table
+                # keeps only fork/baseline verifier rows measured at both sides.
+                continue
 
             v1_stat = self._compute_stat_across_sessions(tw_reps, "verifier_encode_1")
             v2_stat = self._compute_stat_across_sessions(tw_reps, "verifier_encode_2")
@@ -1126,9 +1213,9 @@ class BenchmarkAnalyzer:
                 simd_v2_us = "SKIPPED"
 
             k = 1 << (log_n // 2) if log_n > 0 else 0
-            kd_entry = kdhr26_table6.get(k, {})
+            kd_entry = kdhr26_table6.get(log_n, {})
             kd_reported_us = kd_entry.get("simd_spielman_us")
-            kd_str = f"{kd_reported_us:.1f}" if kd_reported_us is not None else "-"
+            kd_str = f"{kd_reported_us:.1f}" if kd_reported_us is not None else "N/A (no KDHR26 value for this N)"
 
             spd_str = "-"
             if kd_reported_us and v2_stat["mean_median_ns"]:
@@ -1148,6 +1235,8 @@ class BenchmarkAnalyzer:
             "Verifier-side encoding latency in microseconds for 1 vector (v=1) and 2 vectors (v=2) of length k.",
             "[KDHR26] values quoted verbatim from Table 6 (page 14) for Montgomery verifier encoding."
         ]
+        if self.has_smoke_watermark:
+            notes.append("Local smoke keeps paired verifier rows; the baseline-only mode (b) N=2^16 point remains in raw JSON.")
         if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
             notes.append("SIMD-Spielman verifier cells marked SKIPPED for this local smoke: "
                          + self.skipped_baselines["SIMD-Spielman"])
@@ -1200,8 +1289,10 @@ class BenchmarkAnalyzer:
                     and int(r.get("log_n", 0)) in (20, 24, 28)):
                 rows.append([
                     "SIMD-Spielman", r.get("log_n", 0),
-                    "-", format_ns_to_ms(self._get_op_summary(r, "encode_matrix").get("median_ns")),
-                    "-", "-"
+                    "N/A (upstream wrapper exposes encoding only)",
+                    format_ns_to_ms(self._get_op_summary(r, "encode_matrix").get("median_ns")),
+                    "N/A (upstream wrapper exposes encoding only)",
+                    "N/A (upstream wrapper exposes encoding only)"
                 ])
 
         if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
@@ -1210,7 +1301,7 @@ class BenchmarkAnalyzer:
         notes = [
             "Setup includes bipartite expander graph sampling, transposition, prepare_weight, and allocation.",
             "Peak RSS recorded via VmHWM from /proc/self/status.",
-            "SIMD-Spielman wrapper currently reports encoding only; its setup and RSS cells are left blank."
+            "The SIMD-Spielman wrapper reports encoding only; setup and RSS are not exposed by its upstream benchmark interface."
         ]
         if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
             notes.append("SIMD-Spielman row marked SKIPPED for this local smoke: "
@@ -1241,6 +1332,11 @@ class BenchmarkAnalyzer:
             if shape != "orion":
                 continue
 
+            if self.has_smoke_watermark and not tw_grouped.get(key, []):
+                # Keep smoke Orion rows paired at N=2^20; the external
+                # baseline's extra N=2^16 point remains available in raw JSON.
+                continue
+
             tw_orion = self._compute_stat_across_sessions(tw_grouped.get(key, []))["mean_median_ns"]
             simd_orion = self._compute_stat_across_sessions(simd_grouped.get(key, []))["mean_median_ns"]
             simd_orion_text = format_ns_to_ms(simd_orion)
@@ -1254,17 +1350,10 @@ class BenchmarkAnalyzer:
             if tw_orion and tw_brake and tw_brake > 0:
                 ratio_str = f"{tw_orion / tw_brake:.2f}x"
 
-            kd_reported = "-"
+            kd_reported = "N/A (KDHR26 Table 3 reports Fp2M61 only)"
             kd_entry = kdhr26_table3.get(log_n)
-            if kd_entry:
-                if field == "Mont127":
-                    value = kd_entry.get("montgomery_1t_ms" if threads == 1 else "montgomery_8t_ms")
-                elif field == "Mers127":
-                    value = kd_entry.get("mersenne_1t_ms" if threads == 1 else "mersenne_8t_ms")
-                elif field == "Fp2M61":
-                    value = kd_entry.get("extension_1t_ms" if threads == 1 else "extension_8t_ms")
-                else:
-                    value = None
+            if kd_entry and field == "Fp2M61":
+                value = kd_entry.get("simd_spielman_i7_ms")
                 if value is not None:
                     kd_reported = str(value)
 
@@ -1276,8 +1365,10 @@ class BenchmarkAnalyzer:
 
         notes = [
             "Orion matrix shape uses fixed 128 rows (k = 128, n_per_row = N / 128).",
-            "[KDHR26] values quoted verbatim from Table 3 (page 12) on AMD EPYC 9754."
+            "[KDHR26] Table 3 reports Orion results for Fp2M61; Mont127 and Mers127 are not reported there."
         ]
+        if self.has_smoke_watermark:
+            notes.append("Local smoke shows paired Orion rows at N=2^20; the SIMD-Spielman N=2^16 rows remain in raw JSON.")
         if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
             notes.append("SIMD-Spielman Orion cells marked SKIPPED for this local smoke: "
                          + self.skipped_baselines["SIMD-Spielman"])
@@ -1294,7 +1385,12 @@ class BenchmarkAnalyzer:
         rs_grouped = self._group_by_config(self.reports_ligero_rs)
 
         rows = []
-        for log_n in [12, 14, 16, 18, 20, 22]:
+        if self.has_smoke_watermark:
+            log_ns = sorted({int(r.get("log_n", 0)) for r in self.reports_ligero_rs
+                             if int(r.get("threads", 1)) == 1})
+        else:
+            log_ns = [12, 14, 16, 18, 20, 22]
+        for log_n in log_ns:
             tw_reps = tw_grouped.get(("Mont127", "lcpc-sdig6", "brakedown", log_n, 1, 1), [])
             rs_reps = rs_grouped.get(("Mont127", "ligero-rs", "brakedown", log_n, 1, 1), [])
             if not rs_reps:
@@ -1342,8 +1438,11 @@ class BenchmarkAnalyzer:
             for sym in cr.get("symbols", []):
                 if sym.get("is_hot_kernel"):
                     s_name = sym.get("symbol_demangled", sym.get("symbol_raw", "unknown"))[:45]
+                    stats = sym.get("scalar_stats", {})
                     rows.append([
-                        arch, s_name, "-", "-", "-", len(sym.get("vector_arithmetic", [])), sym.get("status", "PASS")
+                        arch, s_name, stats.get("total", len(sym.get("disassembly_lines", []))),
+                        stats.get("mul", 0) + stats.get("mulx", 0), stats.get("adc", 0),
+                        len(sym.get("vector_arithmetic", [])), sym.get("status", "PASS")
                     ])
 
         notes = [
@@ -1587,7 +1686,48 @@ class BenchmarkAnalyzer:
     # -------------------------------------------------------------------------
     # Verification Mode: --check
     # -------------------------------------------------------------------------
-    def check_all_artefacts(self) -> bool:
+    def _check_table_cells(self, allow_patterns: List[str]) -> List[str]:
+        errors = []
+        for tab_index in range(13):
+            tab_id = f"T{tab_index}"
+            csv_path = os.path.join(self.csv_dir, f"table_{tab_id}_*.csv")
+            matches = glob.glob(csv_path)
+            if not matches:
+                continue
+            for path in matches:
+                with open(path, "r", newline="", encoding="utf-8") as source:
+                    records = list(csv.reader(source))
+                table_rows = [
+                    (line_number, row) for line_number, row in enumerate(records, start=1)
+                    if row and any(cell.strip() for cell in row)
+                    and not row[0].lstrip().startswith("#")
+                ]
+                if not table_rows:
+                    continue
+                header_line, headers = table_rows[0]
+                for line_number, row in table_rows[1:]:
+                    if len(row) > len(headers):
+                        errors.append(
+                            f"Malformed artefact row: {tab_id} {path}:{line_number} has "
+                            f"{len(row)} cells, expected {len(headers)}"
+                        )
+                    row_key = row[0].strip() if row else "<empty row label>"
+                    for column_index, header in enumerate(headers):
+                        value = row[column_index] if column_index < len(row) else ""
+                        reason = cell_missing_reason(value, header, row)
+                        if reason is None:
+                            continue
+                        cell_selector = f"{tab_id}|{row_key}|{header.strip()}"
+                        if any(cell_selector == pattern or fnmatch.fnmatchcase(cell_selector, pattern)
+                               for pattern in allow_patterns):
+                            continue
+                        errors.append(
+                            f"Missing artefact cell {cell_selector}={value!r} ({reason}) "
+                            f"at {path}:{line_number}"
+                        )
+        return errors
+
+    def check_all_artefacts(self, allow_patterns: Optional[List[str]] = None) -> bool:
         """
         Validates that all required artefacts T0-T12 and F1-F3 are present and valid.
         Fails if any required file is missing or contains unhandled missing data.
@@ -1618,6 +1758,8 @@ class BenchmarkAnalyzer:
                     lines = [l.strip() for l in f if l.strip() and not l.startswith("#")]
                     if len(lines) < 2:  # Needs at least header + 1 row
                         errors.append(f"CSV table has no data rows: {csv_file}")
+
+        errors.extend(self._check_table_cells(allow_patterns or []))
 
         # Check figures
         for fig_name in required_figures:
@@ -1662,7 +1804,15 @@ def main():
                         help="Path to committed kdhr26_reported.json citation data")
     parser.add_argument("--smoke", action="store_true", help="Mark outputs with LOCAL SMOKE watermark")
     parser.add_argument("--check", action="store_true", help="Fail if any required artefact or cell is missing")
+    parser.add_argument("--allow", action="append", type=parse_allow_pattern, default=[],
+                        help="Allow a documented missing cell selector TABLE|ROW|COLUMN; repeat as needed")
+    parser.add_argument("--self-test", action="store_true",
+                        help="Run the small cell-validation self-test and exit")
     args = parser.parse_args()
+
+    if args.self_test:
+        run_self_test()
+        return
 
     results_dirs = args.results_dir_option or ([args.results_dir_positional] if args.results_dir_positional else [])
     if not results_dirs:
@@ -1673,7 +1823,7 @@ def main():
     analyzer.generate_all()
 
     if args.check:
-        passed = analyzer.check_all_artefacts()
+        passed = analyzer.check_all_artefacts(args.allow)
         if not passed:
             sys.exit(1)
 

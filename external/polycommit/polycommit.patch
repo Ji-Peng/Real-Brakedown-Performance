@@ -1,0 +1,56 @@
+diff --git a/poly-commit/src/linear_codes/brakedown.rs b/poly-commit/src/linear_codes/brakedown.rs
+--- a/poly-commit/src/linear_codes/brakedown.rs
++++ b/poly-commit/src/linear_codes/brakedown.rs
+@@ -98,4 +98,52 @@ impl<F, C, H> BrakedownPCParams<F, C, H>
+     H: CRHScheme,
+ {
++    /// Build the pinned Brakedown graph for an explicit coefficient-matrix shape.
++    ///
++    /// This uses the same code constants, sparse-matrix sizing, and graph sampler
++    /// as [`Self::default`]. `sec_param` is retained for the column-opening query
++    /// count (`calculate_t`) used by the opening protocol; unlike `default`, it
++    /// does not choose or alter the encoding matrix dimensions. This lets callers
++    /// benchmark the same encoder over fields that cannot provide 128-bit opening
++    /// soundness, while reporting the selected opening security parameter.
++    pub fn with_dims<R: RngCore>(
++        rng: &mut R,
++        n_rows: usize,
++        n_cols: usize,
++        sec_param: usize,
++        check_well_formedness: bool,
++        leaf_hash_param: LeafParam<C>,
++        two_to_one_hash_param: TwoToOneParam<C>,
++        col_hash_params: H::Parameters,
++    ) -> Self {
++        let a = (178, 1000);
++        let b = (61, 1000);
++        let r = (1521, 1000);
++        let base_len = 30;
++        let c = Self::cn_const(a, b);
++        let d = Self::dn_const(a, b, r);
++        let ct = Constants { a, b, r, c, d };
++        let (a_dims, b_dims) = Self::mat_size(n_cols, base_len, &ct);
++        let a_mats = Self::make_all(rng, &a_dims);
++        let b_mats = Self::make_all(rng, &b_dims);
++
++        Self::new(
++            sec_param,
++            a,
++            b,
++            r,
++            base_len,
++            n_rows,
++            n_cols,
++            a_dims,
++            b_dims,
++            a_mats,
++            b_mats,
++            check_well_formedness,
++            leaf_hash_param,
++            two_to_one_hash_param,
++            col_hash_params,
++        )
++    }
++
+     /// Create a default UniversalParams, with the values from Fig. 2 from the paper.
+     pub fn default<R: RngCore>(

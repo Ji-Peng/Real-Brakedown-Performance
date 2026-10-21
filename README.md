@@ -139,6 +139,13 @@ To aggregate raw JSON results into publication-ready CSVs, LaTeX tables (`paper/
 python3 scripts/analyze.py --results-dir results/ --out-dir analysis/
 ```
 
+The strict check rejects empty cells, `-`, NaN, and `SKIPPED` values in every
+table. A documented exception can be selected with repeatable
+`--allow 'TABLE|ROW|COLUMN'` globs. Smoke runs pass the known local limits in
+`reproduce/all.sh` (SIMD-Spielman does not expose setup/RSS, Arm is not run
+locally, and the smoke subset omits the campaign's larger field measurements).
+Run `python3 scripts/analyze.py --self-test` to check the missing-cell rules.
+
 Outputs:
 - **CSVs**: `csv/prover_encoding_comparison.csv`, `csv/pcs_breakdown.csv`, `csv/steps_ablation.csv`, `csv/field_microbenchmarks.csv`
 - **LaTeX Tables**: `latex/table_encoding_comparison.tex`, `latex/table_pcs_breakdown.tex`, `latex/table_steps_ablation.tex`, `latex/table_field_microbenchmarks.tex`
@@ -156,11 +163,11 @@ ever disagree, the commands in this section are the reference configuration.
 | Setting | Primary x86-64 machine | Arm portability machine |
 | :--- | :--- | :--- |
 | Instance name | `rbd-bench-c3d` | `rbd-bench-c4a` |
-| Machine type | `c3d-highmem-30` | `c4a-highmem-16` |
+| Machine type | `c3d-highmem-16` (planned `c3d-highmem-30`; see note below) | `c4a-highmem-16` |
 | CPU | AMD EPYC 9004 "Genoa" (Zen 4), AVX-512 incl. IFMA | Google Axion (Arm Neoverse V2) |
-| vCPUs / cores | 30 vCPUs → 15 physical cores with `--threads-per-core=1` (SMT off) | 16 vCPUs = 16 cores (no SMT) |
-| Memory | 240 GB | 128 GB |
-| Zone | `us-central1-a` | `us-central1-a` |
+| vCPUs / cores | 16 vCPUs → 8 physical cores with `--threads-per-core=1` (SMT off) | 16 vCPUs = 16 cores (no SMT) |
+| Memory | 128 GB | 128 GB |
+| Zone | `us-central1-c` | `us-central1-a` |
 | Image | `debian-12` from `debian-cloud` (x86-64) | `debian-12-arm64` from `debian-cloud` |
 | Boot disk | 100 GB `pd-balanced` | 100 GB `hyperdisk-balanced` (C4A uses Hyperdisk) |
 | Provisioning | on-demand (`STANDARD`), `--maintenance-policy=TERMINATE` (no live migration) | same |
@@ -176,6 +183,14 @@ Fallback if `c3d` is unavailable: `c4-highmem-32` (Intel Xeon, 16 physical cores
 `--threads-per-core=1`, `hyperdisk-balanced` boot disk). One machine family is used for
 a whole campaign; results from different families are never mixed in one table.
 
+**Why `c3d-highmem-16` (2026-10-22).** The planned `c3d-highmem-30` could not be created: this
+project's `CPUS_PER_VM_FAMILY` quota for `C3D` is 24 vCPUs per region, and all `us-central1`
+zones also reported a `c3d-highmem-30` stockout. `c3d-highmem-16` (same AMD EPYC Genoa / Zen 4
+CPU with AVX-512 IFMA) was created in `us-central1-c`. Consequences: 8-thread runs occupy all 8
+physical cores, thread scaling stops at 8 threads, and the guest PMU is unavailable
+(`--performance-monitoring-unit` is rejected for `c3d-highmem-*`). The project's global quota
+(`CPUS_ALL_REGIONS` = 32) also means the two VMs must never run at the same time.
+
 ### Create the VMs
 
 Authenticate and select the project first (`gcloud auth login`,
@@ -184,8 +199,8 @@ Authenticate and select the project first (`gcloud auth login`,
 ```sh
 # Primary x86-64 benchmark machine
 gcloud compute instances create rbd-bench-c3d \
-  --zone=us-central1-a \
-  --machine-type=c3d-highmem-30 \
+  --zone=us-central1-c \
+  --machine-type=c3d-highmem-16 \
   --threads-per-core=1 \
   --image-family=debian-12 --image-project=debian-cloud \
   --boot-disk-size=100GB --boot-disk-type=pd-balanced \
@@ -224,8 +239,8 @@ domain for 8-thread runs. Leave the remaining cores for the OS and the harness.
 Cost rule: a VM runs only while a benchmark task is running on it. Stop it between sessions, while results are reviewed, and after any failure. `reproduce/gcp/run_session.sh` stops it automatically on exit. Delete both VMs once all benchmark sessions are finished.
 
 ```sh
-gcloud compute instances stop   rbd-bench-c3d --zone=us-central1-a   # keeps the disk
-gcloud compute instances delete rbd-bench-c3d --zone=us-central1-a   # removes VM and boot disk
+gcloud compute instances stop   rbd-bench-c3d --zone=us-central1-c   # keeps the disk
+gcloud compute instances delete rbd-bench-c3d --zone=us-central1-c   # removes VM and boot disk
 gcloud compute instances stop   rbd-bench-c4a --zone=us-central1-a
 gcloud compute instances delete rbd-bench-c4a --zone=us-central1-a
 ```

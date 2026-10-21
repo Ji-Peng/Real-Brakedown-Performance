@@ -46,6 +46,12 @@ EOF
 done
 
 parse_args "$@"
+SIMD_EXTRA_INCLUDE=${SIMD_SPIELMAN_EXTRA_INCLUDE:-}
+SIMD_CXX=${SIMD_SPIELMAN_CXX_WRAPPER:-${CXX:-g++}}
+if [ -n "$SIMD_EXTRA_INCLUDE" ]; then
+    CPLUS_INCLUDE_PATH="$SIMD_EXTRA_INCLUDE${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH}"
+    export CPLUS_INCLUDE_PATH
+fi
 if [ "$HOST_NAME" = generic ]; then
     HOST_NAME=$(hostname -s)
 fi
@@ -55,7 +61,7 @@ case "$THREADS" in
 esac
 if [ "$THREADS" -gt 1 ] && [ "$EXPLICIT_CORES" -ne 1 ]; then
     log_error "SIMD-Spielman multithreaded runs require an explicit --cores list."
-    exit 0
+    exit 1
 fi
 case "$RUNS" in
     ''|*[!0-9]*) log_error "--runs must be a positive integer."; exit 1 ;;
@@ -161,7 +167,9 @@ finalize() {
     SIMD_SLICES_MODE=$SLICE_MODE \
     SIMD_SLICES_OVERRIDE=$SLICE_OVERRIDE \
     SIMD_SLICE_TABLE=${SIMD_SPIELMAN_SLICE_TABLE:-} \
-    SIMD_CXX=${CXX:-g++} \
+    SIMD_CXX="$SIMD_CXX" \
+    SIMD_CXX_WRAPPER=${SIMD_SPIELMAN_CXX_WRAPPER:-} \
+    SIMD_EXTRA_INCLUDE="$SIMD_EXTRA_INCLUDE" \
     SIMD_CXX_FLAGS='-march=native -O3 -funroll-loops -Wno-uninitialized -mavx512f -mavx512vl -mavx512dq; -Wall -faligned-new -g; -lstdc++; SELECTED_CPU compile definition' \
     SIMD_RAW_DIR=$RAW_DIR \
     SIMD_OUTPUT_DIR=$OUT_DIR \
@@ -206,6 +214,8 @@ manifest = {
     "custom_slice_table": os.environ.get("SIMD_SLICE_TABLE") or None,
     "effective_slice_counts_by_benchmark": effective_slices,
     "cxx": os.environ.get("SIMD_CXX"),
+    "cxx_wrapper_override": os.environ.get("SIMD_CXX_WRAPPER") or None,
+    "extra_include_override": os.environ.get("SIMD_EXTRA_INCLUDE") or None,
     # Compiler search-path overrides (e.g. a local Boost header tree when
     # libboost-all-dev is not installed); None when the system headers are used.
     "cxx_include_env": {
@@ -399,10 +409,10 @@ if [ "$PATCH_SHA256" != "$EXPECTED_PATCH_SHA256" ]; then
 fi
 
 if ! grep -qw avx512ifma /proc/cpuinfo; then
-    RUN_STATUS=skipped
-    SKIP_REASON="CPU flag avx512ifma is absent from /proc/cpuinfo"
-    log_warn "Skipping SIMD-Spielman: $SKIP_REASON"
-    exit 0
+    RUN_STATUS=failed
+    FAILURE_REASON="CPU flag avx512ifma is absent from /proc/cpuinfo"
+    log_error "$FAILURE_REASON"
+    exit 1
 fi
 
 for command_name in git cmake g++ python3 taskset sha256sum tar mktemp hostname; do
@@ -467,12 +477,12 @@ if ! git -C "$PATCHED_SOURCE" apply "$PATCH_FILE"; then
 fi
 
 if ! printf '#include <boost/multiprecision/cpp_int.hpp>\nint main() {}\n' | \
-    taskset -c "$TEST_CORES" g++ -x c++ -fsyntax-only - >/dev/null 2>"$RAW_DIR/prerequisite-boost.log"; then
-    RUN_STATUS=skipped
-    SKIP_REASON="Boost multiprecision headers are missing; install the upstream prerequisite libboost-all-dev"
-    log_warn "Skipping SIMD-Spielman: $SKIP_REASON"
+    taskset -c "$TEST_CORES" "$SIMD_CXX" -x c++ -fsyntax-only - >/dev/null 2>"$RAW_DIR/prerequisite-boost.log"; then
+    RUN_STATUS=failed
+    FAILURE_REASON="Boost multiprecision headers are unavailable to $SIMD_CXX; install libboost-all-dev or set SIMD_SPIELMAN_EXTRA_INCLUDE"
+    log_error "$FAILURE_REASON"
     cat "$RAW_DIR/prerequisite-boost.log" >&2
-    exit 0
+    exit 1
 fi
 
 # Upstream run_tests.py runs the test programs from ./build/ in the source tree
@@ -499,16 +509,16 @@ run_logged() {
 }
 
 run_logged test-configure taskset -c "$TEST_CORES" cmake -S "$PATCHED_SOURCE" -B "$TEST_BUILD" \
-    "-DPOLY_SIZES=12;14;16" "-DTHREADS=2;4;8;16" "-DCMAKE_CXX_COMPILER=${CXX:-g++}" \
+    "-DPOLY_SIZES=12;14;16" "-DTHREADS=2;4;8;16" "-DCMAKE_CXX_COMPILER=$SIMD_CXX" \
     "-DCMAKE_CXX_FLAGS=-DSELECTED_CPU=$SELECTED_CPU"
 run_logged test-build taskset -c "$TEST_CORES" cmake --build "$TEST_BUILD" --parallel "$(count_cores "$TEST_CORES")"
 run_logged upstream-tests taskset -c "$TEST_CORES" env SIMD_SPIELMAN_CORES="$TEST_CORES" \
     SIMD_SPIELMAN_SLICES= \
     SIMD_SPIELMAN_SLICE_TABLE="${SIMD_SPIELMAN_SLICE_TABLE:-}" \
-    sh -c 'cd "$1" && python3 run_tests.py' sh "$PATCHED_SOURCE"
+    sh -c 'cd "$1" && python3 -u run_tests.py' sh "$PATCHED_SOURCE"
 
 run_logged benchmark-configure taskset -c "$TEST_CORES" cmake -S "$PATCHED_SOURCE" -B "$BENCH_BUILD" \
-    "-DPOLY_SIZES=$LOGN_CMAKE" "-DTHREADS=$THREADS" "-DCMAKE_CXX_COMPILER=${CXX:-g++}" \
+    "-DPOLY_SIZES=$LOGN_CMAKE" "-DTHREADS=$THREADS" "-DCMAKE_CXX_COMPILER=$SIMD_CXX" \
     "-DCMAKE_CXX_FLAGS=-DSELECTED_CPU=$SELECTED_CPU"
 run_logged benchmark-build taskset -c "$TEST_CORES" cmake --build "$BENCH_BUILD" --parallel "$(count_cores "$TEST_CORES")"
 
@@ -560,10 +570,14 @@ run_benchmark() {
     done
 }
 
-IFS=,
-for log_n in $LOGN; do
+LOGN_ITEMS=$(printf '%s' "$LOGN" | tr ',' ' ')
+FIELD_ITEMS=$(printf '%s' "$UPSTREAM_FIELDS" | tr ',' ' ')
+OLD_IFS=$IFS
+IFS=' '
+# These lists contain only validated integers or the fixed shape/field tokens.
+for log_n in $LOGN_ITEMS; do
     for shape in $REQUESTED_SHAPES; do
-        for field_name in $UPSTREAM_FIELDS; do
+        for field_name in $FIELD_ITEMS; do
             executable_name="${shape}_spielman_${field_name}_bench_N${log_n}"
             if [ "$THREADS" -gt 1 ]; then
                 executable_name="${executable_name}_T${THREADS}"
