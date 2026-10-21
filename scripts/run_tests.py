@@ -86,11 +86,10 @@ def run_command_under_taskset(
 ) -> int:
     """Runs command pinned to cores_str using taskset."""
     taskset_bin = shutil.which("taskset")
-    if taskset_bin:
-        full_cmd = [taskset_bin, "-c", cores_str] + cmd
-    else:
-        print("[WARN] taskset not found in PATH; running unpinned.", file=sys.stderr)
-        full_cmd = cmd
+    if not taskset_bin:
+        print("[ERROR] taskset is required; refusing to run tests unpinned.", file=sys.stderr)
+        return 127
+    full_cmd = [taskset_bin, "-c", cores_str] + cmd
 
     print(f"[CMD] {' '.join(full_cmd)}")
     sys.stdout.flush()
@@ -169,7 +168,7 @@ def main():
     cargo_subcmd = "check" if args.check_only else "test"
 
     # Base cargo arguments
-    base_cargo_args = [cargo_bin, cargo_subcmd, "--workspace"]
+    base_cargo_args = [cargo_bin, cargo_subcmd, "--workspace", "--locked"]
     if args.release:
         base_cargo_args.append("--release")
     if args.cargo_args:

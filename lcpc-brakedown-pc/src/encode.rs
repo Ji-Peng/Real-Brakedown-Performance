@@ -356,7 +356,13 @@ struct RowMajorSliceJob<'a, F: LazyField> {
     temp_rs: *mut F,
 }
 
+// Safety: the raw pointers refer to buffers exclusively borrowed by the
+// coordinator for the duration of `ThreadPool::execute`. Workers partition
+// source columns, output graph nodes, Reed-Solomon columns, and final rows into
+// disjoint ranges. Barriers separate each read/write phase, and execute waits
+// for every worker before those borrows can end.
 unsafe impl<'a, F: LazyField> Send for RowMajorSliceJob<'a, F> {}
+// Safety: see the partitioning and lifetime invariant above.
 unsafe impl<'a, F: LazyField> Sync for RowMajorSliceJob<'a, F> {}
 
 impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
@@ -406,9 +412,15 @@ impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
                 let (r_start_node, r_end_node) = split_range(precode.n_right(), tid, num_threads);
 
                 unsafe {
-                    let in_slice = std::slice::from_raw_parts(slice_buf.add(in_start * h), precode.n_left() * h);
-                    let out_slice = std::slice::from_raw_parts_mut(slice_buf.add(out_start * h), precode.n_right() * h);
-                    encode_column_block_range_blocked::<F, BLOCK_FACTOR>(
+                    let in_slice = std::slice::from_raw_parts(
+                        slice_buf.add(in_start * h),
+                        precode.n_left() * h,
+                    );
+                    let out_slice = std::slice::from_raw_parts_mut(
+                        slice_buf.add((out_start + r_start_node) * h),
+                        (r_end_node - r_start_node) * h,
+                    );
+                    encode_column_block_range_shard::<F, BLOCK_FACTOR>(
                         precode,
                         in_slice,
                         out_slice,
@@ -428,12 +440,19 @@ impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
                 BaseCase::ReedSolomon => {
                     let precode = &precodes[levels - 1];
                     let in_end = in_start + precode.n_left();
-                    let (r_start_node, r_end_node) = split_range(precode.n_right(), tid, num_threads);
+                    let (r_start_node, r_end_node) =
+                        split_range(precode.n_right(), tid, num_threads);
 
                     unsafe {
-                        let in_slice = std::slice::from_raw_parts(slice_buf.add(in_start * h), precode.n_left() * h);
-                        let out_slice = std::slice::from_raw_parts_mut(self.temp_rs, precode.n_right() * h);
-                        encode_column_block_range_blocked::<F, BLOCK_FACTOR>(
+                        let in_slice = std::slice::from_raw_parts(
+                            slice_buf.add(in_start * h),
+                            precode.n_left() * h,
+                        );
+                        let out_slice = std::slice::from_raw_parts_mut(
+                            self.temp_rs.add(r_start_node * h),
+                            (r_end_node - r_start_node) * h,
+                        );
+                        encode_column_block_range_shard::<F, BLOCK_FACTOR>(
                             precode,
                             in_slice,
                             out_slice,
@@ -451,8 +470,13 @@ impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
 
                     unsafe {
                         let in_rs = std::slice::from_raw_parts(self.temp_rs, precode.n_right() * h);
-                        let out_rs = std::slice::from_raw_parts_mut(slice_buf.add(in_end * h), n_rs_out * h);
-                        reed_solomon_column_block_range(in_rs, out_rs, h, c_start_rs, c_end_rs);
+                        let out_rs = std::slice::from_raw_parts_mut(
+                            slice_buf.add((in_end + c_start_rs) * h),
+                            (c_end_rs - c_start_rs) * h,
+                        );
+                        reed_solomon_column_block_range_shard(
+                            in_rs, out_rs, h, c_start_rs, c_end_rs,
+                        );
                     }
                     barrier.wait();
 
@@ -470,9 +494,15 @@ impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
                 let (r_start_node, r_end_node) = split_range(postcode.n_right(), tid, num_threads);
 
                 unsafe {
-                    let in_slice = std::slice::from_raw_parts(slice_buf.add(in_start * h), (out_start - in_start) * h);
-                    let out_slice = std::slice::from_raw_parts_mut(slice_buf.add(out_start * h), postcode.n_right() * h);
-                    encode_column_block_range_blocked::<F, BLOCK_FACTOR>(
+                    let in_slice = std::slice::from_raw_parts(
+                        slice_buf.add(in_start * h),
+                        (out_start - in_start) * h,
+                    );
+                    let out_slice = std::slice::from_raw_parts_mut(
+                        slice_buf.add((out_start + r_start_node) * h),
+                        (r_end_node - r_start_node) * h,
+                    );
+                    encode_column_block_range_shard::<F, BLOCK_FACTOR>(
                         postcode,
                         in_slice,
                         out_slice,
@@ -616,7 +646,12 @@ struct ColMajorSlicedJob<'a, F: LazyField> {
     temp_rs: *mut F,
 }
 
+// Safety: the raw pointers refer to buffers exclusively borrowed by the
+// coordinator for the duration of `ThreadPool::execute`. Workers partition
+// output graph nodes into disjoint ranges, and barriers separate graph levels
+// and slices. The coordinator waits for every worker before the borrows end.
 unsafe impl<'a, F: LazyField> Send for ColMajorSlicedJob<'a, F> {}
+// Safety: see the partitioning and lifetime invariant above.
 unsafe impl<'a, F: LazyField> Sync for ColMajorSlicedJob<'a, F> {}
 
 impl<'a, F: LazyField> WorkerJob for ColMajorSlicedJob<'a, F> {
@@ -655,9 +690,15 @@ impl<'a, F: LazyField> WorkerJob for ColMajorSlicedJob<'a, F> {
                 let (r_start_node, r_end_node) = split_range(precode.n_right(), tid, num_threads);
 
                 unsafe {
-                    let in_slice = std::slice::from_raw_parts(slice_buf.add(in_start * h), precode.n_left() * h);
-                    let out_slice = std::slice::from_raw_parts_mut(slice_buf.add(out_start * h), precode.n_right() * h);
-                    encode_column_block_range_blocked::<F, BLOCK_FACTOR>(
+                    let in_slice = std::slice::from_raw_parts(
+                        slice_buf.add(in_start * h),
+                        precode.n_left() * h,
+                    );
+                    let out_slice = std::slice::from_raw_parts_mut(
+                        slice_buf.add((out_start + r_start_node) * h),
+                        (r_end_node - r_start_node) * h,
+                    );
+                    encode_column_block_range_shard::<F, BLOCK_FACTOR>(
                         precode,
                         in_slice,
                         out_slice,
@@ -677,12 +718,19 @@ impl<'a, F: LazyField> WorkerJob for ColMajorSlicedJob<'a, F> {
                 BaseCase::ReedSolomon => {
                     let precode = &precodes[levels - 1];
                     let in_end = in_start + precode.n_left();
-                    let (r_start_node, r_end_node) = split_range(precode.n_right(), tid, num_threads);
+                    let (r_start_node, r_end_node) =
+                        split_range(precode.n_right(), tid, num_threads);
 
                     unsafe {
-                        let in_slice = std::slice::from_raw_parts(slice_buf.add(in_start * h), precode.n_left() * h);
-                        let out_slice = std::slice::from_raw_parts_mut(self.temp_rs, precode.n_right() * h);
-                        encode_column_block_range_blocked::<F, BLOCK_FACTOR>(
+                        let in_slice = std::slice::from_raw_parts(
+                            slice_buf.add(in_start * h),
+                            precode.n_left() * h,
+                        );
+                        let out_slice = std::slice::from_raw_parts_mut(
+                            self.temp_rs.add(r_start_node * h),
+                            (r_end_node - r_start_node) * h,
+                        );
+                        encode_column_block_range_shard::<F, BLOCK_FACTOR>(
                             precode,
                             in_slice,
                             out_slice,
@@ -700,8 +748,13 @@ impl<'a, F: LazyField> WorkerJob for ColMajorSlicedJob<'a, F> {
 
                     unsafe {
                         let in_rs = std::slice::from_raw_parts(self.temp_rs, precode.n_right() * h);
-                        let out_rs = std::slice::from_raw_parts_mut(slice_buf.add(in_end * h), n_rs_out * h);
-                        reed_solomon_column_block_range(in_rs, out_rs, h, c_start_rs, c_end_rs);
+                        let out_rs = std::slice::from_raw_parts_mut(
+                            slice_buf.add((in_end + c_start_rs) * h),
+                            (c_end_rs - c_start_rs) * h,
+                        );
+                        reed_solomon_column_block_range_shard(
+                            in_rs, out_rs, h, c_start_rs, c_end_rs,
+                        );
                     }
                     barrier.wait();
 
@@ -719,9 +772,15 @@ impl<'a, F: LazyField> WorkerJob for ColMajorSlicedJob<'a, F> {
                 let (r_start_node, r_end_node) = split_range(postcode.n_right(), tid, num_threads);
 
                 unsafe {
-                    let in_slice = std::slice::from_raw_parts(slice_buf.add(in_start * h), (out_start - in_start) * h);
-                    let out_slice = std::slice::from_raw_parts_mut(slice_buf.add(out_start * h), postcode.n_right() * h);
-                    encode_column_block_range_blocked::<F, BLOCK_FACTOR>(
+                    let in_slice = std::slice::from_raw_parts(
+                        slice_buf.add(in_start * h),
+                        (out_start - in_start) * h,
+                    );
+                    let out_slice = std::slice::from_raw_parts_mut(
+                        slice_buf.add((out_start + r_start_node) * h),
+                        (r_end_node - r_start_node) * h,
+                    );
+                    encode_column_block_range_shard::<F, BLOCK_FACTOR>(
                         postcode,
                         in_slice,
                         out_slice,
@@ -813,11 +872,8 @@ pub fn autotune_slices_with_pool<F: LazyField>(
     if n_rows <= 1 {
         return 1;
     }
-    let s_star = crate::cache::adaptive_slice_count(
-        code.n_per_row(),
-        n_rows,
-        std::mem::size_of::<F>(),
-    );
+    let s_star =
+        crate::cache::adaptive_slice_count(code.n_per_row(), n_rows, std::mem::size_of::<F>());
 
     let mut candidates = Vec::with_capacity(4);
     if s_star >= 2 {
@@ -937,13 +993,43 @@ pub fn encode_column_block_range_blocked<F: LazyField, const B: usize>(
     assert_eq!(input.len(), graph.n_left() * n_rows);
     assert_eq!(output.len(), graph.n_right() * n_rows);
     assert!(r_start <= r_end && r_end <= graph.n_right());
+
+    let output_range = &mut output[r_start * n_rows..r_end * n_rows];
+    encode_column_block_range_shard::<F, B>(
+        graph,
+        input,
+        output_range,
+        n_rows,
+        r_start,
+        r_end,
+        scratch,
+    );
+}
+
+/// Evaluate a contiguous right-node range into a slice containing only that
+/// range. The output slice is therefore disjoint across workers.
+#[inline(always)]
+fn encode_column_block_range_shard<F: LazyField, const B: usize>(
+    graph: &R2lGraph<F>,
+    input: &[F],
+    output: &mut [F],
+    n_rows: usize,
+    r_start: usize,
+    r_end: usize,
+    scratch: &mut [F::Acc],
+) {
+    assert!(n_rows > 0);
+    assert_eq!(input.len(), graph.n_left() * n_rows);
+    assert!(r_start <= r_end && r_end <= graph.n_right());
+    assert_eq!(output.len(), (r_end - r_start) * n_rows);
     assert!(scratch.len() >= n_rows);
 
     let scratch_slice = &mut scratch[..n_rows];
 
     for r in r_start..r_end {
         let (lefts, weights) = graph.incoming(r);
-        let dst = &mut output[r * n_rows..(r + 1) * n_rows];
+        let local_r = r - r_start;
+        let dst = &mut output[local_r * n_rows..(local_r + 1) * n_rows];
         let num_edges = lefts.len();
         if num_edges == 0 {
             dst.fill(F::ZERO);
@@ -1059,6 +1145,7 @@ pub fn reed_solomon_column_block<F>(xi: &[F], xo: &mut [F], n_rows: usize)
 where
     F: Field,
 {
+    assert!(n_rows > 0);
     let total_cols = xo.len() / n_rows;
     reed_solomon_column_block_range(xi, xo, n_rows, 0, total_cols);
 }
@@ -1073,8 +1160,26 @@ pub fn reed_solomon_column_block_range<F>(
 ) where
     F: Field,
 {
+    assert!(n_rows > 0);
     let total_cols = xo.len() / n_rows;
     assert!(c_start <= c_end && c_end <= total_cols);
+    let output_range = &mut xo[c_start * n_rows..c_end * n_rows];
+    reed_solomon_column_block_range_shard(xi, output_range, n_rows, c_start, c_end);
+}
+
+/// Reed-Solomon encoding into a slice containing only columns `[c_start, c_end)`.
+#[inline(always)]
+fn reed_solomon_column_block_range_shard<F: Field>(
+    xi: &[F],
+    xo: &mut [F],
+    n_rows: usize,
+    c_start: usize,
+    c_end: usize,
+) {
+    assert!(n_rows > 0);
+    assert_eq!(xi.len() % n_rows, 0);
+    assert!(c_start <= c_end);
+    assert_eq!(xo.len(), (c_end - c_start) * n_rows);
     let n_in_cols = xi.len() / n_rows;
 
     let mut x = F::ONE;
@@ -1083,7 +1188,8 @@ pub fn reed_solomon_column_block_range<F>(
     }
 
     for col in c_start..c_end {
-        let r = &mut xo[col * n_rows..(col + 1) * n_rows];
+        let local_col = col - c_start;
+        let r = &mut xo[local_col * n_rows..(local_col + 1) * n_rows];
         r.fill(F::ZERO);
         for j in (0..n_in_cols).rev() {
             let coeff = &xi[j * n_rows..(j + 1) * n_rows];
@@ -1093,6 +1199,74 @@ pub fn reed_solomon_column_block_range<F>(
             }
         }
         x += F::ONE;
+    }
+}
+
+#[cfg(test)]
+mod range_kernel_tests {
+    use super::{
+        encode_column_block, encode_column_block_range_shard, reed_solomon_column_block,
+        reed_solomon_column_block_range_shard, BLOCK_FACTOR,
+    };
+    use crate::graph::R2lGraph;
+    use ff::Field;
+    use lcpc_fields::{LazyField, Mont127};
+
+    #[test]
+    fn disjoint_expander_and_reed_solomon_ranges_match_full_outputs() {
+        let graph = R2lGraph::from_left_edges_fixed_degree(
+            3,
+            5,
+            2,
+            &[0u32, 2, 4, 1, 2, 3],
+            &[
+                Mont127::from(2),
+                Mont127::from(3),
+                Mont127::from(5),
+                Mont127::from(7),
+                Mont127::from(11),
+                Mont127::from(13),
+            ],
+        );
+        let n_rows = 3;
+        let input: Vec<_> = (1..=graph.n_left() * n_rows)
+            .map(|v| Mont127::from(v as u64))
+            .collect();
+        let mut expected = vec![Mont127::ZERO; graph.n_right() * n_rows];
+        encode_column_block(&graph, &input, &mut expected, n_rows);
+
+        let mut actual = vec![Mont127::ZERO; graph.n_right() * n_rows];
+        let mut scratch = vec![<Mont127 as LazyField>::Acc::default(); n_rows];
+        let ranges = [(0, 2), (2, 2), (2, 5)];
+        for (start, end) in ranges {
+            encode_column_block_range_shard::<Mont127, BLOCK_FACTOR>(
+                &graph,
+                &input,
+                &mut actual[start * n_rows..end * n_rows],
+                n_rows,
+                start,
+                end,
+                &mut scratch,
+            );
+        }
+        assert_eq!(actual, expected);
+
+        let rs_input: Vec<_> = (1..=4 * n_rows).map(|v| Mont127::from(v as u64)).collect();
+        let n_rs_cols = 7;
+        let mut rs_expected = vec![Mont127::ZERO; n_rs_cols * n_rows];
+        reed_solomon_column_block(&rs_input, &mut rs_expected, n_rows);
+
+        let mut rs_actual = vec![Mont127::ZERO; n_rs_cols * n_rows];
+        for (start, end) in [(0, 3), (3, 3), (3, n_rs_cols)] {
+            reed_solomon_column_block_range_shard(
+                &rs_input,
+                &mut rs_actual[start * n_rows..end * n_rows],
+                n_rows,
+                start,
+                end,
+            );
+        }
+        assert_eq!(rs_actual, rs_expected);
     }
 }
 

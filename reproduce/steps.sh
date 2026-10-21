@@ -129,13 +129,33 @@ for tag in $TAGS_TO_RUN; do
     # Build
     log_info "Building $tag..."
     env CARGO_TARGET_DIR="$TAG_TARGET" taskset -c "$CORES" \
-        cargo build --manifest-path "$WORKTREE_DIR/Cargo.toml" --release --bin lcpc-bench
+        cargo build --manifest-path "$WORKTREE_DIR/Cargo.toml" --release --locked --bin lcpc-bench
 
     # Test
     log_info "Testing $tag..."
     env CARGO_TARGET_DIR="$TAG_TARGET" taskset -c "$CORES" \
-        cargo test --manifest-path "$WORKTREE_DIR/Cargo.toml" --release || {
+        cargo test --manifest-path "$WORKTREE_DIR/Cargo.toml" --release --locked || {
         log_error "Tests failed for tag $tag! Aborting."
+        exit 1
+    }
+
+    # Record generated code for every historical step. The pre-R2L commits do not
+    # expose the named kernels used by the strict checker; from step/04 onward, a
+    # missing hot-kernel symbol or vector arithmetic is a failure.
+    CODEGEN_DIR="$STEP_DEST/codegen"
+    mkdir -p "$CODEGEN_DIR"
+    CODEGEN_ARGS=""
+    case "$tag" in
+        step/01-modernize|step/02-fields|step/03-column-major) ;;
+        *) CODEGEN_ARGS="--strict" ;;
+    esac
+    log_info "Checking generated code for $tag..."
+    # shellcheck disable=SC2086
+    taskset -c "$CORES" python3 "$CODE_DIR/scripts/check_codegen.py" \
+        "$TAG_TARGET/release/lcpc-bench" $CODEGEN_ARGS \
+        --output-json "$CODEGEN_DIR/codegen_report.json" \
+        --output-listing "$CODEGEN_DIR/disassembly.txt" || {
+        log_error "Codegen verification failed for $tag; refusing to benchmark."
         exit 1
     }
 
@@ -162,24 +182,44 @@ for tag in $TAGS_TO_RUN; do
         "$BENCH_BIN" $BENCH_ARGS
 
     # Write per-step manifest
-    STEP_MANIFEST="$STEP_DEST/manifest.json"
-    PARAMS="$EFFECTIVE_PARAMS" FIELD="$EFFECTIVE_FIELD" write_manifest "$STEP_MANIFEST" "$RAW_OUT"
+STEP_MANIFEST="$STEP_DEST/manifest.json"
+PARAMS="$EFFECTIVE_PARAMS" FIELD="$EFFECTIVE_FIELD" write_manifest "$STEP_MANIFEST" "$RAW_OUT"
 
     # Add step metadata to step manifest
-    python3 -c "
+STEP_TAG="$tag" \
+STEP_COMMIT="$TAG_COMMIT" \
+STEP_SUBJECT="$TAG_SUBJECT" \
+STEP_WORKTREE="$WORKTREE_DIR" \
+STEP_MANIFEST="$STEP_MANIFEST" \
+STEP_INDEX="$STEP_INDEX" \
+python3 - <<'PY'
+import hashlib
 import json
-with open('$STEP_MANIFEST', 'r') as f:
+import os
+
+manifest_path = os.environ["STEP_MANIFEST"]
+with open(manifest_path, "r", encoding="utf-8") as f:
     m = json.load(f)
-m['step_info'] = {
-    'tag': '$tag',
-    'step_index': $STEP_INDEX,
-    'commit': '$TAG_COMMIT',
-    'commit_subject': '$TAG_SUBJECT',
-    'order_dependence_note': 'Cumulative commit sequence. Measurements depend on commit order.'
+worktree = os.environ["STEP_WORKTREE"]
+lockfile = os.path.join(worktree, "Cargo.lock")
+if os.path.isfile(lockfile):
+    with open(lockfile, "rb") as f:
+        m["rust_toolchain"]["cargo_lock_sha256"] = hashlib.sha256(f.read()).hexdigest()
+m["git"]["code_repo_sha"] = os.environ["STEP_COMMIT"]
+m["git"]["code_repo_tags"] = os.environ["STEP_TAG"]
+m["step_info"] = {
+    "tag": os.environ["STEP_TAG"],
+    "step_index": int(os.environ["STEP_INDEX"]),
+    "commit": os.environ["STEP_COMMIT"],
+    "commit_subject": os.environ["STEP_SUBJECT"],
+    "codegen_report": "codegen/codegen_report.json",
+    "codegen_scope_note": "step/01 through step/03 predate the named R2L kernels; later steps require a matched hot kernel",
+    "order_dependence_note": "Cumulative commit sequence. Measurements depend on commit order."
 }
-with open('$STEP_MANIFEST', 'w') as f:
+with open(manifest_path, "w", encoding="utf-8") as f:
     json.dump(m, f, indent=2)
-"
+    f.write("\n")
+PY
 
     cleanup_worktree
     STEP_INDEX=$((STEP_INDEX + 1))

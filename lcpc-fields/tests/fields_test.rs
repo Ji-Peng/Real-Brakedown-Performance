@@ -917,12 +917,9 @@ fn fp2m61_simd_spielman_test_vectors_and_encoding() {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let tv_in_path = manifest_dir.join("../../SIMD-Spielman-for-ZKPs/tv/bd_spielman_extension_N12_in.txt");
 
-    if !tv_in_path.exists() {
-        eprintln!("Test vector not found at {:?}, skipping test vector verification", tv_in_path);
-        return;
-    }
-
-    let content = std::fs::read_to_string(&tv_in_path).unwrap();
+    let content = std::fs::read_to_string(&tv_in_path).unwrap_or_else(|error| {
+        panic!("required SIMD-Spielman test vector {:?} is unavailable: {error}", tv_in_path)
+    });
     let p = Fp2M61::MODULUS_P;
     let mut elems = Vec::new();
 

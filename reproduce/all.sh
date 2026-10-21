@@ -85,7 +85,8 @@ elif ! echo '#include <boost/multiprecision/cpp_int.hpp>' | g++ -x c++ -E - >/de
     log_warn "Boost headers (<boost/multiprecision/cpp_int.hpp>) not installed; skipping SIMD-Spielman AVX-512 target."
 else
     "$SCRIPT_DIR/simd_spielman.sh" --threads "$THREADS" --logN "$LOGN" --cores "$CORES" --runs "$RUNS" --field "$FIELD" --slices "$SLICES" --host "$HOST_PROFILE" --out "$SESSION_DIR/simd_spielman" || {
-        log_warn "SIMD-Spielman execution encountered an error; continuing campaign."
+        log_error "SIMD-Spielman execution failed; campaign is incomplete."
+        exit 1
     }
 fi
 
@@ -102,7 +103,8 @@ mkdir -p "$ANALYSIS_DIR"
 python3 "$CODE_DIR/scripts/analyze.py" \
     --results-dir "$SESSION_DIR" \
     --out-dir "$ANALYSIS_DIR" || {
-    log_warn "analyze.py finished with warnings."
+    log_error "Analysis generation failed; campaign artifacts are incomplete."
+    exit 1
 }
 
 log_info "=========================================================="

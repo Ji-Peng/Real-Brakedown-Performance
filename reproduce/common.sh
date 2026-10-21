@@ -45,8 +45,8 @@ CODE_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
 THREADS="1"
 LOGN="16,18,20,22,24,26"
 CORES=""
-RUNS="30"
-WARMUP="5"
+RUNS="5"
+WARMUP="2"
 OUT="results"
 PARAMS="lcpc-sdig6"
 HOST_PROFILE=""
@@ -276,6 +276,13 @@ parse_args() {
         esac
     done
 
+    # Cargo environment flags override the checked-in portable scalar policy.
+    # Reproduction scripts must use the workspace's committed .cargo/config.toml.
+    if [ -n "${RUSTFLAGS:-}" ] || [ -n "${CARGO_ENCODED_RUSTFLAGS:-}" ]; then
+        log_error "RUSTFLAGS and CARGO_ENCODED_RUSTFLAGS must be unset for reproducible runs"
+        exit 1
+    fi
+
     # Load host profile
     load_host_profile "$HOST_PROFILE"
 
@@ -339,7 +346,7 @@ write_manifest() {
     MANIFEST_WARMUP="$WARMUP" \
     MANIFEST_HOST_PROFILE="$HOST_PROFILE" \
     python3 - << 'EOF'
-import os, sys, json, subprocess, glob, hashlib, platform, datetime
+import os, sys, json, subprocess, glob, hashlib, platform, datetime, urllib.request
 
 def safe_read(path):
     try:
@@ -401,6 +408,7 @@ if os.path.exists("/proc/cpuinfo"):
 cpu_info["online_cpus"] = safe_read("/sys/devices/system/cpu/online")
 cpu_info["offline_cpus"] = safe_read("/sys/devices/system/cpu/offline")
 cpu_info["smt_control"] = safe_read("/sys/devices/system/cpu/smt/control")
+cpu_info["lscpu"] = run_cmd(["lscpu"])
 
 siblings_map = {}
 for p in sorted(glob.glob("/sys/devices/system/cpu/cpu[0-9]*/topology/thread_siblings_list")):
@@ -408,15 +416,38 @@ for p in sorted(glob.glob("/sys/devices/system/cpu/cpu[0-9]*/topology/thread_sib
     siblings_map[c] = safe_read(p)
 cpu_info["thread_siblings"] = siblings_map
 
-# 2. Cache topology from sysfs
-cache_topology = []
-for cd in sorted(glob.glob("/sys/devices/system/cpu/cpu0/cache/index*")):
+# 2. Cache topology from every online CPU; deduplicate shared cache instances.
+cache_instances = {}
+for cd in sorted(glob.glob("/sys/devices/system/cpu/cpu[0-9]*/cache/index*")):
     entry = {"index": os.path.basename(cd)}
     for attr in ["level", "type", "size", "shared_cpu_list", "ways_of_associativity", "coherency_line_size"]:
         val = safe_read(os.path.join(cd, attr))
         if val is not None:
             entry[attr] = val
-    cache_topology.append(entry)
+    key = tuple(entry.get(k) for k in ("level", "type", "size", "shared_cpu_list"))
+    cache_instances.setdefault(key, entry)
+cache_topology = list(cache_instances.values())
+
+# GCP instance identity is available from the guest metadata server. Local runs
+# keep these fields null and remain explicitly marked by their host profile.
+def gce_metadata(path):
+    host = os.environ.get("GCE_METADATA_HOST", "metadata.google.internal")
+    req = urllib.request.Request(
+        f"http://{host}/computeMetadata/v1/{path}",
+        headers={"Metadata-Flavor": "Google"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=0.3) as response:
+            return response.read().decode("utf-8", errors="replace").strip()
+    except Exception:
+        return None
+
+machine_type_raw = gce_metadata("instance/machine-type")
+zone_raw = gce_metadata("instance/zone")
+machine_identity = {
+    "gcp_machine_type": machine_type_raw.rsplit("/", 1)[-1] if machine_type_raw else None,
+    "gcp_zone": zone_raw.rsplit("/", 1)[-1] if zone_raw else None,
+}
 
 # 3. Frequency and turbo state
 no_turbo = safe_read("/sys/devices/system/cpu/intel_pstate/no_turbo")
@@ -487,11 +518,69 @@ def parse_verbose(text):
             res[k.strip()] = v.strip()
     return res
 
+rustc_host = parse_verbose(rustc_verbose).get("host")
+rustflags_source = "RUSTFLAGS environment" if os.environ.get("RUSTFLAGS") else None
+effective_rustflags = os.environ.get("RUSTFLAGS")
+if os.environ.get("CARGO_ENCODED_RUSTFLAGS"):
+    rustflags_source = "CARGO_ENCODED_RUSTFLAGS environment"
+    effective_rustflags = os.environ["CARGO_ENCODED_RUSTFLAGS"].split(chr(0))
+else:
+    effective_rustflags = effective_rustflags.split() if effective_rustflags else None
+
+cargo_config_path = os.path.join(code_dir, ".cargo", "config.toml")
+cargo_config_raw = safe_read(cargo_config_path)
+if effective_rustflags is None and cargo_config_raw:
+    try:
+        import tomllib
+        with open(cargo_config_path, "rb") as f:
+            cargo_config = tomllib.load(f)
+        target_config = cargo_config.get("target", {}).get(rustc_host, {})
+        configured_flags = target_config.get("rustflags")
+        if configured_flags is None:
+            configured_flags = cargo_config.get("build", {}).get("rustflags")
+        effective_rustflags = configured_flags
+        rustflags_source = f"{cargo_config_path} target={rustc_host}"
+    except Exception:
+        rustflags_source = f"{cargo_config_path} (raw config retained; TOML parse unavailable)"
+
 lockfile_path = os.path.join(code_dir, "Cargo.lock")
 lockfile_sha256 = None
+locked_blake3_version = None
 if os.path.exists(lockfile_path):
     with open(lockfile_path, "rb") as f:
-        lockfile_sha256 = hashlib.sha256(f.read()).hexdigest()
+        lockfile_data = f.read()
+        lockfile_sha256 = hashlib.sha256(lockfile_data).hexdigest()
+    try:
+        import tomllib
+        lock_data = tomllib.loads(lockfile_data.decode("utf-8"))
+        locked_blake3_version = next(
+            (pkg.get("version") for pkg in lock_data.get("package", []) if pkg.get("name") == "blake3"),
+            None,
+        )
+    except Exception:
+        pass
+
+blake3_declarations = {}
+try:
+    import tomllib
+    for manifest_path in glob.glob(os.path.join(code_dir, "**", "Cargo.toml"), recursive=True):
+        if "/target" in manifest_path or "/.git/" in manifest_path:
+            continue
+        try:
+            with open(manifest_path, "rb") as f:
+                manifest_data = tomllib.load(f)
+        except Exception:
+            continue
+        declarations = {}
+        for section in ("dependencies", "dev-dependencies", "build-dependencies"):
+            spec = manifest_data.get(section, {}).get("blake3")
+            if spec is not None:
+                declarations[section] = spec
+        if declarations:
+            relpath = os.path.relpath(manifest_path, code_dir)
+            blake3_declarations[relpath] = declarations
+except Exception:
+    blake3_declarations = {"parse_error": "Python tomllib unavailable"}
 
 rust_info = {
     "rustc_version": rustc_ver,
@@ -500,7 +589,12 @@ rust_info = {
     "cargo_verbose": parse_verbose(cargo_verbose),
     "cargo_lock_sha256": lockfile_sha256,
     "profile": "release",
-    "env_rustflags": os.environ.get("RUSTFLAGS")
+    "env_rustflags": os.environ.get("RUSTFLAGS"),
+    "env_cargo_encoded_rustflags": os.environ.get("CARGO_ENCODED_RUSTFLAGS"),
+    "effective_rustflags": effective_rustflags,
+    "rustflags_source": rustflags_source,
+    "cargo_rustc_wrapper": cargo_config.get("build", {}).get("rustc-wrapper") if "cargo_config" in locals() else None,
+    "cargo_config_raw": cargo_config_raw
 }
 
 # 7. Compilers for SIMD-Spielman
@@ -551,6 +645,7 @@ manifest = {
     "created_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     "host_name": host_name,
     "host_profile": host_profile,
+    "machine_identity": machine_identity,
     "is_test_only": host_is_test_only,
     "cpu": cpu_info,
     "cache_topology": cache_topology,
@@ -558,6 +653,10 @@ manifest = {
     "memory": mem_info,
     "os_and_kernel": os_info,
     "rust_toolchain": rust_info,
+    "blake3": {
+        "locked_version": locked_blake3_version,
+        "manifest_declarations": blake3_declarations,
+    },
     "compilers_simd_spielman": simd_compilers,
     "git": git_info,
     "pinning": pinning_info,

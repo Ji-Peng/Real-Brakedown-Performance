@@ -51,9 +51,22 @@ DEFAULT_HOT_PATTERNS = [
 # Greedy: demangled generic symbols contain nested `<...>`, e.g.
 # `encode_column_block::<lcpc_fields::mont127::Mont127>`.
 SYM_HEADER_RE = re.compile(r"^[0-9a-fA-F]+\s+<(.+)>:\s*$")
-INSN_LINE_RE = re.compile(
-    r"^\s*([0-9a-fA-F]+):\s+(?:((?:[0-9a-fA-F]{2}\s+)+)\s+)?([a-zA-Z0-9_\.]+)(?:\s+(.*))?$"
+# Standard GNU objdump and llvm-objdump place a TAB between raw instruction bytes and the mnemonic
+INSN_LINE_TAB_RE = re.compile(r"^\s*([0-9a-fA-F]+):\s*(?:[0-9a-fA-F\s]+)?\t\s*([a-zA-Z0-9_\.]+)(?:\s+(.*))?$")
+INSN_LINE_FALLBACK_RE = re.compile(
+    r"^\s*([0-9a-fA-F]+):\s+(?:((?:[0-9a-fA-F]{2,8}\s+)+)\s+)?([a-zA-Z0-9_\.]+)(?:\s+(.*))?$"
 )
+
+
+def parse_instruction_line(line: str) -> Optional[Tuple[str, str, str]]:
+    """Extracts (address, mnemonic, operands) from a disassembly line."""
+    m_tab = INSN_LINE_TAB_RE.match(line)
+    if m_tab:
+        return (m_tab.group(1), m_tab.group(2), m_tab.group(3) or "")
+    m_fallback = INSN_LINE_FALLBACK_RE.match(line)
+    if m_fallback:
+        return (m_fallback.group(1), m_fallback.group(3), m_fallback.group(4) or "")
+    return None
 
 # Architecture instruction sets
 # -------------------------------------------------------------
@@ -202,11 +215,11 @@ def classify_instruction(arch: str, mnemonic: str, operands: str) -> Tuple[str, 
                     return ("VEC_ARITH", f"{mnem} {ops}".strip())
 
         # Scalar classification & quality signals
-        if mnem == "mulx":
+        if mnem in ("mulx", "mulxq"):
             return ("SCALAR_MULX", f"{mnem} {ops}".strip())
-        if mnem in ("mul", "imul", "mulq"):
+        if mnem in ("mul", "imul", "mulq", "imulq"):
             return ("SCALAR_MUL", f"{mnem} {ops}".strip())
-        if mnem in ("adcx", "adox"):
+        if mnem in ("adcx", "adox", "adcxq", "adoxq"):
             return ("SCALAR_ADCX", f"{mnem} {ops}".strip())
         if mnem in ("adc", "adcq"):
             return ("SCALAR_ADC", f"{mnem} {ops}".strip())
@@ -239,7 +252,7 @@ def classify_instruction(arch: str, mnemonic: str, operands: str) -> Tuple[str, 
             return ("SCALAR_ADC", f"{mnem} {ops}".strip())
         if mnem in ("adds", "add"):
             return ("SCALAR_ADD", f"{mnem} {ops}".strip())
-        if ("[sp" in ops) and mnem.startswith("str"):
+        if ("[sp" in ops) and (mnem.startswith("str") or mnem.startswith("stp")):
             return ("STACK_SPILL", f"{mnem} {ops}".strip())
         return ("SCALAR", f"{mnem} {ops}".strip())
 
@@ -263,11 +276,31 @@ def classify_instruction(arch: str, mnemonic: str, operands: str) -> Tuple[str, 
             return ("SCALAR_SLTU", f"{mnem} {ops}".strip())
         if mnem in ("add", "addi"):
             return ("SCALAR_ADD", f"{mnem} {ops}".strip())
-        if ("(sp)" in ops) and mnem.startswith("s"):
+        if ("(sp)" in ops) and (mnem.startswith("sd") or mnem.startswith("sw") or mnem.startswith("sh") or mnem.startswith("sb") or mnem == "s"):
             return ("STACK_SPILL", f"{mnem} {ops}".strip())
         return ("SCALAR", f"{mnem} {ops}".strip())
 
     return ("SCALAR", f"{mnem} {ops}".strip())
+
+
+def find_llvm_objdump() -> Optional[str]:
+    """Finds llvm-objdump in PATH or in the active rustup toolchain sysroot."""
+    tool = shutil.which("llvm-objdump")
+    if tool:
+        return tool
+    rustc = shutil.which("rustc") or os.path.expanduser("~/.cargo/bin/rustc")
+    if os.path.isfile(rustc) and os.access(rustc, os.X_OK):
+        try:
+            sysroot = subprocess.check_output([rustc, "--print", "sysroot"], text=True).strip()
+            rustlib = os.path.join(sysroot, "lib", "rustlib")
+            if os.path.isdir(rustlib):
+                for entry in sorted(os.listdir(rustlib)):
+                    candidate = os.path.join(rustlib, entry, "bin", "llvm-objdump")
+                    if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                        return candidate
+        except Exception:
+            pass
+    return None
 
 
 def disassemble_file(file_path: str, objdump_cmd: Optional[str] = None) -> str:
@@ -275,9 +308,10 @@ def disassemble_file(file_path: str, objdump_cmd: Optional[str] = None) -> str:
     tools = []
     if objdump_cmd:
         tools.append(objdump_cmd)
-    if shutil.which("llvm-objdump"):
-        tools.append("llvm-objdump")
-    if shutil.which("objdump"):
+    llvm_tool = find_llvm_objdump()
+    if llvm_tool and llvm_tool not in tools:
+        tools.append(llvm_tool)
+    if shutil.which("objdump") and "objdump" not in tools:
         tools.append("objdump")
 
     for tool in tools:
@@ -416,11 +450,9 @@ def parse_and_check(
             current_lines = []
             continue
 
-        m_insn = INSN_LINE_RE.match(line)
-        if m_insn:
-            addr = m_insn.group(1)
-            mnem = m_insn.group(3)
-            ops = m_insn.group(4) or ""
+        parsed = parse_instruction_line(line)
+        if parsed:
+            addr, mnem, ops = parsed
             current_lines.append((addr, mnem, ops))
 
     finalize_symbol()

@@ -39,12 +39,11 @@ fn fork_graph<F: Copy>(g: &L2rExpanderGraph<F>) -> R2lGraph<F> {
 }
 
 fn check_tv<F: SpielmanTvField>(shape: MatrixShape, log_n: u32) {
-    let Some(tv_dir) = locate_tv_dir() else {
-        eprintln!(
-            "SKIPPED: SIMD-Spielman tv/ directory not found (set {SIMD_SPIELMAN_TV_DIR_ENV})"
-        );
-        return;
-    };
+    let tv_dir = locate_tv_dir().unwrap_or_else(|| {
+        panic!(
+            "required SIMD-Spielman tv/ directory not found; set {SIMD_SPIELMAN_TV_DIR_ENV}"
+        )
+    });
     let (n_rows, k) = shape.dims(log_n);
     let (in_name, out_name) = tv_filenames::<F>(shape, log_n);
     let input = load_tv_matrix::<F>(&tv_dir.join(&in_name), n_rows, k)

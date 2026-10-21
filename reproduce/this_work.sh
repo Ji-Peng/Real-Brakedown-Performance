@@ -39,12 +39,12 @@ log_info "=========================================================="
 # 1. Build
 log_info "Step 1/5: Building workspace in release mode..."
 env CARGO_TARGET_DIR="$TARGET_DIR" taskset -c "$CORES" \
-    cargo build --workspace --release
+    cargo build --workspace --release --locked
 
 # 2. Correctness tests (abort on failure!)
 log_info "Step 2/5: Running workspace correctness test suite..."
 env CARGO_TARGET_DIR="$TARGET_DIR" taskset -c "$CORES" \
-    cargo test --workspace --release || {
+    cargo test --workspace --release --locked || {
     log_error "Workspace tests failed! Aborting benchmark run."
     exit 1
 }
@@ -53,11 +53,13 @@ env CARGO_TARGET_DIR="$TARGET_DIR" taskset -c "$CORES" \
 log_info "Step 3/5: Checking disassembly for scalar codegen..."
 CODEGEN_DIR="$DEST/codegen"
 mkdir -p "$CODEGEN_DIR"
-python3 "$CODE_DIR/scripts/check_codegen.py" \
+taskset -c "$CORES" python3 "$CODE_DIR/scripts/check_codegen.py" \
     "$TARGET_DIR/release/lcpc-bench" \
+    --strict \
     --output-json "$CODEGEN_DIR/codegen_report.json" \
     --output-listing "$CODEGEN_DIR/disassembly.txt" || {
-    log_warn "check_codegen.py reported warnings or issues (see $CODEGEN_DIR/codegen_report.json)"
+    log_error "Codegen verification failed; refusing to benchmark (see $CODEGEN_DIR/codegen_report.json)"
+    exit 1
 }
 
 # 4. Prover/verifier encoding and PCS benchmarks

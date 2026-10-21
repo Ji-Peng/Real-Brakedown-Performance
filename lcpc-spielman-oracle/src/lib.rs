@@ -1231,14 +1231,13 @@ mod tests {
         }
     }
 
-    fn run_tv_or_skip<F: SpielmanTvField>(shape: MatrixShape, log_n: u32) {
-        let Some(tv_dir) = locate_tv_dir() else {
-            eprintln!(
-                "SKIPPED: SIMD-Spielman tv/ directory not found (set {} or checkout SIMD-Spielman-for-ZKPs/tv)",
+    fn run_tv<F: SpielmanTvField>(shape: MatrixShape, log_n: u32) {
+        let tv_dir = locate_tv_dir().unwrap_or_else(|| {
+            panic!(
+                "required SIMD-Spielman tv/ directory not found; set {} or checkout SIMD-Spielman-for-ZKPs/tv",
                 SIMD_SPIELMAN_TV_DIR_ENV
-            );
-            return;
-        };
+            )
+        });
         verify_tv_case::<F>(&tv_dir, shape, log_n);
     }
 
@@ -1246,93 +1245,93 @@ mod tests {
 
     #[test]
     fn tv_brakedown_montgomery_n12() {
-        run_tv_or_skip::<Mont127>(MatrixShape::Brakedown, 12);
+        run_tv::<Mont127>(MatrixShape::Brakedown, 12);
     }
 
     #[test]
     fn tv_brakedown_montgomery_n14() {
-        run_tv_or_skip::<Mont127>(MatrixShape::Brakedown, 14);
+        run_tv::<Mont127>(MatrixShape::Brakedown, 14);
     }
 
     #[test]
     fn tv_brakedown_montgomery_n16() {
-        run_tv_or_skip::<Mont127>(MatrixShape::Brakedown, 16);
+        run_tv::<Mont127>(MatrixShape::Brakedown, 16);
     }
 
     #[test]
     fn tv_brakedown_mersenne_n12() {
-        run_tv_or_skip::<Mers127>(MatrixShape::Brakedown, 12);
+        run_tv::<Mers127>(MatrixShape::Brakedown, 12);
     }
 
     #[test]
     fn tv_brakedown_mersenne_n14() {
-        run_tv_or_skip::<Mers127>(MatrixShape::Brakedown, 14);
+        run_tv::<Mers127>(MatrixShape::Brakedown, 14);
     }
 
     #[test]
     fn tv_brakedown_mersenne_n16() {
-        run_tv_or_skip::<Mers127>(MatrixShape::Brakedown, 16);
+        run_tv::<Mers127>(MatrixShape::Brakedown, 16);
     }
 
     #[test]
     fn tv_brakedown_extension_n12() {
-        run_tv_or_skip::<Fp2M61>(MatrixShape::Brakedown, 12);
+        run_tv::<Fp2M61>(MatrixShape::Brakedown, 12);
     }
 
     #[test]
     fn tv_brakedown_extension_n14() {
-        run_tv_or_skip::<Fp2M61>(MatrixShape::Brakedown, 14);
+        run_tv::<Fp2M61>(MatrixShape::Brakedown, 14);
     }
 
     #[test]
     fn tv_brakedown_extension_n16() {
-        run_tv_or_skip::<Fp2M61>(MatrixShape::Brakedown, 16);
+        run_tv::<Fp2M61>(MatrixShape::Brakedown, 16);
     }
 
     // --- Orion shape (spielman_*) ---
 
     #[test]
     fn tv_orion_montgomery_n12() {
-        run_tv_or_skip::<Mont127>(MatrixShape::Orion, 12);
+        run_tv::<Mont127>(MatrixShape::Orion, 12);
     }
 
     #[test]
     fn tv_orion_montgomery_n14() {
-        run_tv_or_skip::<Mont127>(MatrixShape::Orion, 14);
+        run_tv::<Mont127>(MatrixShape::Orion, 14);
     }
 
     #[test]
     fn tv_orion_montgomery_n16() {
-        run_tv_or_skip::<Mont127>(MatrixShape::Orion, 16);
+        run_tv::<Mont127>(MatrixShape::Orion, 16);
     }
 
     #[test]
     fn tv_orion_mersenne_n12() {
-        run_tv_or_skip::<Mers127>(MatrixShape::Orion, 12);
+        run_tv::<Mers127>(MatrixShape::Orion, 12);
     }
 
     #[test]
     fn tv_orion_mersenne_n14() {
-        run_tv_or_skip::<Mers127>(MatrixShape::Orion, 14);
+        run_tv::<Mers127>(MatrixShape::Orion, 14);
     }
 
     #[test]
     fn tv_orion_mersenne_n16() {
-        run_tv_or_skip::<Mers127>(MatrixShape::Orion, 16);
+        run_tv::<Mers127>(MatrixShape::Orion, 16);
     }
 
     #[test]
     fn tv_orion_extension_n12() {
-        run_tv_or_skip::<Fp2M61>(MatrixShape::Orion, 12);
+        run_tv::<Fp2M61>(MatrixShape::Orion, 12);
     }
 
     #[test]
     fn tv_orion_extension_n14() {
-        run_tv_or_skip::<Fp2M61>(MatrixShape::Orion, 14);
+        run_tv::<Fp2M61>(MatrixShape::Orion, 14);
     }
 
     #[test]
     fn tv_orion_extension_n16() {
-        run_tv_or_skip::<Fp2M61>(MatrixShape::Orion, 16);
+        run_tv::<Fp2M61>(MatrixShape::Orion, 16);
     }
 }
