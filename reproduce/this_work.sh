@@ -64,20 +64,57 @@ taskset -c "$CORES" python3 "$CODE_DIR/scripts/check_codegen.py" \
 
 # 4. Prover/verifier encoding and PCS benchmarks
 log_info "Step 4/5: Running encoding and PCS benchmarks..."
+run_benchmark_shape() {
+    shape_value=$1
+    output_path=$2
+    if [ "$AUTOTUNE" -eq 1 ]; then
+        env RAYON_NUM_THREADS="$THREADS" taskset -c "$CORES" \
+            "$TARGET_DIR/release/lcpc-bench" \
+            --field "$FIELD" --params "$PARAMS" --shape "$shape_value" \
+            --logN "$LOGN" --threads "$THREADS" --cores "$CORES" \
+            --slices "$SLICES" --runs "$RUNS" --warmup "$WARMUP" \
+            --output "$output_path" --autotune
+    else
+        env RAYON_NUM_THREADS="$THREADS" taskset -c "$CORES" \
+            "$TARGET_DIR/release/lcpc-bench" \
+            --field "$FIELD" --params "$PARAMS" --shape "$shape_value" \
+            --logN "$LOGN" --threads "$THREADS" --cores "$CORES" \
+            --slices "$SLICES" --runs "$RUNS" --warmup "$WARMUP" \
+            --output "$output_path"
+    fi
+}
+
 RAW_OUT="$DEST/this_work_${PARAMS}_${FIELD}_T${THREADS}.json"
-BENCH_RUN_ARGS="--field $FIELD --params $PARAMS --logN $LOGN --threads $THREADS --cores $CORES --slices $SLICES --runs $RUNS --warmup $WARMUP --output $RAW_OUT"
-if [ "$AUTOTUNE" -eq 1 ]; then
-    BENCH_RUN_ARGS="$BENCH_RUN_ARGS --autotune"
+if [ "$SHAPE" = "both" ]; then
+    RAW_BRAKEDOWN="$DEST/this_work_${PARAMS}_${FIELD}_T${THREADS}_brakedown.json"
+    RAW_ORION="$DEST/this_work_${PARAMS}_${FIELD}_T${THREADS}_orion.json"
+    run_benchmark_shape brakedown "$RAW_BRAKEDOWN"
+    run_benchmark_shape orion "$RAW_ORION"
+    python3 - "$RAW_BRAKEDOWN" "$RAW_ORION" "$RAW_OUT" <<'PY'
+import json
+import sys
+
+combined = []
+for path in sys.argv[1:3]:
+    with open(path, "r", encoding="utf-8") as source:
+        records = json.load(source)
+    if not isinstance(records, list):
+        raise SystemExit(f"Expected a JSON report list in {path}")
+    combined.extend(records)
+with open(sys.argv[3], "w", encoding="utf-8") as output:
+    json.dump(combined, output, indent=2)
+    output.write("\n")
+PY
+else
+    run_benchmark_shape "$SHAPE" "$RAW_OUT"
 fi
-env RAYON_NUM_THREADS="$THREADS" taskset -c "$CORES" \
-    "$TARGET_DIR/release/lcpc-bench" $BENCH_RUN_ARGS
 
 # Also run field microbenchmarks
 log_info "Step 5/5: Running field arithmetic microbenchmarks..."
 FIELD_OUT="$DEST/field_microbenchmarks.json"
 env taskset -c "$CORES" \
     "$TARGET_DIR/release/bench_fields" \
-    --field "$FIELD" \
+    --field all \
     --runs "$((RUNS * 10000))" \
     --output "$FIELD_OUT"
 

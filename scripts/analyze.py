@@ -111,6 +111,7 @@ class BenchmarkAnalyzer:
         self.reports_ligero_rs: List[Dict] = []
         self.field_benchmarks: List[Dict] = []
         self.codegen_reports: List[Dict] = []
+        self.skipped_baselines: Dict[str, str] = {}
 
         # Provenance tracking
         self.result_dirs: List[str] = []
@@ -118,6 +119,7 @@ class BenchmarkAnalyzer:
         self.session_ids: Set[str] = set()
         self.hosts: Set[str] = set()
         self.has_smoke_watermark: bool = False
+        self.profile: Optional[str] = None
 
         # KDHR26 reference data
         self.kdhr26_data: Dict[str, Any] = {}
@@ -162,6 +164,24 @@ class BenchmarkAnalyzer:
                                 self.has_smoke_watermark = True
                         continue
 
+                    if fname == "simd_spielman.json" and isinstance(data, dict):
+                        if data.get("status") == "skipped":
+                            self.skipped_baselines["SIMD-Spielman"] = str(data.get("skip_reason") or "prerequisite unavailable")
+                        continue
+
+                    if fname == "polycommit_skipped.json" and isinstance(data, dict):
+                        if data.get("status") == "skipped":
+                            self.skipped_baselines["PolyCommit"] = str(data.get("skip_reason") or "prerequisite unavailable")
+                        continue
+
+                    if fname == "schedule.json" and isinstance(data, dict):
+                        self.profile = data.get("profile") or self.profile
+                        if data.get("session_id"):
+                            self.session_ids.add(str(data.get("session_id")))
+                        if self.profile == "smoke":
+                            self.has_smoke_watermark = True
+                        continue
+
                     # Codegen report files
                     if "codegen" in fname or (isinstance(data, dict) and "hot_kernels_checked" in data):
                         if isinstance(data, dict):
@@ -176,10 +196,21 @@ class BenchmarkAnalyzer:
                     # LCPC bench v1 items
                     if isinstance(data, list):
                         for item in data:
-                            if isinstance(item, dict) and item.get("schema_version") == "lcpc-bench-v1":
+                            if not isinstance(item, dict):
+                                continue
+                            if item.get("watermark"):
+                                self.has_smoke_watermark = True
+                            if item.get("schema_version") == "lcpc-bench-v1":
                                 self._categorize_report(path, item)
-                    elif isinstance(data, dict) and data.get("schema_version") == "lcpc-bench-v1":
-                        self._categorize_report(path, data)
+                            elif item.get("schema_version") == "steps-bench-v1":
+                                self._categorize_step_report(path, item)
+                    elif isinstance(data, dict):
+                        if data.get("watermark"):
+                            self.has_smoke_watermark = True
+                        if data.get("schema_version") == "lcpc-bench-v1":
+                            self._categorize_report(path, data)
+                        elif data.get("schema_version") == "steps-bench-v1":
+                            self._categorize_step_report(path, data)
 
         print(f"[INFO] Loaded: {len(self.reports_this_work)} This Work cases, "
               f"{len(self.reports_lcpc_orig)} Original LCPC cases, "
@@ -234,11 +265,24 @@ class BenchmarkAnalyzer:
         else:
             self.reports_this_work.append(item)
 
+    def _categorize_step_report(self, path: str, item: Dict):
+        """Loads the separate steps-bench-v1 records emitted by steps.sh."""
+        tag = str(item.get("tag") or "unknown_step")
+        if tag != "HEAD" and not tag.startswith("step/"):
+            tag = "step/" + tag.removeprefix("step_")
+        self.reports_steps[tag].append(item)
+
     # -------------------------------------------------------------------------
     # Statistical Engine (06 §3)
     # -------------------------------------------------------------------------
 
     def _extract_samples(self, report: Dict, op_name: str = "encode_matrix") -> List[int]:
+        if report.get("schema_version") == "steps-bench-v1":
+            samples = report.get("samples_ns", [])
+            if samples:
+                return [int(sample) for sample in samples if safe_float(sample) is not None]
+            median = report.get("median_ns")
+            return [int(median)] if median is not None and safe_float(median) is not None else []
         meas = report.get("measurements", {}).get(op_name, {})
         samples = meas.get("samples_ns", [])
         if not samples:
@@ -379,6 +423,159 @@ class BenchmarkAnalyzer:
             return "faster"
         return "comparable"
 
+    def _has_measurement(self, report: Dict, op_name: str) -> bool:
+        """Returns true only when a record contains a positive measured value."""
+        measurement = report.get("measurements", {}).get(op_name, {})
+        samples = measurement.get("samples_ns", [])
+        if any((safe_float(sample) or 0) > 0 for sample in samples):
+            return True
+        median = safe_float(measurement.get("summary", {}).get("median_ns"))
+        return median is not None and median > 0
+
+    def _has_case(self, reports: List[Dict], *, field: Optional[Set[str]] = None,
+                  params: Optional[str] = None, shape: Optional[str] = None,
+                  log_n: Optional[int] = None, threads: Optional[int] = None,
+                  slices: Optional[int] = None, operation: Optional[str] = "encode_matrix") -> bool:
+        for report in reports:
+            if field is not None and report.get("field", "Mont127") not in field:
+                continue
+            if params is not None and report.get("params") != params:
+                continue
+            if shape is not None and report.get("shape", "brakedown") not in (shape, None):
+                continue
+            if log_n is not None and int(report.get("log_n", -1)) != log_n:
+                continue
+            if threads is not None and int(report.get("threads", 1)) != threads:
+                continue
+            if slices is not None and int(report.get("slices", 1)) != slices:
+                continue
+            if operation is not None and not self._has_measurement(report, operation):
+                continue
+            return True
+        return False
+
+    def _check_smoke_coverage(self) -> List[str]:
+        """Checks the representative smoke matrix, not the full paper campaign."""
+        errors = []
+
+        def require(condition: bool, label: str):
+            if not condition:
+                errors.append(f"Smoke coverage missing: {label}")
+
+        require(self._has_case(self.reports_this_work, field={"Mont127"}, params="lcpc-sdig6",
+                               shape="brakedown", log_n=20, threads=1),
+                "T1 This Work mode (a), Mont127, logN=20, T=1")
+        require(self._has_case(self.reports_lcpc_orig, field={"Ft127", "Mont127"}, params="lcpc-sdig6",
+                               shape="brakedown", log_n=20, threads=1),
+                "T1 original LCPC mode (a), logN=20, T=1")
+        polycommit_skip = self.skipped_baselines.get("PolyCommit")
+        require(self._has_case(self.reports_polycommit, log_n=20, threads=1),
+                "T1 PolyCommit logN=20, T=1" + (f" (wrapper skipped: {polycommit_skip})" if polycommit_skip else ""))
+
+        require(self._has_case(self.reports_this_work, field={"Mont127"}, params="simd-spielman",
+                               shape="brakedown", log_n=20, threads=1),
+                "T2 This Work mode (b), Mont127, logN=20, T=1")
+        simd_skip = self.skipped_baselines.get("SIMD-Spielman")
+        require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman",
+                               shape="brakedown", log_n=20, threads=1),
+                "T2 SIMD-Spielman, Mont127, logN=20, T=1" + (f" (wrapper skipped: {simd_skip})" if simd_skip else ""))
+
+        step_tags = {tag for tag, reports in self.reports_steps.items()
+                     if any(r.get("mode", "a") == "a" and int(r.get("log_n", -1)) == 20
+                            and self._extract_samples(r) for r in reports)}
+        require("step/01-modernize" in step_tags and "HEAD" in step_tags,
+                "T3/F1 successful mode (a) step/01-modernize and HEAD records at logN=20")
+
+        require(all(self._has_case(self.reports_this_work, field={"Mont127"}, params="lcpc-sdig6",
+                                   shape="brakedown", log_n=20, threads=1, slices=s)
+                    for s in (1, 2)),
+                "T4 two explicit slice counts (s=1 and s=2) at logN=20")
+
+        micro_by_field = {str(r.get("field")): r for r in self.field_benchmarks}
+        for field_name in ("Mont127", "Mers127", "Fp2M61", "Ft127"):
+            micro = micro_by_field.get(field_name, {})
+            require(all((safe_float(micro.get(op, {}).get("ns_per_op")) or 0) > 0
+                        for op in ("mul", "mac", "reduce")),
+                    f"T5 {field_name} mul/mac/reduce microbenchmarks")
+        for field_name, params in (("Mont127", "lcpc-sdig6"),
+                                  ("Mers127", "simd-spielman"),
+                                  ("Fp2M61", "simd-spielman")):
+            require(self._has_case(self.reports_this_work, field={field_name}, params=params,
+                                   shape="brakedown", log_n=20, threads=1),
+                    f"T5 {field_name} encode sample at logN=20")
+
+        pcs_ops = ("commit_total", "encode_matrix", "hash_matrix_decomposition", "prove", "verify")
+        for label, reports, fields, implementation_params in (
+            ("This Work", self.reports_this_work, {"Mont127"}, "lcpc-sdig6"),
+            ("original LCPC", self.reports_lcpc_orig, {"Ft127", "Mont127"}, "lcpc-sdig6"),
+        ):
+            matching = [r for r in reports if r.get("field", "Mont127") in fields
+                        and r.get("params") == implementation_params
+                        and r.get("shape", "brakedown") in ("brakedown", None)
+                        and int(r.get("log_n", -1)) == 20 and int(r.get("threads", 1)) == 1]
+            require(any(all(self._has_measurement(r, op) for op in pcs_ops)
+                        and (safe_float(r.get("proof_size_bytes")) or 0) > 0 for r in matching),
+                    f"T6 {label} complete PCS record at logN=20, T=1")
+
+        for params in ("lcpc-sdig6", "simd-spielman"):
+            matching = [r for r in self.reports_this_work if r.get("field") == "Mont127"
+                        and r.get("params") == params and r.get("shape", "brakedown") == "brakedown"
+                        and int(r.get("log_n", -1)) == 20 and int(r.get("threads", 1)) == 1]
+            require(any(self._has_measurement(r, "verifier_encode_1")
+                        and (self._has_measurement(r, "verifier_encode_2")
+                             or self._has_measurement(r, "verifier_encode")) for r in matching),
+                    f"T7 This Work verifier v=1 and v=2, params={params}")
+        require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman",
+                               shape="brakedown", log_n=20, threads=1, operation="verifier_encode_2"),
+                "T7 SIMD-Spielman verifier v=2 at logN=20")
+
+        require(self._has_case(self.reports_this_work, field={"Mont127"}, params="simd-spielman",
+                               shape="orion", log_n=20, threads=1),
+                "T9 This Work mode (b) Orion sample at logN=20")
+        require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman",
+                               shape="orion", log_n=20, threads=1),
+                "T9 SIMD-Spielman Orion sample at logN=20")
+        require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman",
+                               shape="brakedown", log_n=20, threads=1),
+                "T8 SIMD-Spielman Brakedown sample at logN=20")
+        require(self._has_case(self.reports_this_work, field={"Mont127"}, params="lcpc-sdig6",
+                               shape="brakedown", log_n=20, threads=1),
+                "T10 Brakedown encode sample at logN=20")
+        require(self._has_case(self.reports_ligero_rs, log_n=20, threads=1),
+                "T10 Ligero RS encode sample at logN=20")
+
+        require(any(cr.get("status") == "PASS" and cr.get("hot_kernels_checked")
+                    for cr in self.codegen_reports),
+                "T11 passing hot-kernel codegen report")
+
+        require(any(r.get("params") == "lcpc-sdig6" and r.get("field") == "Mont127"
+                    and int(r.get("log_n", -1)) == 20 and int(r.get("threads", 1)) == 1
+                    and r.get("slice_mode") == "adaptive" and self._has_measurement(r, "encode_matrix")
+                    for r in self.reports_this_work),
+                "F2 adaptive slicing series at logN=20")
+        for label, reports, fields in (("This Work", self.reports_this_work, {"Mont127"}),
+                                       ("original LCPC", self.reports_lcpc_orig, {"Ft127", "Mont127"})):
+            require(any(r.get("field", "Mont127") in fields and r.get("params") == "lcpc-sdig6"
+                        and int(r.get("log_n", -1)) == 20 and int(r.get("threads", 1)) == 1
+                        and self._has_measurement(r, "encode_matrix")
+                        and r.get("setup_ns") is not None and r.get("peak_rss_bytes") is not None
+                        for r in reports),
+                    f"T8 {label} setup, encoding, and peak-RSS record at logN=20")
+
+        tw_threads = {int(r.get("threads", 1)) for r in self.reports_this_work
+                      if r.get("field") == "Mont127" and r.get("params") == "lcpc-sdig6"
+                      and int(r.get("log_n", -1)) == 20
+                      and self._has_measurement(r, "encode_matrix")}
+        lcpc_threads = {int(r.get("threads", 1)) for r in self.reports_lcpc_orig
+                        if r.get("params") == "lcpc-sdig6" and int(r.get("log_n", -1)) == 20
+                        and self._has_measurement(r, "encode_matrix")}
+        require(1 in tw_threads and len(tw_threads) > 1 and 1 in lcpc_threads and len(lcpc_threads) > 1,
+                "F3 This Work and original LCPC at T=1 and a multithreaded configuration")
+
+        if self.has_smoke_watermark and not self.reports_arm:
+            print("[INFO] T12 Arm rows are marked N/A for local smoke; no Arm numbers are inferred.")
+        return errors
+
     def _get_provenance_text(self) -> str:
         dirs_str = ", ".join(os.path.basename(d.rstrip("/")) for d in self.result_dirs) or "results/"
         fork_sha_str = ", ".join(sorted(self.fork_shas)) or "HEAD"
@@ -394,6 +591,9 @@ class BenchmarkAnalyzer:
                          col_align: Optional[str] = None):
         """Writes both LaTeX booktabs table and CSV summary file with provenance footers."""
         provenance = self._get_provenance_text()
+        if (self.is_smoke or self.has_smoke_watermark) and name.startswith("table_"):
+            notes = list(notes or [])
+            notes.append("LOCAL SMOKE — NOT A RESULT. Do not copy these values to paper/.")
 
         # 1. Write CSV
         csv_path = os.path.join(self.csv_dir, f"{name}.csv")
@@ -661,7 +861,7 @@ class BenchmarkAnalyzer:
         rows = []
 
         for tag in sorted_tags:
-            reps = self.reports_steps[tag]
+            reps = [r for r in self.reports_steps[tag] if r.get("mode", "a") == "a"]
             # Group by log_n
             by_log_n = defaultdict(list)
             for r in reps:
@@ -836,6 +1036,10 @@ class BenchmarkAnalyzer:
         rows = []
         for group, label in [(self.reports_this_work, "This Work"), (self.reports_lcpc_orig, "Original LCPC")]:
             for r in sorted(group, key=lambda x: (x.get("threads", 1), x.get("log_n", 0))):
+                if r.get("params") != "lcpc-sdig6":
+                    continue
+                if int(r.get("log_n", 0)) not in (20, 24, 28) or int(r.get("threads", 1)) not in (1, 8):
+                    continue
                 m = r.get("measurements", {})
                 comm_ms = self._get_op_summary(r, "commit_total").get("median_ns")
                 enc_ms = self._get_op_summary(r, "encode_matrix").get("median_ns")
@@ -933,10 +1137,13 @@ class BenchmarkAnalyzer:
         headers = ["Implementation", "log2(N)", "Setup (ms)", "Encode (ms)", "Setup / Encode", "Peak RSS (MB)"]
         rows = []
         for group, label in [(self.reports_this_work, "This Work"),
-                             (self.reports_lcpc_orig, "Original LCPC"),
-                             (self.reports_simd_spielman, "SIMD-Spielman")]:
+                             (self.reports_lcpc_orig, "Original LCPC")]:
             for r in sorted(group, key=lambda x: (x.get("threads", 1), x.get("log_n", 0))):
-                if r.get("threads", 1) != 1 or r.get("shape") != "brakedown":
+                if (r.get("threads", 1) != 1 or r.get("shape", "brakedown") not in ("brakedown", None)
+                        or int(r.get("log_n", 0)) not in (20, 24, 28)
+                        or r.get("params") != "lcpc-sdig6"):
+                    continue
+                if label == "This Work" and r.get("slice_mode") != "adaptive":
                     continue
 
                 setup_val = r.get("setup_ns", 0)
@@ -951,6 +1158,10 @@ class BenchmarkAnalyzer:
                     ratio_str = f"{setup_ns / enc_ns:.2f}x"
 
                 rss_bytes = r.get("peak_rss_bytes", 0)
+                if setup_ns <= 0:
+                    setup_ns = None
+                if not rss_bytes or rss_bytes <= 0:
+                    rss_bytes = None
 
                 rows.append([
                     label, r.get("log_n", 0),
@@ -958,9 +1169,20 @@ class BenchmarkAnalyzer:
                     ratio_str, format_bytes_to_mb(rss_bytes)
                 ])
 
+        for r in self.reports_simd_spielman:
+            if (r.get("threads", 1) == 1 and r.get("shape") == "brakedown"
+                    and r.get("field") == "Mont127" and r.get("params") == "simd-spielman"
+                    and int(r.get("log_n", 0)) in (20, 24, 28)):
+                rows.append([
+                    "SIMD-Spielman", r.get("log_n", 0),
+                    "-", format_ns_to_ms(self._get_op_summary(r, "encode_matrix").get("median_ns")),
+                    "-", "-"
+                ])
+
         notes = [
             "Setup includes bipartite expander graph sampling, transposition, prepare_weight, and allocation.",
-            "Peak RSS recorded via VmHWM from /proc/self/status."
+            "Peak RSS recorded via VmHWM from /proc/self/status.",
+            "SIMD-Spielman wrapper currently reports encoding only; its setup and RSS cells are left blank."
         ]
         self._write_artefact("table_T8_setup_memory",
                              "One-Time Setup Cost and Peak Memory Overhead",
@@ -1111,15 +1333,21 @@ class BenchmarkAnalyzer:
                 if tw_stat and lcpc_stat and tw_stat > 0:
                     spd_str = f"{lcpc_stat / tw_stat:.2f}x"
 
-                rows.append([
-                    log_n, threads,
-                    format_ns_to_ms(tw_stat), format_ns_to_ms(lcpc_stat), spd_str
-                ])
+                if self.has_smoke_watermark and not self.reports_arm:
+                    rows.append([log_n, threads, "N/A (local smoke)", "N/A (local smoke)", "N/A (local smoke)"])
+                else:
+                    rows.append([
+                        log_n, threads,
+                        format_ns_to_ms(tw_stat), format_ns_to_ms(lcpc_stat), spd_str
+                    ])
 
-        notes = [
-            "Arm campaign executed on GCP c4a (Neoverse V2) with scalar portable Rust.",
-            "Demonstrates direct portability of all software optimizations across ISAs without SIMD rewrites."
-        ]
+        if self.has_smoke_watermark and not self.reports_arm:
+            notes = ["Local smoke does not run on Arm; these cells are explicitly not applicable and contain no Arm measurements."]
+        else:
+            notes = [
+                "Arm campaign executed on GCP c4a (Neoverse V2) with scalar portable Rust.",
+                "Demonstrates direct portability of all software optimizations across ISAs without SIMD rewrites."
+            ]
         self._write_artefact("table_T12_arm_portability",
                              "Arm Architecture Portability Benchmark (GCP c4a Neoverse V2)",
                              "tab:arm_portability", headers, rows, notes)
@@ -1140,14 +1368,23 @@ class BenchmarkAnalyzer:
         x_indices = list(range(len(step_tags)))
         labels = [t.replace("step/", "") for t in step_tags]
 
-        # Get median times for N=20
+        # Use the planned N=20 column when present; smoke runs may contain only
+        # a smaller sample, so fall back to the largest common N in the records.
+        mode_a_steps = {
+            tag: [r for r in self.reports_steps.get(tag, []) if r.get("mode", "a") == "a"]
+            for tag in step_tags
+        }
+        candidate_sizes = sorted({int(r.get("log_n", 0)) for reps in mode_a_steps.values() for r in reps}, reverse=True)
+        plot_log_n = next((n for n in candidate_sizes if all(any(int(r.get("log_n", 0)) == n for r in reps) for reps in mode_a_steps.values())), 20)
+
+        # Get median times for the selected common size.
         times = []
         for tag in step_tags:
-            reps = self.reports_steps.get(tag, [])
+            reps = [r for r in mode_a_steps.get(tag, []) if int(r.get("log_n", 0)) == plot_log_n]
             stat = self._compute_stat_across_sessions(reps)["mean_median_ns"]
             times.append((stat / 1e6) if stat else 0.0)
 
-        bars = ax.bar(x_indices, times, color="#2b5c8f", width=0.6, label="Prover Encoding (N=2^20)")
+        bars = ax.bar(x_indices, times, color="#2b5c8f", width=0.6, label=f"Prover Encoding (N=2^{plot_log_n})")
         ax.set_xticks(x_indices)
         ax.set_xticklabels(labels, rotation=35, ha="right", fontsize=9)
         ax.set_ylabel("Latency (ms)")
@@ -1226,21 +1463,28 @@ class BenchmarkAnalyzer:
             return
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.5))
 
-        tw_grouped = self._group_by_config(self.reports_this_work)
-        lcpc_grouped = self._group_by_config(self.reports_lcpc_orig)
+        tw_grouped = self._group_by_core_config(self.reports_this_work)
+        lcpc_grouped = self._group_by_core_config(self.reports_lcpc_orig)
 
-        threads_list = [1, 2, 4, 8, 15]
+        threads_list = sorted({
+            key[4] for key in list(tw_grouped) + list(lcpc_grouped)
+            if key[:4] == ("Mont127", "lcpc-sdig6", "brakedown", 20)
+        })
+        if not threads_list:
+            threads_list = [1, 2, 4, 8, 15]
 
         # Use logN=20 or highest available
-        t1_tw = self._compute_stat_across_sessions(tw_grouped.get(("Mont127", "lcpc-sdig6", "brakedown", 20, 1, 1), []))["mean_median_ns"]
-        t1_lcpc = self._compute_stat_across_sessions(lcpc_grouped.get(("Mont127", "lcpc-sdig6", "brakedown", 20, 1, 1), []))["mean_median_ns"]
+        t1_tw = self._compute_stat_across_sessions(tw_grouped.get(("Mont127", "lcpc-sdig6", "brakedown", 20, 1), []))["mean_median_ns"]
+        t1_lcpc = self._compute_stat_across_sessions(lcpc_grouped.get(("Ft127", "lcpc-sdig6", "brakedown", 20, 1), []))["mean_median_ns"]
+        if t1_lcpc is None:
+            t1_lcpc = self._compute_stat_across_sessions(lcpc_grouped.get(("Mont127", "lcpc-sdig6", "brakedown", 20, 1), []))["mean_median_ns"]
 
         tw_speedups = []
         tw_effs = []
         valid_threads = []
 
         for t in threads_list:
-            st = self._compute_stat_across_sessions(tw_grouped.get(("Mont127", "lcpc-sdig6", "brakedown", 20, t, 1), []))["mean_median_ns"]
+            st = self._compute_stat_across_sessions(tw_grouped.get(("Mont127", "lcpc-sdig6", "brakedown", 20, t), []))["mean_median_ns"]
             if t1_tw and st and st > 0:
                 spd = t1_tw / st
                 eff = spd / t
@@ -1248,11 +1492,28 @@ class BenchmarkAnalyzer:
                 tw_speedups.append(spd)
                 tw_effs.append(eff)
 
+        lcpc_speedups = []
+        lcpc_effs = []
+        lcpc_threads = []
+        for t in threads_list:
+            st = self._compute_stat_across_sessions(lcpc_grouped.get(("Ft127", "lcpc-sdig6", "brakedown", 20, t), []))["mean_median_ns"]
+            if st is None:
+                st = self._compute_stat_across_sessions(lcpc_grouped.get(("Mont127", "lcpc-sdig6", "brakedown", 20, t), []))["mean_median_ns"]
+            if t1_lcpc and st and st > 0:
+                speedup = t1_lcpc / st
+                lcpc_threads.append(t)
+                lcpc_speedups.append(speedup)
+                lcpc_effs.append(speedup / t)
+
         if valid_threads:
             ax1.plot(valid_threads, tw_speedups, marker="o", linewidth=2, color="#1f77b4", label="This Work")
+            if lcpc_threads:
+                ax1.plot(lcpc_threads, lcpc_speedups, marker="s", linewidth=2, color="#ff7f0e", label="Original LCPC")
             ax1.plot(valid_threads, valid_threads, linestyle=":", color="gray", label="Ideal Linear")
             ax1.legend()
             ax2.plot(valid_threads, tw_effs, marker="s", linewidth=2, color="#1f77b4", label="This Work E(T)")
+            if lcpc_threads:
+                ax2.plot(lcpc_threads, lcpc_effs, marker="^", linewidth=2, color="#ff7f0e", label="Original LCPC E(T)")
             ax2.legend()
         else:
             ax1.text(0.5, 0.5, "Multithreaded sweep data pending", ha="center", va="center", color="gray")
@@ -1325,6 +1586,18 @@ class BenchmarkAnalyzer:
             if not os.path.isfile(png_path) or os.path.getsize(png_path) == 0:
                 errors.append(f"Missing or empty PNG figure: {png_path}")
 
+        if self.has_smoke_watermark or self.profile == "smoke":
+            errors.extend(self._check_smoke_coverage())
+        else:
+            errors.extend(
+                error.replace("Smoke coverage missing:", "Campaign coverage missing:")
+                for error in self._check_smoke_coverage()
+            )
+            if len(self.session_ids) < 2:
+                errors.append("Campaign artefacts require two independent sessions; include both session directories in --results-dir before --check")
+            if self.profile == "full" and not self.reports_arm:
+                errors.append("Full campaign artefacts require the matching Arm session; include both sessions in --results-dir before --check")
+
         if errors:
             print("[FAIL] Artefact validation failed with errors:")
             for err in errors:
@@ -1337,16 +1610,24 @@ class BenchmarkAnalyzer:
 
 def main():
     parser = argparse.ArgumentParser(description="Analyze benchmark results and generate paper evaluation artefacts.")
-    parser.add_argument("--results-dir", nargs="+", required=True, help="One or more directories containing benchmark results")
-    parser.add_argument("--out-dir", default="./analysis", help="Output directory for generated artefacts")
+    parser.add_argument("results_dir_positional", nargs="?",
+                        help="Result directory (positional form; also accepts --results-dir)")
+    parser.add_argument("--results-dir", nargs="+", dest="results_dir_option",
+                        help="One or more directories containing benchmark results")
+    parser.add_argument("--out", "--out-dir", dest="out_dir", default="./analysis",
+                        help="Output directory for generated artefacts")
     parser.add_argument("--kdhr26-json", default=os.path.join(os.path.dirname(__file__), "kdhr26_reported.json"),
                         help="Path to committed kdhr26_reported.json citation data")
     parser.add_argument("--smoke", action="store_true", help="Mark outputs with LOCAL SMOKE watermark")
     parser.add_argument("--check", action="store_true", help="Fail if any required artefact or cell is missing")
     args = parser.parse_args()
 
+    results_dirs = args.results_dir_option or ([args.results_dir_positional] if args.results_dir_positional else [])
+    if not results_dirs:
+        parser.error("provide a result directory positionally or with --results-dir")
+
     analyzer = BenchmarkAnalyzer(args.out_dir, args.kdhr26_json, is_smoke=args.smoke)
-    analyzer.load_results(args.results_dir)
+    analyzer.load_results(results_dirs)
     analyzer.generate_all()
 
     if args.check:

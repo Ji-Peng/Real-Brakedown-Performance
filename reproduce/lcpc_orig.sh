@@ -45,8 +45,9 @@ CODE_SHA=$(git -C "$CODE_DIR" rev-parse --short=12 HEAD)
 RUN_ID=$(date -u +%Y-%m-%d)-$CODE_SHA
 DEST="$OUT_ROOT/$HOST_NAME/$RUN_ID/lcpc_orig"
 mkdir -p "$DEST"
-mkdir -p "$CODE_DIR/target-lcpc-orig/tmp"
-export TMPDIR="$CODE_DIR/target-lcpc-orig/tmp"
+TARGET_ROOT="${CARGO_TARGET_DIR:-$CODE_DIR/target-lcpc-orig}"
+mkdir -p "$TARGET_ROOT/tmp"
+export TMPDIR="$TARGET_ROOT/tmp"
 
 FORK_RUSTFLAGS="-C target-cpu=native -C no-vectorize-loops -C no-vectorize-slp"
 unset RUSTFLAGS
@@ -55,7 +56,7 @@ build_variant() {
     variant_name=$1
     build_profile=$2
     hash_mode=$3
-    target_dir="$CODE_DIR/target-lcpc-orig/$variant_name"
+    target_dir="$TARGET_ROOT/$variant_name"
 
     log_info "Building original LCPC: $variant_name"
     if [ "$build_profile" = "plain-release" ]; then

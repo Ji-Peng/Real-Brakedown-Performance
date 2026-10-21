@@ -11,7 +11,7 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 CODE_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 REPO_DIR=$(CDPATH= cd -- "$CODE_DIR/.." && pwd)
 DRIVER_SRC="$CODE_DIR/external/steps-driver"
-TARGET_ROOT="$CODE_DIR/target-eval-steps"
+TARGET_ROOT="${CARGO_TARGET_DIR:-$CODE_DIR/target-eval-steps}"
 WORKTREE_ROOT="$TARGET_ROOT/worktrees"
 
 SPECIFIC_TAGS=""

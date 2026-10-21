@@ -156,6 +156,8 @@ struct BenchReport {
     recursion_depth: usize,
     level_parameters: Vec<LevelParameters>,
     setup_ns: SetupTimes,
+    peak_rss_bytes: usize,
+    proof_size_bytes: usize,
     measurements: Measurements,
     correctness: Correctness,
     hash_decomposition_includes_scratch_allocation: bool,
@@ -447,6 +449,9 @@ where
         );
     });
     let proof = proof_slot.expect("runs is nonzero");
+    let proof_size_bytes = bincode::serialize(&proof)
+        .map_err(|e| format!("cannot serialize LCPC proof size: {e}"))?
+        .len();
 
     let mut verified = false;
     let mut verified_value = <F as Field>::zero();
@@ -496,6 +501,8 @@ where
             input_generation_and_row_buffer_init_ns: input_setup_ns,
             verifier_encoding_init_ns,
         },
+        peak_rss_bytes: peak_rss_bytes(),
+        proof_size_bytes,
         measurements: Measurements {
             encode_matrix: summarize(encode_samples),
             hash_matrix_decomposition: summarize(hash_samples),
@@ -939,6 +946,8 @@ fn write_report(out: &mut String, report: &BenchReport, indent: usize) {
     writeln!(out, "{}\"input_generation_and_row_buffer_init_ns\": {},", " ".repeat(indent + 4), report.setup_ns.input_generation_and_row_buffer_init_ns).unwrap();
     writeln!(out, "{}\"verifier_encoding_init_ns\": {}", " ".repeat(indent + 4), report.setup_ns.verifier_encoding_init_ns).unwrap();
     writeln!(out, "{} }},", " ".repeat(indent + 2)).unwrap();
+    writeln!(out, "{}\"peak_rss_bytes\": {},", " ".repeat(indent + 2), report.peak_rss_bytes).unwrap();
+    writeln!(out, "{}\"proof_size_bytes\": {},", " ".repeat(indent + 2), report.proof_size_bytes).unwrap();
 
     writeln!(out, "{}\"measurements\": {{", " ".repeat(indent + 2)).unwrap();
     let measurements = [
@@ -962,6 +971,18 @@ fn write_report(out: &mut String, report: &BenchReport, indent: usize) {
     writeln!(out, "{} }},", " ".repeat(indent + 2)).unwrap();
     writeln!(out, "{}\"hash_decomposition_includes_scratch_allocation\": {}", " ".repeat(indent + 2), report.hash_decomposition_includes_scratch_allocation).unwrap();
     write!(out, "{pad}}}").unwrap();
+}
+
+fn peak_rss_bytes() -> usize {
+    fs::read_to_string("/proc/self/status")
+        .ok()
+        .and_then(|status| {
+            status.lines().find_map(|line| {
+                let value = line.strip_prefix("VmHWM:")?.split_whitespace().next()?;
+                value.parse::<usize>().ok().map(|kilobytes| kilobytes.saturating_mul(1024))
+            })
+        })
+        .unwrap_or(0)
 }
 
 fn benchmark_json(reports: &[BenchReport]) -> String {

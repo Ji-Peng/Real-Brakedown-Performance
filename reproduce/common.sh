@@ -190,7 +190,7 @@ Options:
   --runs <n>          Number of timed repetitions (default: 5)
   --warmup <n>        Number of untimed warm-up repetitions (default: 2)
   --out <dir>         Output directory for results and manifests (default: results)
-  --params <mode>     Code parameter mode: lcpc-sdig6 | lcpc-sdig3 | simd-spielman (default: lcpc-sdig6)
+  --params <mode>     Benchmark mode: lcpc-sdig6 | lcpc-sdig3 | simd-spielman | rs-ligero (default: lcpc-sdig6)
   --host <name>       Host profile name from reproduce/hosts/<name>.sh
   --field <name>      Field: mont127 | mers127 | fp2m61 (default: mont127)
   --slices <n>        LLC slice count: adaptive | 1 | 2 | 4 | 8 | 16... (default: adaptive)
@@ -238,8 +238,8 @@ parse_args() {
             --params)
                 [ $# -ge 2 ] || { log_error "Option --params requires an argument"; exit 1; }
                 case "$2" in
-                    lcpc-sdig6|lcpc-sdig3|simd-spielman) PARAMS="$2" ;;
-                    *) log_error "Invalid --params '$2'. Must be lcpc-sdig6, lcpc-sdig3, or simd-spielman."; exit 1 ;;
+                    lcpc-sdig6|lcpc-sdig3|simd-spielman|rs-ligero) PARAMS="$2" ;;
+                    *) log_error "Invalid --params '$2'. Must be lcpc-sdig6, lcpc-sdig3, simd-spielman, or rs-ligero."; exit 1 ;;
                 esac
                 shift 2
                 ;;

@@ -55,11 +55,14 @@ case "$THREADS" in
 esac
 if [ "$THREADS" -gt 1 ] && [ "$EXPLICIT_CORES" -ne 1 ]; then
     log_error "SIMD-Spielman multithreaded runs require an explicit --cores list."
-    exit 1
+    exit 0
 fi
 case "$RUNS" in
     ''|*[!0-9]*) log_error "--runs must be a positive integer."; exit 1 ;;
     0) log_error "--runs must be a positive integer."; exit 1 ;;
+esac
+case "$WARMUP" in
+    ''|*[!0-9]*) log_error "--warmup must be a nonnegative integer."; exit 1 ;;
 esac
 case "$LOGN" in
     ''|*[!0-9,]*) log_error "--logN must be a comma-separated list of integer sizes."; exit 1 ;;
@@ -113,7 +116,7 @@ else
     OUT_DIR="$CODE_DIR/results/$HOST_NAME/$RUN_DATE-$CODE_GIT_SHA/simd_spielman"
 fi
 
-TARGET_ROOT="$CODE_DIR/target-simd-spielman"
+TARGET_ROOT="${CARGO_TARGET_DIR:-$CODE_DIR/target-simd-spielman}/simd-spielman"
 RAW_DIR="$OUT_DIR/raw"
 PATCH_FILE="$CODE_DIR/external/simd_spielman/params.patch"
 UPSTREAM_SHA=$UPSTREAM_COMMIT
@@ -150,6 +153,7 @@ finalize() {
     SIMD_THREADS=$THREADS \
     SIMD_LOGN=$LOGN \
     SIMD_RUNS=$RUNS \
+    SIMD_WARMUP=$WARMUP \
     SIMD_CORES=$CORES \
     SIMD_TEST_CORES=$TEST_CORES \
     SIMD_FIELDS="$UPSTREAM_FIELDS" \
@@ -190,6 +194,8 @@ manifest = {
     "threads": int(os.environ.get("SIMD_THREADS", "1")),
     "logN": [int(x) for x in os.environ.get("SIMD_LOGN", "").split(",") if x],
     "runs": int(os.environ.get("SIMD_RUNS", "1")),
+    "warmup": int(os.environ.get("SIMD_WARMUP", "2")),
+    "measurement_method": "one native timed repetition per process; warm-up processes excluded",
     "benchmark_cores": os.environ.get("SIMD_CORES"),
     "correctness_test_cores": os.environ.get("SIMD_TEST_CORES"),
     "fields": os.environ.get("SIMD_FIELDS", "").replace(",", " ").split(),
@@ -233,13 +239,15 @@ field_map = {
 verifier_latencies = {}
 if raw_dir.is_dir():
     for path in sorted(raw_dir.glob("verifier-*.log")):
+        if "-warmup-" in path.name:
+            continue
         try:
             content = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        m = re.search(r"verifier-([a-zA-Z0-9]+)-montgomery-N(\d+)-T1\.log", path.name)
+        m = re.search(r"verifier-([a-zA-Z0-9]+)-montgomery-N(\d+)-T1-run-(\d+)\.log", path.name)
         if not m:
-            m2 = re.search(r"verifier-montgomery-N(\d+)-T1\.log", path.name)
+            m2 = re.search(r"verifier-montgomery-N(\d+)-T1-run-(\d+)\.log", path.name)
             if m2:
                 sh = "brakedown"
                 ln = int(m2.group(1))
@@ -251,22 +259,25 @@ if raw_dir.is_dir():
         m_enc = re.search(r"Encode time for logN\s*=\s*\d+,\s*repetitions\s*(\d+)\s*:\s*(\d+)\s*us", content)
         if m_enc:
             v_us = int(m_enc.group(2))
-            verifier_latencies[(sh, ln)] = v_us * 1000
+            verifier_latencies.setdefault((sh, ln), []).append(v_us * 1000)
 
     bench_reports = []
+    bench_cases = {}
     for path in sorted(raw_dir.glob("*.log")):
         fname = path.name
         if (fname.startswith("verifier-") or fname.startswith("prerequisite-") or
                 fname.startswith("manifest") or fname.startswith("upstream-") or
-                fname.startswith("test-") or fname.startswith("benchmark-")):
+                fname.startswith("test-") or fname.startswith("benchmark-") or
+                "-warmup-" in fname):
             continue
-        m = re.search(r"^([a-zA-Z0-9]+)-([a-zA-Z0-9]+)-N(\d+)-T(\d+)\.log$", fname)
+        m = re.search(r"^([a-zA-Z0-9]+)-([a-zA-Z0-9]+)-N(\d+)-T(\d+)-run-(\d+)\.log$", fname)
         if not m:
             continue
         shape = m.group(1)
         field_raw = m.group(2)
         log_n = int(m.group(3))
         threads = int(m.group(4))
+        case_key = (shape, field_raw, log_n, threads)
         field = field_map.get(field_raw, field_raw)
 
         try:
@@ -277,47 +288,44 @@ if raw_dir.is_dir():
         m_graph = re.search(r"GraphGen Done lgN=(\d+) k=(\d+)(?:\s+slices=(\d+))?", content)
         m_enc = re.search(r"Encode time for logN\s*=\s*\d+,\s*repetitions\s*(\d+)\s*:\s*(\d+)\s*us", content)
 
-        status = "ok" if m_enc else "failed"
         k = int(m_graph.group(2)) if m_graph else (128 if shape == "orion" else 1 << (log_n // 2))
         slices = int(m_graph.group(3)) if (m_graph and m_graph.group(3)) else 1
-        runs = int(m_enc.group(1)) if m_enc else 1
-        lat_us = int(m_enc.group(2)) if m_enc else 0
-        lat_ns = lat_us * 1000
-
-        measurements = {}
+        case = bench_cases.setdefault(case_key, {"field": field, "k": k, "slices": slices, "samples_ns": []})
         if m_enc:
-            measurements["encode_matrix"] = {
-                "samples_ns": [lat_ns] * runs,
-                "summary": {
-                    "min_ns": lat_ns,
-                    "q1_ns": lat_ns,
-                    "median_ns": float(lat_ns),
-                    "q3_ns": lat_ns,
-                    "iqr_ns": 0.0,
-                    "max_ns": lat_ns,
-                    "mean_ns": float(lat_ns)
-                }
-            }
+            case["samples_ns"].append(int(m_enc.group(2)) * 1000)
 
-        if (shape, log_n) in verifier_latencies and field == "Mont127":
-            v_ns = verifier_latencies[(shape, log_n)]
-            v_summary = {
-                "min_ns": v_ns,
-                "q1_ns": v_ns,
-                "median_ns": float(v_ns),
-                "q3_ns": v_ns,
-                "iqr_ns": 0.0,
-                "max_ns": v_ns,
-                "mean_ns": float(v_ns)
-            }
-            measurements["verifier_encode_2"] = {
-                "samples_ns": [v_ns],
-                "summary": v_summary
-            }
-            measurements["verifier_encode"] = {
-                "samples_ns": [v_ns],
-                "summary": v_summary
-            }
+    def summarize(samples):
+        ordered = sorted(samples)
+        count = len(ordered)
+        if not count:
+            return {"samples_ns": [], "summary": {}}
+        median = (ordered[(count - 1) // 2] + ordered[count // 2]) / 2.0
+        q1 = ordered[(count - 1) // 4]
+        q3 = ordered[(3 * (count - 1)) // 4]
+        return {
+            "samples_ns": ordered,
+            "summary": {
+                "min_ns": ordered[0], "q1_ns": q1, "median_ns": median,
+                "q3_ns": q3, "iqr_ns": q3 - q1, "max_ns": ordered[-1],
+                "mean_ns": sum(ordered) / count,
+            },
+        }
+
+    for (shape, field_raw, log_n, threads), case in sorted(bench_cases.items()):
+        field = case["field"]
+        k = case["k"]
+        slices = case["slices"]
+        samples_ns = case["samples_ns"]
+        runs = len(samples_ns)
+        status = "ok" if runs == int(os.environ.get("SIMD_RUNS", "1")) else "failed"
+        measurements = {}
+        if samples_ns:
+            measurements["encode_matrix"] = summarize(samples_ns)
+
+        verifier_samples = verifier_latencies.get((shape, log_n), []) if field == "Mont127" else []
+        if verifier_samples:
+            measurements["verifier_encode_2"] = summarize(verifier_samples)
+            measurements["verifier_encode"] = summarize(verifier_samples)
 
         n_per_row = (1 << log_n) // k if k > 0 else 0
         report = {
@@ -330,7 +338,7 @@ if raw_dir.is_dir():
             "hash_mode": "none",
             "shape": shape,
             "status": status,
-            "error": None if status == "ok" else "Encoding benchmark failed or missing in log",
+            "error": None if status == "ok" else f"Expected {os.environ.get('SIMD_RUNS')} timed samples, found {runs}",
             "field": field,
             "params": "simd-spielman",
             "log_n": log_n,
@@ -340,7 +348,7 @@ if raw_dir.is_dir():
             "slices": slices,
             "slice_mode": os.environ.get("SIMD_SLICES_MODE", "table"),
             "adaptive_slices": None,
-            "warmup": 0,
+            "warmup": int(os.environ.get("SIMD_WARMUP", "2")),
             "runs": runs,
             "cpu_mhz_before": None,
             "cpu_mhz_after": None,
@@ -356,7 +364,7 @@ if raw_dir.is_dir():
             "total_edge_row_macs": 0,
             "ns_per_mac": None,
             "cycles_per_mac": None,
-            "setup_ns": 0,
+            "setup_ns": None,
             "measurements": measurements,
             "proof_size_bytes": None,
             "correctness": {
@@ -364,7 +372,7 @@ if raw_dir.is_dir():
                 "proof_verifies": True,
                 "evaluation_hex": "n/a"
             },
-            "peak_rss_bytes": 0,
+            "peak_rss_bytes": None,
             "perf_stat": None
         }
         bench_reports.append(report)
@@ -460,11 +468,11 @@ fi
 
 if ! printf '#include <boost/multiprecision/cpp_int.hpp>\nint main() {}\n' | \
     taskset -c "$TEST_CORES" g++ -x c++ -fsyntax-only - >/dev/null 2>"$RAW_DIR/prerequisite-boost.log"; then
-    RUN_STATUS=failed
-    FAILURE_REASON="Boost multiprecision headers are missing; install the upstream prerequisite libboost-all-dev"
-    log_error "$FAILURE_REASON"
+    RUN_STATUS=skipped
+    SKIP_REASON="Boost multiprecision headers are missing; install the upstream prerequisite libboost-all-dev"
+    log_warn "Skipping SIMD-Spielman: $SKIP_REASON"
     cat "$RAW_DIR/prerequisite-boost.log" >&2
-    exit 1
+    exit 0
 fi
 
 # Upstream run_tests.py runs the test programs from ./build/ in the source tree
@@ -513,20 +521,43 @@ run_benchmark() {
         log_error "$FAILURE_REASON"
         return 1
     fi
-    log_file="$RAW_DIR/$name.log"
-    log_info "Running benchmark $name under taskset -c $CORES"
-    if taskset -c "$CORES" env SIMD_SPIELMAN_CORES="$CORES" \
-        SIMD_SPIELMAN_SLICES="$SLICE_OVERRIDE" \
-        SIMD_SPIELMAN_SLICE_TABLE="${SIMD_SPIELMAN_SLICE_TABLE:-}" \
-        "$executable" "$RUNS" > "$log_file" 2>&1; then
-        cat "$log_file"
-    else
-        command_status=$?
-        cat "$log_file" >&2
-        RUN_STATUS=failed
-        FAILURE_REASON="Benchmark failed ($command_status): $name"
-        return "$command_status"
-    fi
+    run_index=1
+    while [ "$run_index" -le "$WARMUP" ]; do
+        log_file="$RAW_DIR/$name-warmup-$(printf '%02d' "$run_index").log"
+        log_info "Running warm-up $run_index/$WARMUP for $name under taskset -c $CORES"
+        if taskset -c "$CORES" env SIMD_SPIELMAN_CORES="$CORES" \
+            SIMD_SPIELMAN_SLICES="$SLICE_OVERRIDE" \
+            SIMD_SPIELMAN_SLICE_TABLE="${SIMD_SPIELMAN_SLICE_TABLE:-}" \
+            "$executable" 1 > "$log_file" 2>&1; then
+            :
+        else
+            command_status=$?
+            cat "$log_file" >&2
+            RUN_STATUS=failed
+            FAILURE_REASON="Benchmark warm-up failed ($command_status): $name"
+            return "$command_status"
+        fi
+        run_index=$((run_index + 1))
+    done
+
+    run_index=1
+    while [ "$run_index" -le "$RUNS" ]; do
+        log_file="$RAW_DIR/$name-run-$(printf '%02d' "$run_index").log"
+        log_info "Running timed sample $run_index/$RUNS for $name under taskset -c $CORES"
+        if taskset -c "$CORES" env SIMD_SPIELMAN_CORES="$CORES" \
+            SIMD_SPIELMAN_SLICES="$SLICE_OVERRIDE" \
+            SIMD_SPIELMAN_SLICE_TABLE="${SIMD_SPIELMAN_SLICE_TABLE:-}" \
+            "$executable" 1 > "$log_file" 2>&1; then
+            cat "$log_file"
+        else
+            command_status=$?
+            cat "$log_file" >&2
+            RUN_STATUS=failed
+            FAILURE_REASON="Benchmark failed ($command_status): $name"
+            return "$command_status"
+        fi
+        run_index=$((run_index + 1))
+    done
 }
 
 IFS=,

@@ -13,7 +13,16 @@ POLYCOMMIT_COMMIT="1eaec5090ba5bc87d75a69570ed38f6fcf8b9417"
 DRIVER_DIR="$CODE_DIR/external/polycommit"
 DRIVER_MANIFEST="$DRIVER_DIR/Cargo.toml"
 DRIVER_LOCK="$DRIVER_DIR/Cargo.lock"
-TARGET_DIR="$CODE_DIR/target-eval-polycommit"
+TARGET_DIR="${CARGO_TARGET_DIR:-$CODE_DIR/target-eval-polycommit}/polycommit"
+
+case "$OUT" in
+    /*) OUT_ROOT="$OUT" ;;
+    *) OUT_ROOT="$CODE_DIR/$OUT" ;;
+esac
+CODE_SHA=$(git -C "$CODE_DIR" rev-parse --short=12 HEAD)
+RUN_ID=$(date -u +%Y-%m-%d)-$CODE_SHA
+DEST="$OUT_ROOT/$HOST_NAME/$RUN_ID/polycommit"
+mkdir -p "$DEST"
 
 for tool in cargo rustc taskset python3 sha256sum git awk date; do
     command -v "$tool" >/dev/null 2>&1 || {
@@ -27,8 +36,21 @@ done
     exit 1
 }
 [ -f "$DRIVER_LOCK" ] || {
-    log_error "Missing pinned driver lockfile: $DRIVER_LOCK"
-    exit 1
+    reason="Missing pinned driver lockfile: $DRIVER_LOCK; see external/polycommit/README.md"
+    log_warn "Skipping PolyCommit: $reason"
+    POLY_SKIP_REASON="$reason" POLY_SKIP_OUTPUT="$DEST/polycommit_skipped.json" python3 - <<'PY'
+import json
+import os
+
+with open(os.environ["POLY_SKIP_OUTPUT"], "w", encoding="utf-8") as output:
+    json.dump({
+        "schema_version": "polycommit-skip-v1",
+        "status": "skipped",
+        "skip_reason": os.environ["POLY_SKIP_REASON"],
+    }, output, indent=2)
+    output.write("\n")
+PY
+    exit 0
 }
 
 if ! grep -Fq "rev = \"$POLYCOMMIT_COMMIT\"" "$DRIVER_MANIFEST"; then
@@ -40,13 +62,6 @@ if ! grep -Fq "$POLYCOMMIT_COMMIT" "$DRIVER_LOCK"; then
     exit 1
 fi
 
-case "$OUT" in
-    /*) OUT_ROOT="$OUT" ;;
-    *) OUT_ROOT="$CODE_DIR/$OUT" ;;
-esac
-CODE_SHA=$(git -C "$CODE_DIR" rev-parse --short=12 HEAD)
-RUN_ID=$(date -u +%Y-%m-%d)-$CODE_SHA
-DEST="$OUT_ROOT/$HOST_NAME/$RUN_ID/polycommit"
 mkdir -p "$DEST" "$TARGET_DIR/tmp"
 export CARGO_TARGET_DIR="$TARGET_DIR"
 export TMPDIR="$TARGET_DIR/tmp"

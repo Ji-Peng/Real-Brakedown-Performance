@@ -23,6 +23,8 @@ if [ -f "$HOME/.cargo/env" ]; then
     # shellcheck disable=SC1091
     . "$HOME/.cargo/env"
 fi
+CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-"$CODE_DIR/target-harness"}
+export CARGO_TARGET_DIR
 
 PROFILE=""
 SESSION_ID=""
@@ -91,6 +93,7 @@ done
 
 # shellcheck disable=SC2086
 parse_args $PASSTHROUGH_ARGS
+export CORES
 
 # Auto-detect profile if not provided
 if [ -z "$PROFILE" ]; then
@@ -165,15 +168,15 @@ def tag_file(path, session_id, seed, watermark=None, freq_before=None, freq_afte
     modified = False
     if isinstance(data, list):
         for item in data:
-            if isinstance(item, dict):
+            if isinstance(item, dict) and not item.get("block_id"):
                 item["session_id"] = session_id
                 item["session_seed"] = seed
                 if block_id: item["block_id"] = block_id
                 if freq_before: item["freq_before_mhz"] = freq_before
                 if freq_after: item["freq_after_mhz"] = freq_after
                 if watermark: item["watermark"] = watermark
-        modified = True
-    elif isinstance(data, dict):
+                modified = True
+    elif isinstance(data, dict) and not data.get("block_id"):
         data["session_id"] = session_id
         data["session_seed"] = seed
         if block_id: data["block_id"] = block_id
@@ -208,37 +211,74 @@ profile = "$PROFILE"
 seed = int("$SEED")
 host = "$HOST_NAME"
 session_dir = "$SESSION_DIR"
+session_id = "$SESSION_ID"
 script_dir = "$SCRIPT_DIR"
 tags_arg = "$SPECIFIC_TAGS"
 
 blocks = []
 
 if profile == "smoke":
-    # Tiny sizes, 1-2 runs, test-only local dry run
+    # Representative, small local runs covering every experiment family.
+    # These outputs are watermarked and are never publishable measurements.
+    smoke_cores = os.environ.get("CORES", "0")
+    step_tags_flag = f"--tags '{tags_arg}'" if tags_arg else ""
     blocks.append({
         "id": "smoke_this_work_mode_a_t1",
         "description": "This Work mode (a) tiny smoke T=1",
-        "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 12,14 --threads 1 --runs 2 --warmup 1 --slices adaptive --test-only --host '{host}' --out '{session_dir}/this_work'"
+        "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 16,20 --threads 1 --runs 2 --warmup 1 --slices adaptive --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_mode_a_t1'"
     })
     blocks.append({
         "id": "smoke_lcpc_orig_a_t1",
         "description": "Original LCPC baseline tiny smoke T=1",
-        "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 12,14 --threads 1 --runs 2 --warmup 1 --host '{host}' --out '{session_dir}/lcpc_orig'"
+        "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 16,20 --threads 1 --runs 2 --warmup 1 --cores '{smoke_cores}' --host '{host}' --out '{session_dir}/smoke_lcpc_orig_a_t1'"
     })
     blocks.append({
         "id": "smoke_this_work_mode_b_t1",
         "description": "This Work mode (b) tiny smoke T=1",
-        "cmd": f"'{script_dir}/this_work.sh' --params simd-spielman --field mont127 --logN 12,14 --threads 1 --runs 2 --warmup 1 --slices adaptive --test-only --host '{host}' --out '{session_dir}/this_work'"
+        "cmd": f"'{script_dir}/this_work.sh' --params simd-spielman --field mont127 --logN 20 --threads 1 --runs 2 --warmup 1 --slices adaptive --shape both --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_mode_b_mont127_t1'"
     })
+    for smoke_field in ["mers127", "fp2m61"]:
+        blocks.append({
+            "id": f"smoke_this_work_mode_b_{smoke_field}_t1",
+            "description": f"This Work mode (b) {smoke_field} smoke T=1",
+            "cmd": f"'{script_dir}/this_work.sh' --params simd-spielman --field {smoke_field} --logN 20 --threads 1 --runs 2 --warmup 1 --slices adaptive --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_mode_b_{smoke_field}_t1'"
+        })
     blocks.append({
         "id": "smoke_steps",
-        "description": "Steps progression smoke",
-        "cmd": f"'{script_dir}/steps.sh' --params lcpc-sdig6 --field mont127 --logN 12 --threads 1 --runs 2 --warmup 1 --slices adaptive --tags 'step/01-modernize,HEAD' --test-only --host '{host}' --out '{session_dir}/steps'"
+        "description": "All tagged steps progression smoke",
+        "cmd": f"'{script_dir}/steps.sh' --logN 20 --threads 1 --runs 2 --warmup 1 {step_tags_flag} --cores '{smoke_cores}' --session-id '{session_id}' --smoke --host '{host}' --out '{session_dir}/smoke_steps'"
     })
     blocks.append({
-        "id": "smoke_fields",
-        "description": "Field arithmetic microbenchmarks smoke",
-        "cmd": f"taskset -c 0 '{script_dir}/../target-harness/release/bench_fields' --field all --runs 1000 --output '{session_dir}/field_microbenchmarks.json'"
+        "id": "smoke_simd_spielman",
+        "description": "SIMD-Spielman baseline smoke (Brakedown and Orion)",
+        "cmd": f"'{script_dir}/simd_spielman.sh' --field mont127 --shape both --logN 16,20 --threads 1 --runs 2 --warmup 1 --cores '{smoke_cores}' --host '{host}' --out '{session_dir}/smoke_simd_spielman'"
+    })
+    blocks.append({
+        "id": "smoke_polycommit",
+        "description": "PolyCommit baseline smoke",
+        "cmd": f"sh '{script_dir}/polycommit.sh' --field mont127 --logN 20 --threads 1 --runs 2 --warmup 1 --cores '{smoke_cores}' --host '{host}' --out '{session_dir}/smoke_polycommit'"
+    })
+    for smoke_threads in [2, 4, 7]:
+        blocks.append({
+            "id": f"smoke_this_work_threads_t{smoke_threads}",
+            "description": f"This Work thread-scaling smoke T={smoke_threads}",
+            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20 --threads {smoke_threads} --runs 2 --warmup 1 --slices adaptive --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_threads_t{smoke_threads}'"
+        })
+        blocks.append({
+            "id": f"smoke_lcpc_orig_threads_t{smoke_threads}",
+            "description": f"Original LCPC thread-scaling smoke T={smoke_threads}",
+            "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 20 --threads {smoke_threads} --runs 2 --warmup 1 --cores '{smoke_cores}' --host '{host}' --out '{session_dir}/smoke_lcpc_orig_threads_t{smoke_threads}'"
+        })
+    for smoke_slices in [1, 2]:
+        blocks.append({
+            "id": f"smoke_this_work_slice_s{smoke_slices}",
+            "description": f"This Work slice sweep smoke s={smoke_slices}",
+            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20 --threads 1 --runs 2 --warmup 1 --slices {smoke_slices} --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_slice_s{smoke_slices}'"
+        })
+    blocks.append({
+        "id": "smoke_ligero_rs",
+        "description": "Same-library Ligero Reed-Solomon encoding smoke",
+        "cmd": f"'{script_dir}/this_work.sh' --params rs-ligero --field mont127 --logN 20 --threads 1 --runs 2 --warmup 1 --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_ligero_rs'"
     })
 elif profile == "arm":
     # E14: Arm portability campaign on Google Axion (c4a-highmem-16)
@@ -246,27 +286,22 @@ elif profile == "arm":
     blocks.append({
         "id": "arm_this_work_t1",
         "description": "This Work mode (a) on Arm T=1 (logN 18,22,26)",
-        "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 1 --runs 5 --warmup 2 --slices adaptive --host '{host}' --out '{session_dir}/this_work'"
+        "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 1 --runs 5 --warmup 2 --slices adaptive --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/arm_this_work_t1'"
     })
     blocks.append({
         "id": "arm_lcpc_orig_t1",
         "description": "Original LCPC mode (a) on Arm T=1 (logN 18,22,26)",
-        "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 1 --runs 5 --warmup 2 --host '{host}' --out '{session_dir}/lcpc_orig'"
+        "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 1 --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/arm_lcpc_orig_t1'"
     })
     blocks.append({
         "id": "arm_this_work_t8",
         "description": "This Work mode (a) on Arm T=8 (logN 18,22,26)",
-        "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 8 --runs 5 --warmup 2 --slices adaptive --host '{host}' --out '{session_dir}/this_work'"
+        "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 8 --runs 5 --warmup 2 --slices adaptive --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/arm_this_work_t8'"
     })
     blocks.append({
         "id": "arm_lcpc_orig_t8",
         "description": "Original LCPC mode (a) on Arm T=8 (logN 18,22,26)",
-        "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 8 --runs 5 --warmup 2 --host '{host}' --out '{session_dir}/lcpc_orig'"
-    })
-    blocks.append({
-        "id": "arm_field_microbenchmarks",
-        "description": "Field arithmetic microbenchmarks on Arm",
-        "cmd": f"taskset -c 1 '{script_dir}/../target-harness/release/bench_fields' --field all --runs 100000 --output '{session_dir}/field_microbenchmarks.json'"
+        "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 8 --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/arm_lcpc_orig_t8'"
     })
 else:
     # full: x86-64 primary campaign (c3d-highmem-30, E1-E13, logN 16..28)
@@ -274,22 +309,22 @@ else:
     blocks.append({
         "id": "full_this_work_mode_a_t1",
         "description": "E1: This Work mode (a) Mont127 T=1 (logN 16..28)",
-        "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26,28 --threads 1 --runs 5 --warmup 2 --slices adaptive --host '{host}' --out '{session_dir}/this_work'"
+            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26,28 --threads 1 --runs 5 --warmup 2 --slices adaptive --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_this_work_mode_a_t1'"
     })
     blocks.append({
         "id": "full_lcpc_orig_mode_a_t1",
         "description": "E1: Original LCPC mode (a) Ft127 T=1 (logN 16..28)",
-        "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26,28 --threads 1 --runs 5 --warmup 2 --host '{host}' --out '{session_dir}/lcpc_orig'"
+            "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26,28 --threads 1 --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_lcpc_orig_mode_a_t1'"
     })
     blocks.append({
         "id": "full_this_work_mode_a_t8",
         "description": "E1: This Work mode (a) Mont127 T=8 (logN 16..28)",
-        "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26,28 --threads 8 --runs 5 --warmup 2 --slices adaptive --host '{host}' --out '{session_dir}/this_work'"
+            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26,28 --threads 8 --runs 5 --warmup 2 --slices adaptive --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_this_work_mode_a_t8'"
     })
     blocks.append({
         "id": "full_lcpc_orig_mode_a_t8",
         "description": "E1: Original LCPC mode (a) Ft127 T=8 (logN 16..28)",
-        "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26,28 --threads 8 --runs 5 --warmup 2 --host '{host}' --out '{session_dir}/lcpc_orig'"
+            "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26,28 --threads 8 --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_lcpc_orig_mode_a_t8'"
     })
 
     # E2: Comparison with SIMD-Spielman (mode b, Mont127, Mers127, Fp2M61)
@@ -297,22 +332,22 @@ else:
         blocks.append({
             "id": f"full_this_work_mode_b_{field_name}_t1",
             "description": f"E2: This Work mode (b) {field_name} T=1 (logN 16..28)",
-            "cmd": f"'{script_dir}/this_work.sh' --params simd-spielman --field {field_name} --logN 16,18,20,22,24,26,28 --threads 1 --runs 5 --warmup 2 --slices adaptive --host '{host}' --out '{session_dir}/this_work'"
+            "cmd": f"'{script_dir}/this_work.sh' --params simd-spielman --field {field_name} --logN 16,18,20,22,24,26,28 --threads 1 --runs 5 --warmup 2 --slices adaptive --shape both --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_this_work_mode_b_{field_name}_t1'"
         })
         blocks.append({
             "id": f"full_this_work_mode_b_{field_name}_t8",
             "description": f"E2: This Work mode (b) {field_name} T=8 (logN 16..28)",
-            "cmd": f"'{script_dir}/this_work.sh' --params simd-spielman --field {field_name} --logN 16,18,20,22,24,26,28 --threads 8 --runs 5 --warmup 2 --slices adaptive --host '{host}' --out '{session_dir}/this_work'"
+            "cmd": f"'{script_dir}/this_work.sh' --params simd-spielman --field {field_name} --logN 16,18,20,22,24,26,28 --threads 8 --runs 5 --warmup 2 --slices adaptive --shape both --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_this_work_mode_b_{field_name}_t8'"
         })
         blocks.append({
             "id": f"full_simd_spielman_{field_name}_t1",
             "description": f"E2: SIMD-Spielman AVX-512 {field_name} T=1 (logN 16..28)",
-            "cmd": f"'{script_dir}/simd_spielman.sh' --field {field_name} --logN 16,18,20,22,24,26,28 --threads 1 --runs 5 --host '{host}' --out '{session_dir}/simd_spielman'"
+            "cmd": f"'{script_dir}/simd_spielman.sh' --field {field_name} --logN 16,18,20,22,24,26,28 --threads 1 --runs 5 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_simd_spielman_{field_name}_t1'"
         })
         blocks.append({
             "id": f"full_simd_spielman_{field_name}_t8",
             "description": f"E2: SIMD-Spielman AVX-512 {field_name} T=8 (logN 16..28)",
-            "cmd": f"'{script_dir}/simd_spielman.sh' --field {field_name} --logN 16,18,20,22,24,26,28 --threads 8 --runs 5 --host '{host}' --out '{session_dir}/simd_spielman'"
+            "cmd": f"'{script_dir}/simd_spielman.sh' --field {field_name} --logN 16,18,20,22,24,26,28 --threads 8 --runs 5 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_simd_spielman_{field_name}_t8'"
         })
 
     # E3: Per-technique breakdown (steps.sh mode a Mont127 and mode b Mers127)
@@ -320,20 +355,21 @@ else:
     blocks.append({
         "id": "full_steps_mode_a",
         "description": "E3: Tagged steps progression mode (a) Mont127 (logN 16,20,24,28)",
-        "cmd": f"'{script_dir}/steps.sh' --params lcpc-sdig6 --field mont127 --logN 16,20,24,28 --threads 1 --runs 5 --warmup 2 {step_tags_flag} --host '{host}' --out '{session_dir}/steps'"
+        "cmd": f"'{script_dir}/steps.sh' --logN 16,20,24,28 --threads 1 --runs 5 --warmup 2 {step_tags_flag} --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_steps_mode_a'"
     })
     blocks.append({
         "id": "full_steps_mode_b",
         "description": "E3: Tagged steps progression mode (b) Mers127 (logN 16,20,24,28)",
-        "cmd": f"'{script_dir}/steps.sh' --params simd-spielman --field mers127 --logN 16,20,24,28 --threads 1 --runs 5 --warmup 2 {step_tags_flag} --host '{host}' --out '{session_dir}/steps'"
+        "cmd": f"'{script_dir}/steps.sh' --logN 16,20,24,28 --threads 1 --runs 5 --warmup 2 {step_tags_flag} --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_steps_mode_b'"
     })
 
     # E5: Slice sweep on Mont127 (s in {1, 2, 4, 8, 16, 32, 64, 128, 256}, logN 20,22,24,26,28, T 1,8)
-    for slice_val in [1, 2, 4, 8, 16, 32, 64, 128, 256]:
+    for t_count in [1, 8]:
+      for slice_val in [1, 2, 4, 8, 16, 32, 64, 128, 256]:
         blocks.append({
-            "id": f"full_slice_sweep_s{slice_val}_t1",
-            "description": f"E5: Slice sweep s={slice_val} Mont127 T=1",
-            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,22,24,26,28 --threads 1 --slices {slice_val} --runs 5 --warmup 2 --host '{host}' --out '{session_dir}/this_work_slices'"
+            "id": f"full_slice_sweep_s{slice_val}_t{t_count}",
+            "description": f"E5: Slice sweep s={slice_val} Mont127 T={t_count}",
+            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,22,24,26,28 --threads {t_count} --slices {slice_val} --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_slice_sweep_s{slice_val}_t{t_count}'"
         })
 
     # E6: Thread scaling T in {1, 2, 4, 8, 15} at logN 20, 24, 28
@@ -341,29 +377,33 @@ else:
         blocks.append({
             "id": f"full_thread_scaling_this_work_t{t_count}",
             "description": f"E6: Thread scaling This Work T={t_count}",
-            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,28 --threads {t_count} --runs 5 --warmup 2 --host '{host}' --out '{session_dir}/this_work_threads'"
+            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,28 --threads {t_count} --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_this_work_threads_t{t_count}'"
         })
         blocks.append({
             "id": f"full_thread_scaling_lcpc_orig_t{t_count}",
             "description": f"E6: Thread scaling Original LCPC T={t_count}",
-            "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,28 --threads {t_count} --runs 5 --warmup 2 --host '{host}' --out '{session_dir}/lcpc_orig_threads'"
+            "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,28 --threads {t_count} --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_lcpc_orig_threads_t{t_count}'"
         })
 
     # E7: Field microbenchmarks
+    # PolyCommit baseline; invoke through sh because the source file need not be executable.
+    polycommit_script = os.path.join(script_dir, "polycommit.sh")
     blocks.append({
-        "id": "full_field_microbenchmarks",
-        "description": "E7: Field arithmetic microbenchmarks (mul, mac, reduce)",
-        "cmd": f"taskset -c 1 '{script_dir}/../target-harness/release/bench_fields' --field all --runs 100000 --output '{session_dir}/field_microbenchmarks.json'"
+        "id": "full_polycommit_baseline",
+        "description": "E1: PolyCommit baseline comparison",
+        "cmd": f"sh '{polycommit_script}' --field mont127 --logN 16,18,20,22,24,26,28 --threads 1 --runs 5 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_polycommit_t1'"
+    })
+    blocks.append({
+        "id": "full_polycommit_t8",
+        "description": "E1: PolyCommit baseline comparison T=8",
+        "cmd": f"sh '{polycommit_script}' --field mont127 --logN 16,18,20,22,24,26,28 --threads 8 --runs 5 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_polycommit_t8'"
     })
 
-    # PolyCommit baseline (if driver script exists)
-    polycommit_script = os.path.join(script_dir, "polycommit.sh")
-    if os.path.isfile(polycommit_script) and os.access(polycommit_script, os.X_OK):
-        blocks.append({
-            "id": "full_polycommit_baseline",
-            "description": "E1: PolyCommit baseline comparison",
-            "cmd": f"'{polycommit_script}' --field mont127 --logN 16,18,20,22,24,26,28 --threads 1 --runs 5 --host '{host}' --out '{session_dir}/polycommit'"
-        })
+    blocks.append({
+        "id": "full_ligero_rs",
+        "description": "E12: Same-library Ligero Reed-Solomon encoding",
+        "cmd": f"'{script_dir}/this_work.sh' --params rs-ligero --field mont127 --logN 20,22,24 --threads 1 --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_ligero_rs'"
+    })
 
 # Randomize block order using the recorded seed (interleaving targets)
 rng = random.Random(seed)
@@ -453,11 +493,18 @@ log_info ""
 log_info "Generating analysis tables, LaTeX documents, and figures via analyze.py..."
 ANALYSIS_DIR="$SESSION_DIR/analysis"
 mkdir -p "$ANALYSIS_DIR"
-python3 "$CODE_DIR/scripts/analyze.py" \
-    --results-dir "$SESSION_DIR" \
-    --out-dir "$ANALYSIS_DIR" || {
-    log_warn "Analysis script generated warnings or skipped empty tables."
-}
+mkdir -p "$CARGO_TARGET_DIR/matplotlib"
+if [ "$PROFILE" = "smoke" ]; then
+    MPLCONFIGDIR="$CARGO_TARGET_DIR/matplotlib" python3 "$CODE_DIR/scripts/analyze.py" \
+        --results-dir "$SESSION_DIR" \
+        --out-dir "$ANALYSIS_DIR" \
+        --check
+else
+    MPLCONFIGDIR="$CARGO_TARGET_DIR/matplotlib" python3 "$CODE_DIR/scripts/analyze.py" \
+        --results-dir "$SESSION_DIR" \
+        --out-dir "$ANALYSIS_DIR"
+    log_info "Run analyze.py --check on the combined full and Arm session directories before using paper artefacts."
+fi
 
 log_info "=========================================================="
 log_info "Master Campaign Session Completed Successfully!"
