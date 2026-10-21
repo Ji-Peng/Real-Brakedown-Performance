@@ -192,7 +192,9 @@ All three encoders are verified against all 18 test-vector pairs in
 `lcpc-spielman-oracle` exports [`GlibcRandom`], [`SpielmanTvField`], [`MatrixShape`],
 [`SimdSpielmanParams`], [`L2rExpanderGraph`], [`R2lExpanderGraph`],
 [`SpielmanOracleCode`], [`locate_tv_dir`], [`load_tv_input_matrix`],
-[`load_tv_output_matrix`], and [`verify_tv_case`] so that in `step/04-r2l` (M3),
-`lcpc-brakedown-pc` can import `lcpc-spielman-oracle` as a dev-dependency and
-verify the fork's own R2L column-major encoder directly against all 18
-`SIMD-Spielman-for-ZKPs/tv/` test-vector pairs.
+[`load_tv_output_matrix`], and [`verify_tv_case`]. Since `step/04-r2l`,
+`lcpc-oracle-tests/tests/simd_spielman_tv.rs` uses them to check the fork's own
+R2L column-major encoder in mode (b) against all 18 `SIMD-Spielman-for-ZKPs/tv/`
+test-vector pairs: the oracle's L2R graphs are transposed by the fork
+(`R2lGraph::from_left_edges_fixed_degree`) and passed in through
+`ExpanderCode::from_graphs` (see `docs/R2L.md`).

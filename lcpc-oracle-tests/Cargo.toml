@@ -27,5 +27,5 @@ rand-orig = { package = "rand", version = "=0.8.8" }
 rand-chacha-orig = { package = "rand_chacha", version = "=0.3.1" }
 rand-new = { package = "rand", version = "=0.10.3" }
 rand-chacha-new = { package = "rand_chacha", version = "=0.10.0" }
+lcpc-spielman-oracle = { path = "../lcpc-spielman-oracle" }
 serde = { version = "1.0", features = ["derive"] }
-sprs = "0.11"

@@ -129,7 +129,8 @@ pub fn fold_column<F: LazyField>(acc: &mut [F::Acc]) {
 /// and `from_u64_val` methods.
 ///
 /// Also implements `for<'a, 'b> &'a $ident: Mul<&'b $ident, Output = $ident>`, which
-/// satisfies `sprs::MulAcc`'s blanket implementation required by LCPC's eager encoder.
+/// satisfies `sprs::MulAcc`'s blanket implementation (used by upstream LCPC's encoder
+/// and the fork's test-only references).
 #[macro_export]
 macro_rules! impl_field_ops_and_num {
     ($ident:ident) => {

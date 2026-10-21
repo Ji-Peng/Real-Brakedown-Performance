@@ -9,7 +9,8 @@ use digest_09::generic_array::{typenum::U32, GenericArray};
 use digest_09::{FixedOutputDirty, Reset, Update};
 use ff::{Field, PrimeField};
 use lcpc_2d::{LcCommit, LcEncoding, SizedField};
-use lcpc_brakedown_pc::{codespec, SdigEncodingS};
+use lcpc_brakedown_pc::codespec::CodeParams;
+use lcpc_brakedown_pc::{codespec, matgen, SdigEncodingS, SpielmanEncoding};
 use lcpc_fields::Mont127;
 use lcpc_orig_2d::LcCommit as OriginalCommit;
 use lcpc_orig_2d::LcEncoding as OriginalLcEncoding;
@@ -24,7 +25,6 @@ use rand_chacha_orig::ChaCha20Rng as OriginalChaCha20Rng;
 use rand_new::SeedableRng as ForkSeedableRng;
 use rand_orig::SeedableRng as OriginalSeedableRng;
 use serde::Serialize;
-use sprs::MulAcc;
 
 /// Digest 0.9 adapter for the pinned upstream LCPC API.
 #[derive(Clone)]
@@ -94,12 +94,140 @@ fn fork_fields_match_original_lcpc_mode_a() {
     }
 }
 
+// Since step/04-r2l the fork stores each graph transposed (right to left). The graphs
+// sampled by the fork must be exactly upstream's CSC matrices, transposed: same
+// dimensions, the same incoming edges per right node, the same weights.
+#[test]
+fn fork_r2l_graphs_are_transposed_original_graphs() {
+    for &n in &[32usize, 100, 1000, 4096] {
+        for &seed in GRAPH_SEEDS {
+            check_graphs::<original_codespec::SdigCode3, codespec::SdigCode3>(n, seed);
+            check_graphs::<original_codespec::SdigCode6, codespec::SdigCode6>(n, seed);
+        }
+    }
+}
+
+fn check_graphs<OriginalSpec, ForkSpec>(n: usize, seed: u64)
+where
+    OriginalSpec: lcpc_orig_brakedown_pc::codespec::SdigSpecification,
+    ForkSpec: codespec::SdigSpecification,
+{
+    let (orig_pre, orig_post) =
+        lcpc_orig_brakedown_pc::matgen::generate::<OriginalFt127, OriginalSpec>(n, seed);
+    let (fork_pre, fork_post) = matgen::generate::<Mont127, ForkSpec>(n, seed);
+    assert_eq!(orig_pre.len(), fork_pre.len());
+    assert_eq!(orig_post.len(), fork_post.len());
+    for (orig, fork) in orig_pre
+        .iter()
+        .zip(&fork_pre)
+        .chain(orig_post.iter().zip(&fork_post))
+    {
+        assert!(orig.is_csc());
+        assert_eq!((orig.rows(), orig.cols()), (fork.n_right(), fork.n_left()));
+        // transpose upstream's CSC matrix naively: incoming edges per right node,
+        // in increasing left-node order
+        let mut incoming: Vec<Vec<(u32, Vec<u8>)>> = vec![Vec::new(); orig.rows()];
+        for (l, column) in orig.outer_iterator().enumerate() {
+            for (r, w) in column.iter() {
+                incoming[r].push((l as u32, ff_orig::PrimeField::to_repr(w).as_ref().to_vec()));
+            }
+        }
+        for (r, expect) in incoming.iter().enumerate() {
+            let (lefts, weights) = fork.incoming(r);
+            let got: Vec<(u32, Vec<u8>)> = lefts
+                .iter()
+                .zip(weights)
+                .map(|(&l, w)| (l, PrimeField::to_repr(w).as_ref().to_vec()))
+                .collect();
+            assert_eq!(&got, expect, "n={n}, seed={seed:#x}, right node {r}");
+        }
+    }
+}
+
+// Larger shapes, encoded through both the compile-time specification and the
+// runtime mode (a) parameters (`SpielmanEncoding` with `CodeParams::Lcpc`).
+#[test]
+fn fork_runtime_params_match_original_lcpc_mode_a() {
+    std::env::set_var("RAYON_NUM_THREADS", "1");
+    for &(n_rows, n_per_row, seed) in &[(16usize, 1024usize, 0x5eed_u64), (7, 777, 0x1234)] {
+        check_case::<Mont127, original_codespec::SdigCode6, codespec::SdigCode6>(
+            "Mont127/SdigCode6",
+            n_rows,
+            n_per_row,
+            seed,
+        );
+        check_case::<Mont127, original_codespec::SdigCode3, codespec::SdigCode3>(
+            "Mont127/SdigCode3",
+            n_rows,
+            n_per_row,
+            seed,
+        );
+        check_runtime_encoding::<original_codespec::SdigCode6>(
+            CodeParams::lcpc_sdig6(),
+            n_rows,
+            n_per_row,
+            seed,
+        );
+        check_runtime_encoding::<original_codespec::SdigCode3>(
+            CodeParams::lcpc_sdig3(),
+            n_rows,
+            n_per_row,
+            seed,
+        );
+    }
+}
+
+fn check_runtime_encoding<OriginalSpec>(
+    params: CodeParams,
+    n_rows: usize,
+    n_per_row: usize,
+    seed: u64,
+) where
+    OriginalSpec: lcpc_orig_brakedown_pc::codespec::SdigSpecification + Debug + Clone + Sync,
+    OriginalSdigEncodingS<OriginalFt127, OriginalSpec>: lcpc_orig_2d::LcEncoding<F = OriginalFt127>,
+{
+    let n_cols = original_output_length::<OriginalSpec>(n_per_row);
+    let original_enc = OriginalSdigEncodingS::<OriginalFt127, OriginalSpec>::new_from_dims(
+        n_per_row, n_cols, seed,
+    );
+    let fork_enc = SpielmanEncoding::<Mont127>::with_params(params, n_per_row, seed);
+    assert_eq!(fork_enc.get_dims(n_per_row), (1, n_per_row, n_cols));
+    assert_eq!(fork_enc.get_n_col_opens(), original_enc.get_n_col_opens());
+    assert_eq!(
+        fork_enc.get_n_degree_tests(),
+        original_enc.get_n_degree_tests()
+    );
+
+    let mut rng = OriginalChaCha20Rng::seed_from_u64(seed);
+    let mut fork_rng = ForkChaCha20Rng::seed_from_u64(seed);
+    let mut original_matrix = vec![<OriginalFt127 as ff_orig::Field>::zero(); n_rows * n_cols];
+    let mut fork_matrix = vec![Mont127::ZERO; n_rows * n_cols];
+    for row in 0..n_rows {
+        for col in 0..n_per_row {
+            original_matrix[row * n_cols + col] =
+                <OriginalFt127 as ff_orig::Field>::random(&mut rng);
+            fork_matrix[row * n_cols + col] = <Mont127 as Field>::random(&mut fork_rng);
+        }
+    }
+    for row in original_matrix.chunks_mut(n_cols) {
+        original_enc.encode(row).expect("original encode");
+    }
+    fork_enc
+        .encode_rows(&mut fork_matrix, n_cols)
+        .expect("fork encode_rows");
+    assert_eq!(
+        reprs_original(&original_matrix),
+        reprs(&fork_matrix),
+        "{}: runtime-parameter encoding, rows={n_rows}, n_per_row={n_per_row}",
+        params.name()
+    );
+}
+
 fn check_case<F, OriginalSpec, ForkSpec>(case: &str, n_rows: usize, n_per_row: usize, seed: u64)
 where
     F: Field
         + PrimeField
         + lcpc_2d::FieldHash
-        + MulAcc
         + Num
         + SizedField
         + Serialize

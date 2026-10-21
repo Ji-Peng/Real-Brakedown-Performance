@@ -11,10 +11,9 @@ use std::time::Instant;
 use digest::{FixedOutput, Output, Update};
 use ff::{Field, PrimeField};
 use lcpc_2d::{FieldHash, LcCommit, LcEncoding, SizedField};
-use lcpc_brakedown_pc::codespec::{SdigCode3, SdigCode6, SdigSpecification};
-use lcpc_brakedown_pc::SdigEncodingS;
-// NOTE (step/02-fields part 2): Also import `Fp2M61` from `lcpc_fields` here once implemented.
-use lcpc_fields::{Mers127, Mont127};
+use lcpc_brakedown_pc::codespec::{CodeParams, SdigCode3, SdigCode6, SdigSpecification};
+use lcpc_brakedown_pc::{SdigEncodingS, SpielmanEncoding};
+use lcpc_fields::{Fp2M61, Mers127, Mont127};
 use lcpc_test_fields::{ft127::Ft127, ft63::Ft63, Blake3};
 use merlin::Transcript;
 use num_traits::Num;
@@ -22,7 +21,6 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use rayon::prelude::*;
 use serde::Serialize;
-use sprs::MulAcc;
 
 const UPSTREAM_COMMIT: &str = "f0e2116001af5a1bbf39481535f837d6a25772e8";
 const HASH_SEED: u64 = 0x4c43_5043_4f52_4947;
@@ -163,13 +161,14 @@ fn main() {
 
 fn run() -> Result<(), String> {
     // Ensure non-inlined field kernel symbols are retained in the binary for `scripts/check_codegen.py --strict`
-    // even before `step/05-lazy-reduce` wires lazy column reduction into the encoder.
-    // NOTE (step/02-fields part 2): Also include `mac_column_fp2m61` and `reduce_column_fp2m61` here.
+    // even before `step/05-lazy` wires lazy column reduction into the encoder.
     std::hint::black_box((
         lcpc_fields::mont127::mac_column_mont127 as *const (),
         lcpc_fields::mont127::reduce_column_mont127 as *const (),
         lcpc_fields::mers127::mac_column_mers127 as *const (),
         lcpc_fields::mers127::reduce_column_mers127 as *const (),
+        lcpc_fields::fp2m61::mac_column_fp2_m61 as *const (),
+        lcpc_fields::fp2m61::reduce_column_fp2_m61 as *const (),
     ));
 
     let args = parse_args()?;
@@ -196,38 +195,15 @@ fn run() -> Result<(), String> {
 
     let mut reports = Vec::with_capacity(args.logn.len());
     for &log_n in &args.logn {
-        let report = match (args.field.as_str(), args.params.as_str()) {
-            ("mont127", "lcpc-sdig6") => {
-                benchmark::<Mont127, SdigCode6>(&args, log_n, "Mont127", "lcpc-sdig6", 6)?
-            }
-            ("mont127", "lcpc-sdig3") => {
-                benchmark::<Mont127, SdigCode3>(&args, log_n, "Mont127", "lcpc-sdig3", 3)?
-            }
-            ("mers127", "lcpc-sdig6") => {
-                benchmark::<Mers127, SdigCode6>(&args, log_n, "Mers127", "lcpc-sdig6", 6)?
-            }
-            ("mers127", "lcpc-sdig3") => {
-                benchmark::<Mers127, SdigCode3>(&args, log_n, "Mers127", "lcpc-sdig3", 3)?
-            }
-            // NOTE (step/02-fields part 2): Add ("fp2m61", "lcpc-sdig6") and ("fp2m61", "lcpc-sdig3") arms here.
-            ("ft127", "lcpc-sdig6") => {
-                benchmark::<Ft127, SdigCode6>(&args, log_n, "Ft127", "lcpc-sdig6", 6)?
-            }
-            ("ft127", "lcpc-sdig3") => {
-                benchmark::<Ft127, SdigCode3>(&args, log_n, "Ft127", "lcpc-sdig3", 3)?
-            }
-            ("ft63", "lcpc-sdig6") => {
-                benchmark::<Ft63, SdigCode6>(&args, log_n, "Ft63", "lcpc-sdig6", 6)?
-            }
-            ("ft63", "lcpc-sdig3") => {
-                benchmark::<Ft63, SdigCode3>(&args, log_n, "Ft63", "lcpc-sdig3", 3)?
-            }
-            _ => {
-                return Err(format!(
-                    "unsupported (field, params) combination: ({}, {})",
-                    args.field, args.params
-                ))
-            }
+        let params = CodeParams::from_name(&args.params)
+            .ok_or_else(|| format!("unsupported --params {}", args.params))?;
+        let report = match args.field.as_str() {
+            "mont127" => benchmark::<Mont127>(&args, log_n, "Mont127", params)?,
+            "mers127" => benchmark::<Mers127>(&args, log_n, "Mers127", params)?,
+            "fp2m61" => benchmark::<Fp2M61>(&args, log_n, "Fp2M61", params)?,
+            "ft127" => benchmark::<Ft127>(&args, log_n, "Ft127", params)?,
+            "ft63" => benchmark::<Ft63>(&args, log_n, "Ft63", params)?,
+            other => return Err(format!("unsupported field {other}")),
         };
         reports.push(report);
     }
@@ -261,15 +237,19 @@ fn parse_args() -> Result<Args, String> {
         match arg.as_str() {
             "--field" => {
                 args.field = value(&mut it, "--field")?.to_ascii_lowercase();
-                // NOTE (step/02-fields part 2): Add "fp2m61" to this match once implemented.
-                if !matches!(args.field.as_str(), "mont127" | "mers127" | "ft127" | "ft63") {
-                    return Err("--field must be mont127, mers127, ft127, or ft63".to_owned());
+                if !matches!(
+                    args.field.as_str(),
+                    "mont127" | "mers127" | "fp2m61" | "ft127" | "ft63"
+                ) {
+                    return Err("--field must be mont127, mers127, fp2m61, ft127, or ft63".to_owned());
                 }
             }
             "--params" => {
                 args.params = value(&mut it, "--params")?;
-                if !matches!(args.params.as_str(), "lcpc-sdig6" | "lcpc-sdig3") {
-                    return Err("--params must be lcpc-sdig6 or lcpc-sdig3".to_owned());
+                if CodeParams::from_name(&args.params).is_none() {
+                    return Err(
+                        "--params must be lcpc-sdig6, lcpc-sdig3, or simd-spielman".to_owned()
+                    );
                 }
             }
             "--logN" => {
@@ -311,7 +291,8 @@ fn parse_args() -> Result<Args, String> {
 
 fn print_help() {
     println!(
-        "Usage: lcpc-bench [--field mont127|mers127|ft127|ft63] [--params lcpc-sdig6|lcpc-sdig3] \\\n\
+        "Usage: lcpc-bench [--field mont127|mers127|fp2m61|ft127|ft63] \\\n\
+         [--params lcpc-sdig6|lcpc-sdig3|simd-spielman] \\\n\
          [--logN 16,18,...] [--runs N] [--warmup N] [--threads N] [--cores LIST] [--output PATH] \\\n\
          [--generate-golden PATH | --check-golden PATH]"
     );
@@ -337,18 +318,26 @@ fn write_output(path: &str, text: &str) -> Result<(), String> {
         .map_err(|e| format!("cannot write {}: {e}", path.display()))
 }
 
-fn benchmark<F, S>(
+// Seed tag per code-parameter mode (mode (a) tags as before step/04-r2l).
+fn params_tag(params: &CodeParams) -> u64 {
+    match params.name() {
+        "lcpc-sdig6" => 6,
+        "lcpc-sdig3" => 3,
+        "simd-spielman" => 0x5353,
+        _ => 0,
+    }
+}
+
+fn benchmark<F>(
     args: &Args,
     log_n: u32,
     field_name: &'static str,
-    params_name: &'static str,
-    params_tag: u64,
+    params: CodeParams,
 ) -> Result<BenchReport, String>
 where
     F: Field
         + FieldReprHex
         + FieldHash
-        + MulAcc
         + Num
         + SizedField
         + Serialize
@@ -357,24 +346,21 @@ where
         + Send
         + Sync
         + 'static,
-    S: SdigSpecification + Debug + Clone + Sync,
-    SdigEncodingS<F, S>: LcEncoding<F = F>,
-    <SdigEncodingS<F, S> as LcEncoding>::Err: 'static,
 {
     let coefficient_count = 1usize
         .checked_shl(log_n)
         .ok_or_else(|| format!("logN={log_n} overflows usize"))?;
     let n_per_row = 1usize << (log_n / 2);
     let n_rows = coefficient_count / n_per_row;
-    let n_cols = codeword_length::<S>(n_per_row);
-    let level_parameters = level_parameters::<F, S>(n_per_row);
-    let seed = HASH_SEED ^ u64::from(log_n) ^ params_tag;
+    let seed = HASH_SEED ^ u64::from(log_n) ^ params_tag(&params);
 
     let setup_start = Instant::now();
-    let enc = SdigEncodingS::<F, S>::new_from_dims(n_per_row, n_cols, seed);
+    let enc = SpielmanEncoding::<F>::with_params(params, n_per_row, seed);
     let graph_sampling_ns = setup_start.elapsed().as_nanos();
+    let n_cols = enc.code().codeword_len();
+    let level_parameters = level_parameters(&enc);
     if enc.get_dims(n_per_row) != (1, n_per_row, n_cols) {
-        return Err("derived encoding dimensions disagree with upstream constructor".to_owned());
+        return Err("derived encoding dimensions disagree with the code".to_owned());
     }
 
     let input_setup_start = Instant::now();
@@ -403,7 +389,7 @@ where
     });
 
     let verifier_setup_start = Instant::now();
-    let verifier_enc = SdigEncodingS::<F, S>::new_from_dims(n_per_row, n_cols, seed);
+    let verifier_enc = SpielmanEncoding::<F>::with_params(params, n_per_row, seed);
     let verifier_encoding_init_ns = verifier_setup_start.elapsed().as_nanos();
     let point = F::random(&mut rng);
     let (inner_tensor, outer_tensor) = tensors(point, n_per_row, n_rows);
@@ -485,7 +471,7 @@ where
         hash_crate_version: "1.8.7",
         hash_mode: HASH_MODE,
         field: field_name,
-        params: params_name.to_owned(),
+        params: params.name().to_owned(),
         log_n,
         seed,
         threads: args.threads,
@@ -670,35 +656,25 @@ fn codeword_length<S: SdigSpecification>(n_per_row: usize) -> usize {
         + post_dims.iter().map(|(_, mip)| *mip).sum::<usize>()
 }
 
-fn level_parameters<F: SizedField, S: SdigSpecification>(n: usize) -> Vec<LevelParameters> {
-    let mut result = Vec::new();
-    let mut n_i = n;
-    while n_i > S::baselen() {
-        let m_i = ceil_muldiv(n_i, S::alpha_num(), S::alpha_den());
-        let lower_a = ceil_muldiv(n_i, 32 * S::beta_num(), 25 * S::beta_den());
-        let lower_b = 4 + ceil_muldiv(n_i, S::beta_num(), S::beta_den());
-        let entropy_c = ((110.0 / n_i as f64 + S::cnst_cn_1()) / S::cnst_cn_2()).ceil() as usize;
-        let c_n = lower_a.max(lower_b).min(entropy_c).min(m_i);
-
-        let n_i_prime = ceil_muldiv(m_i, S::r_num(), S::r_den());
-        let m_i_prime = ceil_muldiv(n_i, S::r_num(), S::r_den()) - n_i - n_i_prime;
-        let tmp1 = ceil_muldiv(n_i, 2 * S::beta_num(), S::beta_den());
-        let tmp2 = ceil_muldiv(n_i, S::r_num(), S::r_den()) - n_i + 110;
-        let formula_d = tmp1 + (tmp2 as f64 / F::FLOG2 as f64).ceil() as usize;
-        let entropy_d = ((110.0 / n_i as f64 + S::cnst_dn_1()) / S::cnst_dn_2()).ceil() as usize;
-        let d_n = formula_d.min(entropy_d).min(m_i_prime);
-
-        result.push(LevelParameters {
-            n_i,
-            m_i,
-            c_n,
-            n_i_prime,
-            m_i_prime,
-            d_n,
-        });
-        n_i = m_i;
-    }
-    result
+// Per-level dimensions and left degrees, read off the sampled graphs (every left node
+// of a level has the same degree in both code-parameter modes).
+fn level_parameters<F>(enc: &SpielmanEncoding<F>) -> Vec<LevelParameters>
+where
+    F: Field + Num + SizedField,
+{
+    let code = enc.code();
+    code.precodes()
+        .iter()
+        .zip(code.postcodes())
+        .map(|(pre, post)| LevelParameters {
+            n_i: pre.n_left(),
+            m_i: pre.n_right(),
+            c_n: pre.n_edges() / pre.n_left(),
+            n_i_prime: post.n_left(),
+            m_i_prime: post.n_right(),
+            d_n: post.n_edges() / post.n_left(),
+        })
+        .collect()
 }
 
 trait FieldReprHex {
@@ -729,7 +705,15 @@ impl FieldReprHex for Ft63 {
     }
 }
 
-// NOTE (step/02-fields part 2): Implement `FieldReprHex` for `Fp2M61` here once added.
+impl FieldReprHex for Fp2M61 {
+    // little-endian real part, then little-endian imaginary part
+    fn to_repr_hex(&self) -> String {
+        let mut bytes = [0u8; 16];
+        bytes[..8].copy_from_slice(&self.real.to_le_bytes());
+        bytes[8..].copy_from_slice(&self.img.to_le_bytes());
+        bytes_hex(&bytes)
+    }
+}
 
 fn field_hex<F: FieldReprHex>(value: &F) -> String {
     value.to_repr_hex()
@@ -826,7 +810,6 @@ where
     F: Field
         + FieldReprHex
         + FieldHash
-        + MulAcc
         + Num
         + SizedField
         + Serialize

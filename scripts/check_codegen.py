@@ -39,6 +39,7 @@ from typing import Dict, List, Optional, Set, Tuple
 # Default hot kernel patterns per Plan 03 §1, §3.4, §6.1
 DEFAULT_HOT_PATTERNS = [
     r"encode_column_block",
+    r"reed_solomon_column_block",
     r"reduce_column",
     r"LazyField::mac",
     r"LazyField::reduce",
@@ -47,7 +48,9 @@ DEFAULT_HOT_PATTERNS = [
 ]
 
 # Regex patterns for parsing disassembly
-SYM_HEADER_RE = re.compile(r"^[0-9a-fA-F]+\s+<([^>]+)>:\s*$")
+# Greedy: demangled generic symbols contain nested `<...>`, e.g.
+# `encode_column_block::<lcpc_fields::mont127::Mont127>`.
+SYM_HEADER_RE = re.compile(r"^[0-9a-fA-F]+\s+<(.+)>:\s*$")
 INSN_LINE_RE = re.compile(
     r"^\s*([0-9a-fA-F]+):\s+(?:((?:[0-9a-fA-F]{2}\s+)+)\s+)?([a-zA-Z0-9_\.]+)(?:\s+(.*))?$"
 )

@@ -7,7 +7,11 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use super::{BrakedownCommit, Fp2M61, Mers127, Mont127, SdigEncoding, SdigEncodingS};
+use super::codespec::{CodeParams, LcpcParams};
+use super::graph::R2lGraph;
+use super::{
+    BrakedownCommit, Fp2M61, Mers127, Mont127, SdigEncoding, SdigEncodingS, SpielmanEncoding,
+};
 
 use ff::{Field, PrimeField};
 use itertools::iterate;
@@ -80,18 +84,18 @@ fn sprs_playground() {
 fn test_matgen_encode() {
     let mut rng = rng();
     use super::codespec::SdigCode3 as TestCode;
-    use super::encode::{codeword_length, encode};
-    use super::matgen::generate;
+    use super::encode::encode;
+    use super::matgen::generate_code;
 
     let n = 256usize + ((rng.random::<u64>() as usize) % 4096);
-    let (precodes, postcodes) = generate::<Ft63, TestCode>(n, 0u64);
+    let code = generate_code::<Ft63>(&CodeParams::Lcpc(LcpcParams::of::<TestCode>()), n, 0u64);
 
-    let xi_len = codeword_length(&precodes, &postcodes);
+    let xi_len = code.codeword_len();
     let mut xi = Vec::with_capacity(xi_len);
     for _ in 0..xi_len {
         xi.push(Ft63::random(&mut rng));
     }
-    encode(&mut xi, &precodes, &postcodes);
+    encode(&mut xi, &code);
 }
 
 const N_ITERS: usize = 10;
@@ -618,7 +622,7 @@ fn golden_vectors_bit_exact_with_lcpc_orig() {
 #[test]
 fn test_mont127_vs_ft127_matgen_encode_and_pcs_bit_exact() {
     use super::codespec::{SdigCode3, SdigCode6};
-    use super::encode::{codeword_length, encode};
+    use super::encode::{encode, BaseCase, ExpanderCode};
     use super::matgen::generate;
 
     fn check_spec<S: super::codespec::SdigSpecification + std::fmt::Debug + Clone + Sync>(
@@ -631,16 +635,19 @@ fn test_mont127_vs_ft127_matgen_encode_and_pcs_bit_exact() {
         assert_eq!(pre_ft.len(), pre_mt.len());
         assert_eq!(post_ft.len(), post_mt.len());
 
-        for (m_ft, m_mt) in pre_ft
+        for (g_ft, g_mt) in pre_ft
             .iter()
             .zip(pre_mt.iter())
             .chain(post_ft.iter().zip(post_mt.iter()))
         {
-            assert_eq!(m_ft.shape(), m_mt.shape());
-            assert_eq!(m_ft.indptr(), m_mt.indptr());
-            assert_eq!(m_ft.indices(), m_mt.indices());
-            assert_eq!(m_ft.data().len(), m_mt.data().len());
-            for (v_ft, v_mt) in m_ft.data().iter().zip(m_mt.data().iter()) {
+            assert_eq!(
+                (g_ft.n_left(), g_ft.n_right()),
+                (g_mt.n_left(), g_mt.n_right())
+            );
+            assert_eq!(g_ft.row_ptr(), g_mt.row_ptr());
+            assert_eq!(g_ft.col_idx(), g_mt.col_idx());
+            assert_eq!(g_ft.weights().len(), g_mt.weights().len());
+            for (v_ft, v_mt) in g_ft.weights().iter().zip(g_mt.weights().iter()) {
                 assert_eq!(v_ft.to_repr().as_ref(), v_mt.to_repr().as_ref());
                 assert_eq!(
                     bincode::serialize(v_ft).unwrap(),
@@ -649,8 +656,10 @@ fn test_mont127_vs_ft127_matgen_encode_and_pcs_bit_exact() {
             }
         }
 
-        let n_cols = codeword_length(&pre_ft, &post_ft);
-        assert_eq!(n_cols, codeword_length(&pre_mt, &post_mt));
+        let code_ft = ExpanderCode::from_graphs(BaseCase::ReedSolomon, pre_ft, post_ft);
+        let code_mt = ExpanderCode::from_graphs(BaseCase::ReedSolomon, pre_mt, post_mt);
+        let n_cols = code_ft.codeword_len();
+        assert_eq!(n_cols, code_mt.codeword_len());
 
         let mut rng_ft = ChaCha20Rng::seed_from_u64(seed ^ 0x1234_5678_9abc_def0);
         let mut rng_mt = ChaCha20Rng::seed_from_u64(seed ^ 0x1234_5678_9abc_def0);
@@ -670,8 +679,8 @@ fn test_mont127_vs_ft127_matgen_encode_and_pcs_bit_exact() {
         let mut row_mt = vec![Mont127::ZERO; n_cols];
         row_ft[..n_per_row].copy_from_slice(&coeffs_ft[..n_per_row]);
         row_mt[..n_per_row].copy_from_slice(&coeffs_mt[..n_per_row]);
-        encode(&mut row_ft, &pre_ft, &post_ft);
-        encode(&mut row_mt, &pre_mt, &post_mt);
+        encode(&mut row_ft, &code_ft);
+        encode(&mut row_mt, &code_mt);
         for (a, b) in row_ft.iter().zip(row_mt.iter()) {
             assert_eq!(a.to_repr().as_ref(), b.to_repr().as_ref());
             assert_eq!(
@@ -781,16 +790,16 @@ fn test_end_to_end_lazy_fields() {
                 .collect()
         };
 
-        let expected: F = coeffs
-            .chunks(inner_tensor.len())
-            .zip(&outer_tensor)
-            .fold(F::ZERO, |acc, (row, &ow)| {
+        let expected: F = coeffs.chunks(inner_tensor.len()).zip(&outer_tensor).fold(
+            F::ZERO,
+            |acc, (row, &ow)| {
                 let row_val = row
                     .iter()
                     .zip(&inner_tensor)
                     .fold(F::ZERO, |racc, (&c, &iw)| racc + c * iw);
                 acc + row_val * ow
-            });
+            },
+        );
 
         let mut tr1 = Transcript::new(b"e2e lazy fields");
         tr1.append_message(b"polycommit", root.as_ref());
@@ -839,16 +848,16 @@ fn test_end_to_end_fp2m61_with_proof_serde() {
                 .collect()
         };
 
-        let expected: Fp2M61 = coeffs
-            .chunks(inner_tensor.len())
-            .zip(&outer_tensor)
-            .fold(Fp2M61::ZERO, |acc, (row, &ow)| {
+        let expected: Fp2M61 = coeffs.chunks(inner_tensor.len()).zip(&outer_tensor).fold(
+            Fp2M61::ZERO,
+            |acc, (row, &ow)| {
                 let row_val = row
                     .iter()
                     .zip(&inner_tensor)
                     .fold(Fp2M61::ZERO, |racc, (&c, &iw)| racc + c * iw);
                 acc + row_val * ow
-            });
+            },
+        );
 
         let mut tr1 = Transcript::new(b"e2e fp2m61 serde");
         tr1.append_message(b"polycommit", root.as_ref());
@@ -876,6 +885,29 @@ fn test_end_to_end_fp2m61_with_proof_serde() {
 
     run_fp2_test::<SdigCode3>(8, 0x1122_3344);
     run_fp2_test::<SdigCode6>(10, 0x5566_7788);
+}
+
+// Convert an R2L graph back into the CSC `sprs` matrix upstream LCPC built for it
+// (`n_right` rows, `n_left` columns, each column's row indices increasing).
+fn to_sprs<F: Clone>(g: &R2lGraph<F>) -> CsMat<F> {
+    let mut per_left: Vec<Vec<(usize, F)>> = vec![Vec::new(); g.n_left()];
+    for r in 0..g.n_right() {
+        let (lefts, weights) = g.incoming(r);
+        for (&l, w) in lefts.iter().zip(weights) {
+            per_left[l as usize].push((r, w.clone()));
+        }
+    }
+    let mut ptrs = vec![0usize];
+    let mut idxs = Vec::with_capacity(g.n_edges());
+    let mut data = Vec::with_capacity(g.n_edges());
+    for edges in per_left {
+        for (r, w) in edges {
+            idxs.push(r);
+            data.push(w);
+        }
+        ptrs.push(idxs.len());
+    }
+    CsMat::new_csc((g.n_right(), g.n_left()), ptrs, idxs, data)
 }
 
 // Upstream LCPC's per-row encoder (`f0e2116`, `encode.rs`), kept verbatim as a test-only
@@ -935,23 +967,29 @@ where
     assert_eq!(out_start, xi.len());
 }
 
-// The batched column-major encoder (direct kernel, single-vector wrapper, and the
+// The batched column-major R2L encoder (direct kernel, single-vector wrapper, and the
 // `LcEncoding::encode_rows` override used by `commit`) must reproduce the upstream
-// per-row encoder bit for bit, for every batch size including the verifier's 1 and 2.
+// per-row `sprs` encoder bit for bit (as `step/03-column-major` did), for every batch
+// size including the verifier's 1 and 2.
 #[test]
 fn batched_col_major_encode_matches_per_row_reference() {
     use super::codespec::{SdigCode3, SdigCode6, SdigSpecification};
-    use super::encode::{codeword_length, encode, encode_col_major};
-    use super::matgen::generate;
+    use super::encode::{encode, encode_col_major};
 
     fn check<F, S>(n_per_row: usize, seed: u64)
     where
         F: Field + FieldHash + MulAcc + Num + SizedField + std::fmt::Debug,
         S: SdigSpecification + std::fmt::Debug + Clone + Sync,
     {
-        let (pre, post) = generate::<F, S>(n_per_row, seed);
-        let n_cols = codeword_length(&pre, &post);
-        let enc = SdigEncodingS::<F, S>::new_from_dims(n_per_row, n_cols, seed);
+        let enc = SdigEncodingS::<F, S>::new_from_dims(
+            n_per_row,
+            codeword_length_spec::<S>(n_per_row),
+            seed,
+        );
+        let code = enc.code();
+        let n_cols = code.codeword_len();
+        let pre: Vec<CsMat<F>> = code.precodes().iter().map(to_sprs).collect();
+        let post: Vec<CsMat<F>> = code.postcodes().iter().map(to_sprs).collect();
         let mut rng = ChaCha20Rng::seed_from_u64(seed ^ 0x0c01_3a70);
 
         for n_rows in [1usize, 2, 3, 5, 16, 33] {
@@ -967,7 +1005,7 @@ fn batched_col_major_encode_matches_per_row_reference() {
             // single-vector wrapper, row by row
             let mut single = rows.clone();
             for row in single.chunks_mut(n_cols) {
-                encode(row, &pre, &post);
+                encode(row, code);
             }
             assert_eq!(single, expect, "encode, n_rows={n_rows}");
 
@@ -978,7 +1016,7 @@ fn batched_col_major_encode_matches_per_row_reference() {
                     buf[col * n_rows + row] = rows[row * n_cols + col];
                 }
             }
-            encode_col_major(&mut buf, n_rows, &pre, &post);
+            encode_col_major(&mut buf, n_rows, code);
             for row in 0..n_rows {
                 for col in 0..n_cols {
                     assert_eq!(
@@ -1001,4 +1039,156 @@ fn batched_col_major_encode_matches_per_row_reference() {
     check::<Mont127, SdigCode6>(512, 3);
     check::<Mers127, SdigCode3>(400, 4);
     check::<Fp2M61, SdigCode6>(333, 5);
+}
+
+// Runtime mode (a) parameters build exactly the code of the matching compile-time
+// specification (same graphs, dimensions, and PCS parameters).
+#[test]
+fn runtime_lcpc_params_match_compile_time_spec() {
+    use super::codespec::{SdigCode3, SdigCode6, SdigSpecification};
+
+    fn check<S: SdigSpecification + std::fmt::Debug + Clone + Sync>(
+        params: CodeParams,
+        name: &str,
+    ) {
+        assert_eq!(params.name(), name);
+        assert_eq!(CodeParams::from_name(name), Some(params));
+        for (n, seed) in [(64usize, 7u64), (1000, 8)] {
+            let a =
+                SdigEncodingS::<Mont127, S>::new_from_dims(n, codeword_length_spec::<S>(n), seed);
+            let b = SpielmanEncoding::<Mont127>::with_params(params, n, seed);
+            assert_eq!(a.code().precodes(), b.code().precodes());
+            assert_eq!(a.code().postcodes(), b.code().postcodes());
+            assert_eq!(a.get_dims(n), b.get_dims(n));
+            assert_eq!(a.get_n_col_opens(), b.get_n_col_opens());
+            assert_eq!(a.get_n_degree_tests(), b.get_n_degree_tests());
+        }
+        let a = SdigEncodingS::<Fp2M61, S>::new_ml(12, 9);
+        let b = SpielmanEncoding::<Fp2M61>::new_ml_with_params(params, 12, 9);
+        assert_eq!(a.get_dims(1 << 12), b.get_dims(1 << 12));
+        assert_eq!(a.code().precodes(), b.code().precodes());
+    }
+
+    check::<SdigCode6>(CodeParams::lcpc_sdig6(), "lcpc-sdig6");
+    check::<SdigCode3>(CodeParams::lcpc_sdig3(), "lcpc-sdig3");
+}
+
+// Mode (b) (SIMD-Spielman parameters): graph shapes, systematic prefix, linearity,
+// batch invariance, and an end-to-end PCS round trip. Bit-exactness with upstream's
+// test vectors is checked in `lcpc-oracle-tests` (`simd_spielman_tv.rs`).
+#[test]
+fn simd_spielman_mode_encodes_and_commits() {
+    use super::codespec::SimdSpielmanParams;
+    use super::encode::{encode, encode_col_major, BaseCase};
+    use super::matgen::simd_spielman_dims;
+
+    fn check<F>(k: usize, seed: u64)
+    where
+        F: Field + FieldHash + Num + SizedField + serde::Serialize + serde::de::DeserializeOwned,
+    {
+        let enc = SpielmanEncoding::<F>::with_params(CodeParams::SimdSpielman, k, seed);
+        let code = enc.code();
+        assert_eq!(code.base_case(), BaseCase::Identity);
+        let dims = simd_spielman_dims(k);
+        assert_eq!(code.precodes().len(), dims.len());
+        for (lvl, (g1, g2)) in dims
+            .iter()
+            .zip(code.precodes().iter().zip(code.postcodes()))
+        {
+            assert_eq!((g1.n_left(), g1.n_right()), (lvl.n, lvl.m));
+            assert_eq!((g2.n_left(), g2.n_right()), (lvl.n_prime, lvl.m_prime));
+            assert_eq!(g1.n_edges(), lvl.n * SimdSpielmanParams::CN);
+            assert_eq!(g2.n_edges(), lvl.n_prime * SimdSpielmanParams::DN);
+        }
+        let last = dims.last().unwrap();
+        assert!(last.m < SimdSpielmanParams::DISTANCE_THRESHOLD);
+        let n_cols = code.codeword_len();
+        assert_eq!(
+            n_cols,
+            k + dims.iter().map(|l| l.m + l.m_prime).sum::<usize>()
+        );
+
+        let mut rng = ChaCha20Rng::seed_from_u64(seed ^ 0xb0b0);
+        let n_rows = 5;
+        let msgs: Vec<F> = (0..n_rows * k).map(|_| F::random(&mut rng)).collect();
+        let mut rows: Vec<F> = (0..n_rows * n_cols).map(|_| F::random(&mut rng)).collect();
+        for (row, msg) in rows.chunks_mut(n_cols).zip(msgs.chunks(k)) {
+            row[..k].copy_from_slice(msg);
+        }
+        let mut single = rows.clone();
+        for row in single.chunks_mut(n_cols) {
+            encode(row, code);
+        }
+        let mut buf = vec![F::ZERO; n_rows * n_cols];
+        for row in 0..n_rows {
+            for col in 0..n_cols {
+                buf[col * n_rows + row] = rows[row * n_cols + col];
+            }
+        }
+        encode_col_major(&mut buf, n_rows, code);
+        enc.encode_rows(&mut rows, n_cols).unwrap();
+        assert_eq!(rows, single);
+        for row in 0..n_rows {
+            assert_eq!(
+                &rows[row * n_cols..row * n_cols + k],
+                &msgs[row * k..(row + 1) * k]
+            );
+            for col in 0..n_cols {
+                assert_eq!(buf[col * n_rows + row], rows[row * n_cols + col]);
+            }
+        }
+
+        // linearity: Enc(a x + y) = a Enc(x) + Enc(y)
+        let a = F::random(&mut rng);
+        let (x, y) = (&rows[..n_cols], &rows[n_cols..2 * n_cols]);
+        let mut comb = vec![F::ZERO; n_cols];
+        for i in 0..k {
+            comb[i] = a * x[i] + y[i];
+        }
+        encode(&mut comb, code);
+        for i in 0..n_cols {
+            assert_eq!(comb[i], a * x[i] + y[i], "linearity at {i}");
+        }
+
+        // PCS round trip
+        let lgl = 12;
+        let coeffs: Vec<F> = (0..(1usize << lgl)).map(|_| F::random(&mut rng)).collect();
+        let enc = SpielmanEncoding::<F>::new_ml_with_params(CodeParams::SimdSpielman, lgl, seed);
+        let comm = LcCommit::<Blake3, _>::commit(&coeffs, &enc).unwrap();
+        let root = comm.get_root();
+        let pt = F::random(&mut rng);
+        let inner: Vec<F> = iterate(F::ONE, |&v| v * pt)
+            .take(comm.get_n_per_row())
+            .collect();
+        let outer: Vec<F> = {
+            let xr = pt * inner.last().unwrap();
+            iterate(F::ONE, |&v| v * xr)
+                .take(comm.get_n_rows())
+                .collect()
+        };
+        let expected = coeffs
+            .chunks(inner.len())
+            .zip(&outer)
+            .fold(F::ZERO, |acc, (row, &ow)| {
+                acc + row
+                    .iter()
+                    .zip(&inner)
+                    .fold(F::ZERO, |r, (&c, &iw)| r + c * iw)
+                    * ow
+            });
+        let mut tr1 = Transcript::new(b"simd-spielman mode");
+        tr1.append_message(b"polycommit", root.as_ref());
+        let pf = comm.prove(&outer, &enc, &mut tr1).unwrap();
+        let mut tr2 = Transcript::new(b"simd-spielman mode");
+        tr2.append_message(b"polycommit", root.as_ref());
+        let verified = pf
+            .verify(root.as_ref(), &outer, &inner, &enc, &mut tr2)
+            .unwrap();
+        assert_eq!(verified, expected);
+    }
+
+    check::<Mont127>(64, 1);
+    check::<Mers127>(256, 2);
+    check::<Fp2M61>(300, 3);
+    check::<Ft63>(13, 4);
 }

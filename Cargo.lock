@@ -462,7 +462,6 @@ dependencies = [
  "rand_chacha 0.10.0",
  "rayon",
  "serde",
- "sprs 0.11.6",
 ]
 
 [[package]]
@@ -554,6 +553,7 @@ dependencies = [
  "lcpc-brakedown-pc 0.1.1",
  "lcpc-brakedown-pc 0.1.1 (git+https://github.com/conroi/lcpc?rev=f0e2116001af5a1bbf39481535f837d6a25772e8)",
  "lcpc-fields",
+ "lcpc-spielman-oracle",
  "lcpc-test-fields 0.1.0",
  "lcpc-test-fields 0.1.1",
  "merlin 2.0.1",
@@ -564,7 +564,6 @@ dependencies = [
  "rand_chacha 0.10.0",
  "rand_chacha 0.3.1",
  "serde",
- "sprs 0.11.6",
 ]
 
 [[package]]

@@ -230,3 +230,195 @@ pub type SdigCode6 = SdigSpec<
     typenum::U25,
     typenum::U20, // baselen = 20
 >;
+
+// ---------------------------------------------------------------------------
+// Runtime code parameters (added in step/04-r2l by the RealBrakedownPerf authors)
+// ---------------------------------------------------------------------------
+
+/// A snapshot of an [`SdigSpecification`] as runtime values.
+///
+/// Every number that LCPC's dimension recurrence (`matgen::get_dims`) and
+/// column-opening count read from the specification is captured by calling the
+/// specification's own methods, so a code built from `LcpcParams::of::<S>()` is
+/// identical to one built from `S` directly.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LcpcParams {
+    alpha_num: usize,
+    alpha_den: usize,
+    beta_num: usize,
+    beta_den: usize,
+    r_num: usize,
+    r_den: usize,
+    baselen: usize,
+    dist: f64,
+    cnst_cn_1: f64,
+    cnst_cn_2: f64,
+    cnst_dn_1: f64,
+    cnst_dn_2: f64,
+}
+
+impl LcpcParams {
+    /// Capture the parameters of specification `S`.
+    pub fn of<S: SdigSpecification>() -> Self {
+        Self {
+            alpha_num: S::alpha_num(),
+            alpha_den: S::alpha_den(),
+            beta_num: S::beta_num(),
+            beta_den: S::beta_den(),
+            r_num: S::r_num(),
+            r_den: S::r_den(),
+            baselen: S::baselen(),
+            dist: S::dist(),
+            cnst_cn_1: S::cnst_cn_1(),
+            cnst_cn_2: S::cnst_cn_2(),
+            cnst_dn_1: S::cnst_dn_1(),
+            cnst_dn_2: S::cnst_dn_2(),
+        }
+    }
+
+    /// numerator of alpha
+    pub fn alpha_num(&self) -> usize {
+        self.alpha_num
+    }
+
+    /// denominator of alpha
+    pub fn alpha_den(&self) -> usize {
+        self.alpha_den
+    }
+
+    /// numerator of beta
+    pub fn beta_num(&self) -> usize {
+        self.beta_num
+    }
+
+    /// denominator of beta
+    pub fn beta_den(&self) -> usize {
+        self.beta_den
+    }
+
+    /// numerator of r
+    pub fn r_num(&self) -> usize {
+        self.r_num
+    }
+
+    /// denominator of r
+    pub fn r_den(&self) -> usize {
+        self.r_den
+    }
+
+    /// base-case code length (recursion stops once a level has at most this many inputs)
+    pub fn baselen(&self) -> usize {
+        self.baselen
+    }
+
+    /// relative distance (`SdigSpecification::dist`)
+    pub fn dist(&self) -> f64 {
+        self.dist
+    }
+
+    /// constant for cn calculation (`SdigSpecification::cnst_cn_1`)
+    pub fn cnst_cn_1(&self) -> f64 {
+        self.cnst_cn_1
+    }
+
+    /// constant for cn calculation (`SdigSpecification::cnst_cn_2`)
+    pub fn cnst_cn_2(&self) -> f64 {
+        self.cnst_cn_2
+    }
+
+    /// constant for dn calculation (`SdigSpecification::cnst_dn_1`)
+    pub fn cnst_dn_1(&self) -> f64 {
+        self.cnst_dn_1
+    }
+
+    /// constant for dn calculation (`SdigSpecification::cnst_dn_2`)
+    pub fn cnst_dn_2(&self) -> f64 {
+        self.cnst_dn_2
+    }
+}
+
+/// The fixed code parameters of SIMD-Spielman (`spielman/SpielmanParams.h` at
+/// commit `7b399db`), which follow Orion and Brakedown.
+#[derive(Clone, Copy, Debug)]
+pub struct SimdSpielmanParams;
+
+impl SimdSpielmanParams {
+    /// Target relative distance `code_distance = 0.07`.
+    pub const CODE_DISTANCE: f64 = 0.07;
+    /// Recursion threshold `(int)(1.0 / code_distance) - 1 = 13`: a level with
+    /// fewer left nodes is not expanded (identity base case).
+    pub const DISTANCE_THRESHOLD: usize = (1.0 / Self::CODE_DISTANCE) as usize - 1;
+    /// Precode ratio `alpha = 0.238` (right nodes `floor(alpha * n)`).
+    pub const ALPHA: f64 = 0.238;
+    /// `beta = 0.1205` (only enters through the relative distance).
+    pub const BETA: f64 = 0.1205;
+    /// Inverse rate `r = 1.72`.
+    pub const R: f64 = 1.72;
+    /// Left degree of every precode graph.
+    pub const CN: usize = 10;
+    /// Left degree of every postcode graph.
+    pub const DN: usize = 20;
+}
+
+/// Code-parameter mode, chosen at runtime (README §3 of the project plan).
+///
+/// This selects *which code* is computed, not how it is computed: both modes
+/// use the same encoder (R2L graphs, column-major batches). The mode is
+/// recorded with every benchmark result.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum CodeParams {
+    /// Mode (a): LCPC's `SdigSpecification` code. Dimensions by exact rational
+    /// ceiling division, per-level degrees `c_n`, `d_n` from the entropy formulas,
+    /// distinct neighbors per left node, recursion down to `baselen` and a
+    /// Reed-Solomon base case. Bit-exact with upstream LCPC `f0e2116`.
+    Lcpc(LcpcParams),
+    /// Mode (b): SIMD-Spielman's code (`SpielmanParams.h`): `alpha = 0.238`,
+    /// `r = 1.72` with floating-point floor dimensions, fixed degrees
+    /// `c_n = 10`, `d_n = 20`, neighbors sampled with replacement (parallel
+    /// edges kept), recursion threshold 13 and an identity base case.
+    SimdSpielman,
+}
+
+impl CodeParams {
+    /// Mode (a) with `SdigCode6` (alpha = 0.238, beta = 0.1205, r = 1.72).
+    pub fn lcpc_sdig6() -> Self {
+        CodeParams::Lcpc(LcpcParams::of::<SdigCode6>())
+    }
+
+    /// Mode (a) with `SdigCode3`, LCPC's default code.
+    pub fn lcpc_sdig3() -> Self {
+        CodeParams::Lcpc(LcpcParams::of::<SdigCode3>())
+    }
+
+    /// Parse a mode name: `lcpc-sdig6`, `lcpc-sdig3`, or `simd-spielman`.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "lcpc-sdig6" => Some(Self::lcpc_sdig6()),
+            "lcpc-sdig3" => Some(Self::lcpc_sdig3()),
+            "simd-spielman" => Some(CodeParams::SimdSpielman),
+            _ => None,
+        }
+    }
+
+    /// The mode name accepted by [`CodeParams::from_name`], or `lcpc-custom`
+    /// for another LCPC specification.
+    pub fn name(&self) -> &'static str {
+        match self {
+            CodeParams::Lcpc(p) if *p == LcpcParams::of::<SdigCode6>() => "lcpc-sdig6",
+            CodeParams::Lcpc(p) if *p == LcpcParams::of::<SdigCode3>() => "lcpc-sdig3",
+            CodeParams::Lcpc(_) => "lcpc-custom",
+            CodeParams::SimdSpielman => "simd-spielman",
+        }
+    }
+
+    /// Relative distance used to size the column openings of the PCS.
+    ///
+    /// Mode (b) uses the same `beta / r` as `SdigCode6` (whose `alpha`, `beta`
+    /// and `r` it shares), so both modes open the same number of columns.
+    pub fn dist(&self) -> f64 {
+        match self {
+            CodeParams::Lcpc(p) => p.dist(),
+            CodeParams::SimdSpielman => SdigCode6::dist(),
+        }
+    }
+}

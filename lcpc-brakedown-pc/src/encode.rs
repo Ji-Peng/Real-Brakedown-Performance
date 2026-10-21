@@ -10,173 +10,286 @@
 /*!
 encode a batch of vectors using an expander code
 
-Since `step/03-column-major`, every encoding goes through one batched kernel,
-[`encode_col_major`], which encodes `n_rows` codewords at once. The batch is
+Every encoding goes through one batched kernel, [`encode_col_major`], which
+encodes `n_rows` codewords at once (`step/03-column-major`). The batch is
 stored **column-major** (position-major, row-minor): codeword position `col`
 of row `row` lives at index `col * n_rows + row`, so each codeword position is
-one contiguous "column" of `n_rows` elements.
+one contiguous "column" of `n_rows` elements. The single-vector [`encode`] is
+the special case `n_rows = 1`.
 
-Each graph edge `(l, r, w)` is then applied to a whole column at once,
-`out[r][row] += w * in[l][row]` for `row in 0..n_rows`: the edge and its
-weight are loaded once per batch instead of once per row, both columns are
-traversed with unit stride (full cache-line use), and consecutive rows carry no
-data dependency on each other. The single-vector [`encode`] is the special
-case `n_rows = 1`, whose column-major layout is the plain vector.
+Since `step/04-r2l`, the graphs are [`R2lGraph`]s and are evaluated right to
+left (Algorithm 3 of SIMD-Spielman): for each output column `r`, the incoming
+edges `(l, w)` are gathered, `out[r][row] = sum_l w * in[l][row]` for
+`row in 0..n_rows`, and `out[r]` is written once. Input columns are only read.
+This replaces the left-to-right scatter of `sprs`'s CSC matrix-vector product.
 
 Field arithmetic is still eager (one modular multiply and add per edge and
-row), and the graph is still `sprs`'s compressed sparse matrices, evaluated in
-their storage order (left-to-right for LCPC's CSC matrices). Because field
-addition is associative and commutative, the result is bit-exact with the
-row-by-row `sprs` matrix-vector products this replaces.
+row). Field addition is associative and commutative, so the gather order does
+not change the result: the output is bit-exact with the `sprs` products of
+`step/03-column-major` and with upstream LCPC.
+
+The code itself ([`ExpanderCode`]) is a list of precode/postcode graph pairs
+plus a base case. It can be sampled by [`crate::matgen`] for either
+code-parameter mode or assembled from externally sampled graphs with
+[`ExpanderCode::from_graphs`].
 */
 
+use crate::graph::R2lGraph;
+
 use ff::Field;
-use num_traits::Num;
-use sprs::{CsMat, MulAcc};
 
-// given a set of precodes and postcodes, output length of codeword
-pub(super) fn codeword_length<F>(precodes: &[CsMat<F>], postcodes: &[CsMat<F>]) -> usize
-where
-    F: Field + Num,
-{
-    assert!(!precodes.is_empty());
-    assert_eq!(precodes.len(), postcodes.len());
+/// How the innermost level's precode output is encoded.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BaseCase {
+    /// LCPC (mode (a)): the last precode output (at most `baselen` elements) is a
+    /// temporary, not part of the codeword; it is Reed-Solomon encoded (Vandermonde
+    /// evaluation at `x = 1, 2, ...`) into the last postcode's `n_left` positions.
+    ReedSolomon,
+    /// SIMD-Spielman (mode (b)): the last precode output is written into the
+    /// codeword and the base code is the identity, so the last postcode reads it
+    /// directly (its `n_left` equals the last precode's `n_right`).
+    Identity,
+}
 
-    // input
-    precodes[0].cols()
-    // R-S result
-        + postcodes.last().unwrap().cols()
-    // precode outputs (except input to R-S, which is not part of codeword)
-        + precodes.iter().take(precodes.len() - 1).map(|pc| pc.rows()).sum::<usize>()
-    // postcode outputs
-        + postcodes.iter().map(|pc| pc.rows()).sum::<usize>()
+/// A recursive expander code: precode/postcode graphs per level and a base case.
+///
+/// Level `i` encodes `x_i` (`precodes[i].n_left()` elements) as
+/// `[x_i | Enc_{i+1}(y_i) | z_i]` with `y_i = G1_i x_i` and
+/// `z_i = G2_i Enc_{i+1}(y_i)`, where `G1_i = precodes[i]` and
+/// `G2_i = postcodes[i]`; after the last level, `Enc` is the [`BaseCase`].
+#[derive(Clone, Debug)]
+pub struct ExpanderCode<F> {
+    n_per_row: usize,
+    n_cols: usize,
+    precodes: Vec<R2lGraph<F>>,
+    postcodes: Vec<R2lGraph<F>>,
+    base: BaseCase,
+}
+
+impl<F> ExpanderCode<F> {
+    /// Assemble a code from its graphs, for example graphs sampled by an
+    /// external sampler (the test-only glibc sampler that reproduces
+    /// SIMD-Spielman's test vectors).
+    ///
+    /// # Panics
+    ///
+    /// Panics unless the graph dimensions form a valid code: at least one level,
+    /// `precodes[i].n_right() == precodes[i + 1].n_left()`, and the postcode
+    /// of level `i` reads exactly the encoding of the precode output, i.e.
+    /// `postcodes[i].n_left() == precodes[i].n_right() + postcodes[i + 1].n_left()
+    /// + postcodes[i + 1].n_right()`; for the last level, with
+    /// [`BaseCase::Identity`], `postcodes[L - 1].n_left() == precodes[L - 1].n_right()`.
+    pub fn from_graphs(
+        base: BaseCase,
+        precodes: Vec<R2lGraph<F>>,
+        postcodes: Vec<R2lGraph<F>>,
+    ) -> Self {
+        assert!(!precodes.is_empty(), "a code needs at least one level");
+        assert_eq!(precodes.len(), postcodes.len());
+        let levels = precodes.len();
+        for i in 0..levels - 1 {
+            assert_eq!(
+                precodes[i].n_right(),
+                precodes[i + 1].n_left(),
+                "precode {i} output does not match precode {} input",
+                i + 1
+            );
+            assert_eq!(
+                postcodes[i].n_left(),
+                precodes[i].n_right() + postcodes[i + 1].n_left() + postcodes[i + 1].n_right(),
+                "postcode {i} input is not the encoding of precode {i} output"
+            );
+        }
+        if base == BaseCase::Identity {
+            assert_eq!(
+                postcodes[levels - 1].n_left(),
+                precodes[levels - 1].n_right(),
+                "identity base case: last postcode must read the last precode output"
+            );
+        }
+
+        let n_per_row = precodes[0].n_left();
+        let n_cols = n_per_row
+            // base-case result (R-S output, or the last precode output for the identity)
+            + postcodes[levels - 1].n_left()
+            // precode outputs except the input to the base case
+            + precodes[..levels - 1].iter().map(R2lGraph::n_right).sum::<usize>()
+            // postcode outputs
+            + postcodes.iter().map(R2lGraph::n_right).sum::<usize>();
+        Self {
+            n_per_row,
+            n_cols,
+            precodes,
+            postcodes,
+            base,
+        }
+    }
+
+    /// Message length (inputs of the first precode).
+    #[inline]
+    pub fn n_per_row(&self) -> usize {
+        self.n_per_row
+    }
+
+    /// Codeword length.
+    #[inline]
+    pub fn codeword_len(&self) -> usize {
+        self.n_cols
+    }
+
+    /// Precode graphs `G1_0, ..., G1_{L-1}`.
+    #[inline]
+    pub fn precodes(&self) -> &[R2lGraph<F>] {
+        &self.precodes
+    }
+
+    /// Postcode graphs `G2_0, ..., G2_{L-1}`.
+    #[inline]
+    pub fn postcodes(&self) -> &[R2lGraph<F>] {
+        &self.postcodes
+    }
+
+    /// The base case.
+    #[inline]
+    pub fn base_case(&self) -> BaseCase {
+        self.base
+    }
 }
 
 /// encode a vector given a code of corresponding length
 ///
 /// This is [`encode_col_major`] with a batch of one row.
-pub fn encode<F, T>(mut xi: T, precodes: &[CsMat<F>], postcodes: &[CsMat<F>])
+pub fn encode<F, T>(mut xi: T, code: &ExpanderCode<F>)
 where
-    F: Field + Num + MulAcc,
+    F: Field,
     T: AsMut<[F]>,
 {
-    encode_col_major(xi.as_mut(), 1, precodes, postcodes);
+    encode_col_major(xi.as_mut(), 1, code);
 }
 
 /// Encode a batch of `n_rows` vectors stored column-major in `buf`.
 ///
-/// `buf` holds `n_cols * n_rows` elements, where `n_cols` is the codeword length
-/// of the code given by `precodes` and `postcodes`; element `(row, col)` is
-/// `buf[col * n_rows + row]`. On entry, columns `0..n_per_row` (with
-/// `n_per_row = precodes[0].cols()`) hold the messages; the remaining columns are
-/// overwritten with the redundancy part of each codeword, so on return row `row`
-/// is the codeword that [`encode`] would produce for that row's message.
+/// `buf` holds `n_cols * n_rows` elements, where `n_cols = code.codeword_len()`;
+/// element `(row, col)` is `buf[col * n_rows + row]`. On entry, columns
+/// `0..code.n_per_row()` hold the messages; the remaining columns are overwritten
+/// with the redundancy part of each codeword, so on return row `row` is the
+/// codeword that [`encode`] would produce for that row's message.
 ///
 /// # Panics
 ///
 /// Panics if `n_rows == 0` or `buf.len() != n_cols * n_rows`.
-pub fn encode_col_major<F>(
-    buf: &mut [F],
-    n_rows: usize,
-    precodes: &[CsMat<F>],
-    postcodes: &[CsMat<F>],
-) where
-    F: Field + Num + MulAcc,
+pub fn encode_col_major<F>(buf: &mut [F], n_rows: usize, code: &ExpanderCode<F>)
+where
+    F: Field,
 {
+    let (precodes, postcodes) = (code.precodes(), code.postcodes());
+    let levels = precodes.len();
+
     // check sizes
     assert!(n_rows > 0, "encode_col_major needs at least one row");
-    let n_cols = codeword_length(precodes, postcodes);
+    let n_cols = code.codeword_len();
     assert_eq!(buf.len(), n_cols * n_rows);
 
-    // compute precodes all the way down
+    // compute precodes all the way down (all but the last for the R-S base case)
+    let n_inplace = match code.base_case() {
+        BaseCase::ReedSolomon => levels - 1,
+        BaseCase::Identity => levels,
+    };
     let mut in_start = 0usize;
-    for precode in precodes.iter().take(precodes.len() - 1) {
-        // compute matrix product over the whole column block
-        let in_end = in_start + precode.cols();
+    for precode in &precodes[..n_inplace] {
+        let in_end = in_start + precode.n_left();
         let (in_arr, out_arr) = buf.split_at_mut(in_end * n_rows);
-        mac_column_block(
+        encode_column_block(
             precode,
             &in_arr[in_start * n_rows..],
-            &mut out_arr[..precode.rows() * n_rows],
+            &mut out_arr[..precode.n_right() * n_rows],
             n_rows,
         );
-
         in_start = in_end;
     }
 
-    // base-case code: Reed-Solomon
-    let (mut in_start, mut out_start) = {
-        // first, evaluate last precode into temporary column-major storage
-        let precode = precodes.last().unwrap();
-        let in_end = in_start + precode.cols();
-        let mut in_arr = vec![<F as Field>::ZERO; precode.rows() * n_rows];
-        mac_column_block(
-            precode,
-            &buf[in_start * n_rows..in_end * n_rows],
-            &mut in_arr,
-            n_rows,
-        );
+    // base case; afterwards `in_start` is one past the last precode output and
+    // `out_start` is where the deepest postcode writes
+    let (mut in_start, mut out_start) = match code.base_case() {
+        BaseCase::ReedSolomon => {
+            // evaluate last precode into temporary column-major storage
+            let precode = &precodes[levels - 1];
+            let in_end = in_start + precode.n_left();
+            let mut in_arr = vec![F::ZERO; precode.n_right() * n_rows];
+            encode_column_block(
+                precode,
+                &buf[in_start * n_rows..in_end * n_rows],
+                &mut in_arr,
+                n_rows,
+            );
 
-        // now evaluate Reed-Solomon code on the result
-        let out_end = in_end + postcodes.last().unwrap().cols();
-        reed_solomon_column_block(&in_arr, &mut buf[in_end * n_rows..out_end * n_rows], n_rows);
+            // now evaluate Reed-Solomon code on the result
+            let out_end = in_end + postcodes[levels - 1].n_left();
+            reed_solomon_column_block(&in_arr, &mut buf[in_end * n_rows..out_end * n_rows], n_rows);
 
-        (in_end + precode.rows(), out_end)
+            (in_end + precode.n_right(), out_end)
+        }
+        // identity: the last precode output already sits in the codeword
+        BaseCase::Identity => {
+            let end = in_start + precodes[levels - 1].n_right();
+            (end, end)
+        }
     };
 
     for (precode, postcode) in precodes.iter().rev().zip(postcodes.iter().rev()) {
         // move input pointer backward
-        in_start -= precode.rows();
+        in_start -= precode.n_right();
 
-        // compute matrix product over the whole column block
         let (in_arr, out_arr) = buf.split_at_mut(out_start * n_rows);
-        mac_column_block(
+        encode_column_block(
             postcode,
-            &in_arr[in_start * n_rows..],
-            &mut out_arr[..postcode.rows() * n_rows],
+            &in_arr[in_start * n_rows..out_start * n_rows],
+            &mut out_arr[..postcode.n_right() * n_rows],
             n_rows,
         );
 
-        out_start += postcode.rows();
+        out_start += postcode.n_right();
     }
 
-    assert_eq!(in_start, precodes[0].cols());
+    assert_eq!(in_start, code.n_per_row());
     assert_eq!(out_start, n_cols);
 }
 
-/// Sparse matrix times column block: `output = mat * input`, column-major.
+/// Evaluate one expander graph on a column block, right to left (gather).
 ///
-/// `input` holds `mat.cols()` columns and `output` holds `mat.rows()` columns, each
-/// of `n_rows` contiguous elements. Every nonzero `w` at `(r, l)` adds `w * input[l]`
-/// to `output[r]` element-wise across the column, with eager field arithmetic.
-/// Kept out of line so that `scripts/check_codegen.py` can find and disassemble it.
+/// `input` holds `graph.n_left()` columns and `output` holds `graph.n_right()`
+/// columns, each of `n_rows` contiguous elements. Output column `r` is
+/// overwritten with `sum w * input[l]` over the incoming edges `(l, w)` of `r`,
+/// element-wise across the column, with eager field arithmetic; a right node
+/// without edges gets zeros.
+///
+/// Kept out of line so that `scripts/check_codegen.py` can find and disassemble
+/// it (one symbol per field, e.g. `encode_column_block::<Mont127>`).
 #[inline(never)]
-fn mac_column_block<F>(mat: &CsMat<F>, input: &[F], output: &mut [F], n_rows: usize)
+pub fn encode_column_block<F>(graph: &R2lGraph<F>, input: &[F], output: &mut [F], n_rows: usize)
 where
-    F: Field + MulAcc,
+    F: Field,
 {
-    assert_eq!(input.len(), mat.cols() * n_rows);
-    assert_eq!(output.len(), mat.rows() * n_rows);
-    output.fill(<F as Field>::ZERO);
+    assert!(n_rows > 0);
+    assert_eq!(input.len(), graph.n_left() * n_rows);
+    assert_eq!(output.len(), graph.n_right() * n_rows);
 
-    // apply one edge (l, r, w) to the whole column block
-    let mut edge = |l: usize, r: usize, w: &F| {
-        let src = &input[l * n_rows..(l + 1) * n_rows];
-        let dst = &mut output[r * n_rows..(r + 1) * n_rows];
+    for (r, dst) in output.chunks_exact_mut(n_rows).enumerate() {
+        let (lefts, weights) = graph.incoming(r);
+        let mut edges = lefts.iter().zip(weights);
+        let Some((&l, w)) = edges.next() else {
+            dst.fill(F::ZERO);
+            continue;
+        };
+        // first edge initializes the column, the rest accumulate into it
+        let src = &input[l as usize * n_rows..][..n_rows];
         for (d, s) in dst.iter_mut().zip(src) {
-            d.mul_acc(w, s);
+            *d = *s * w;
         }
-    };
-
-    // walk the edges in storage order: by input node for CSC (LCPC's matgen),
-    // by output node for CSR
-    let csc = mat.is_csc();
-    for (outer, vec) in mat.outer_iterator().enumerate() {
-        for (inner, w) in vec.iter() {
-            if csc {
-                edge(outer, inner, w);
-            } else {
-                edge(inner, outer, w);
+        for (&l, w) in edges {
+            let src = &input[l as usize * n_rows..][..n_rows];
+            for (d, s) in dst.iter_mut().zip(src) {
+                *d += *s * w;
             }
         }
     }
@@ -188,13 +301,13 @@ where
 /// each). Output column `k` is the message polynomial evaluated at `x = k + 1`,
 /// computed with Horner's rule element-wise across the column.
 #[inline(never)]
-fn reed_solomon_column_block<F>(xi: &[F], xo: &mut [F], n_rows: usize)
+pub fn reed_solomon_column_block<F>(xi: &[F], xo: &mut [F], n_rows: usize)
 where
     F: Field,
 {
-    let mut x = <F as Field>::ONE;
+    let mut x = F::ONE;
     for r in xo.chunks_exact_mut(n_rows) {
-        r.fill(<F as Field>::ZERO);
+        r.fill(F::ZERO);
         for j in (0..xi.len() / n_rows).rev() {
             let coeff = &xi[j * n_rows..(j + 1) * n_rows];
             for (o, c) in r.iter_mut().zip(coeff) {
@@ -202,7 +315,7 @@ where
                 *o += c;
             }
         }
-        x += <F as Field>::ONE;
+        x += F::ONE;
     }
 }
 
