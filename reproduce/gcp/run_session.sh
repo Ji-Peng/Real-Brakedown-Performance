@@ -271,8 +271,12 @@ fi
 RUN_CMD="cd '$REMOTE_DIR_ACTUAL' && . \"\$HOME/.cargo/env\" && ./reproduce/all.sh $REMOTE_ALL_ARGS > '$REMOTE_LOG' 2>&1; echo \$? > '$REMOTE_STATUS'"
 
 log_info "Launching remote benchmark campaign via nohup..."
+# POSIX sh has no printf %q: ship the command as a remote script over stdin.
+REMOTE_SCRIPT="/tmp/rbd-session-${SESSION_ID}.sh"
+printf '%s\n' "$RUN_CMD" | "$GCLOUD" compute ssh "$INSTANCE" --zone="$ZONE" \
+    --command "cat > '$REMOTE_SCRIPT'"
 "$GCLOUD" compute ssh "$INSTANCE" --zone="$ZONE" \
-    --command "nohup sh -c $(printf '%q' "$RUN_CMD") >/dev/null 2>&1 & echo \$! > '$REMOTE_PID'"
+    --command "nohup sh '$REMOTE_SCRIPT' >/dev/null 2>&1 & echo \$! > '$REMOTE_PID'"
 
 REMOTE_PID_VAL=$("$GCLOUD" compute ssh "$INSTANCE" --zone="$ZONE" --command "cat '$REMOTE_PID' 2>/dev/null || echo unknown")
 log_info "Remote job launched (PID: $REMOTE_PID_VAL). Streaming log output until completion..."
