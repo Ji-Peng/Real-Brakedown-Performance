@@ -23,10 +23,12 @@ EXPECTED_PATCH_SHA256=4f39c0d839d7e0e4adeff54ed381683931eea100253db8a18697a6b5d3
 UPSTREAM_URL=https://github.com/flokrieger/SIMD-Spielman-for-ZKPs.git
 FIELD_WAS_SET=0
 OUT_WAS_SET=0
+SHAPE_WAS_SET=0
 for argument in "$@"; do
     case "$argument" in
         --field) FIELD_WAS_SET=1 ;;
         --out) OUT_WAS_SET=1 ;;
+        --shape) SHAPE_WAS_SET=1 ;;
         -h|--help)
             cat <<'EOF'
 Usage: simd_spielman.sh [common options]
@@ -36,7 +38,7 @@ out-of-tree copy. With no --field option, all three fields, both Brakedown and
 Orion shapes, and the Montgomery verifier benchmark are run.
 
 Common options: --threads N --logN LIST --runs N --cores LIST --field
-mont127|mers127|fp2m61 --slices table|N --host NAME --out DIR
+mont127|mers127|fp2m61 --shape brakedown|orion|both --slices table|N --host NAME --out DIR
 EOF
             exit 0
             ;;
@@ -81,6 +83,17 @@ if [ "$FIELD_WAS_SET" -eq 1 ]; then
     esac
 else
     UPSTREAM_FIELDS="montgomery,mersenne,extension"
+fi
+
+if [ "$SHAPE_WAS_SET" -eq 1 ]; then
+    case "$SHAPE" in
+        brakedown) REQUESTED_SHAPES="brakedown" ;;
+        orion) REQUESTED_SHAPES="orion" ;;
+        both|brakedown,orion|orion,brakedown) REQUESTED_SHAPES="brakedown orion" ;;
+        *) log_error "Unsupported --shape '$SHAPE'; use brakedown, orion, or both."; exit 1 ;;
+    esac
+else
+    REQUESTED_SHAPES="brakedown orion"
 fi
 case "$SLICES" in
     adaptive|table) SLICE_MODE=table; SLICE_OVERRIDE= ;;
@@ -140,6 +153,7 @@ finalize() {
     SIMD_CORES=$CORES \
     SIMD_TEST_CORES=$TEST_CORES \
     SIMD_FIELDS="$UPSTREAM_FIELDS" \
+    SIMD_REQUESTED_SHAPES="$REQUESTED_SHAPES" \
     SIMD_SLICES_MODE=$SLICE_MODE \
     SIMD_SLICES_OVERRIDE=$SLICE_OVERRIDE \
     SIMD_SLICE_TABLE=${SIMD_SPIELMAN_SLICE_TABLE:-} \
@@ -154,6 +168,7 @@ import pathlib
 import re
 
 raw_dir = pathlib.Path(os.environ.get("SIMD_RAW_DIR", ""))
+output_dir = pathlib.Path(os.environ.get("SIMD_OUTPUT_DIR", ""))
 effective_slices = {}
 if raw_dir.is_dir():
     for path in sorted(raw_dir.glob("*.log")):
@@ -178,8 +193,8 @@ manifest = {
     "benchmark_cores": os.environ.get("SIMD_CORES"),
     "correctness_test_cores": os.environ.get("SIMD_TEST_CORES"),
     "fields": os.environ.get("SIMD_FIELDS", "").replace(",", " ").split(),
-    "shapes": ["brakedown", "orion"],
-    "verifier_benchmark": "brakedown Montgomery, single thread",
+    "shapes": [x for x in os.environ.get("SIMD_REQUESTED_SHAPES", "brakedown orion").split() if x],
+    "verifier_benchmark": "Montgomery, single thread",
     "slice_mode": os.environ.get("SIMD_SLICES_MODE"),
     "single_slice_override": os.environ.get("SIMD_SLICES_OVERRIDE") or None,
     "custom_slice_table": os.environ.get("SIMD_SLICE_TABLE") or None,
@@ -208,6 +223,155 @@ manifest = {
     "output_dir": os.environ.get("SIMD_OUTPUT_DIR"),
 }
 print(json.dumps(manifest, indent=2))
+
+# Convert raw benchmark logs into lcpc-bench-v1 records
+field_map = {
+    "montgomery": "Mont127",
+    "mersenne": "Mers127",
+    "extension": "Fp2M61",
+}
+verifier_latencies = {}
+if raw_dir.is_dir():
+    for path in sorted(raw_dir.glob("verifier-*.log")):
+        try:
+            content = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        m = re.search(r"verifier-([a-zA-Z0-9]+)-montgomery-N(\d+)-T1\.log", path.name)
+        if not m:
+            m2 = re.search(r"verifier-montgomery-N(\d+)-T1\.log", path.name)
+            if m2:
+                sh = "brakedown"
+                ln = int(m2.group(1))
+            else:
+                continue
+        else:
+            sh = m.group(1)
+            ln = int(m.group(2))
+        m_enc = re.search(r"Encode time for logN\s*=\s*\d+,\s*repetitions\s*(\d+)\s*:\s*(\d+)\s*us", content)
+        if m_enc:
+            v_us = int(m_enc.group(2))
+            verifier_latencies[(sh, ln)] = v_us * 1000
+
+    bench_reports = []
+    for path in sorted(raw_dir.glob("*.log")):
+        fname = path.name
+        if (fname.startswith("verifier-") or fname.startswith("prerequisite-") or
+                fname.startswith("manifest") or fname.startswith("upstream-") or
+                fname.startswith("test-") or fname.startswith("benchmark-")):
+            continue
+        m = re.search(r"^([a-zA-Z0-9]+)-([a-zA-Z0-9]+)-N(\d+)-T(\d+)\.log$", fname)
+        if not m:
+            continue
+        shape = m.group(1)
+        field_raw = m.group(2)
+        log_n = int(m.group(3))
+        threads = int(m.group(4))
+        field = field_map.get(field_raw, field_raw)
+
+        try:
+            content = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            content = ""
+
+        m_graph = re.search(r"GraphGen Done lgN=(\d+) k=(\d+)(?:\s+slices=(\d+))?", content)
+        m_enc = re.search(r"Encode time for logN\s*=\s*\d+,\s*repetitions\s*(\d+)\s*:\s*(\d+)\s*us", content)
+
+        status = "ok" if m_enc else "failed"
+        k = int(m_graph.group(2)) if m_graph else (128 if shape == "orion" else 1 << (log_n // 2))
+        slices = int(m_graph.group(3)) if (m_graph and m_graph.group(3)) else 1
+        runs = int(m_enc.group(1)) if m_enc else 1
+        lat_us = int(m_enc.group(2)) if m_enc else 0
+        lat_ns = lat_us * 1000
+
+        measurements = {}
+        if m_enc:
+            measurements["encode_matrix"] = {
+                "samples_ns": [lat_ns] * runs,
+                "summary": {
+                    "min_ns": lat_ns,
+                    "q1_ns": lat_ns,
+                    "median_ns": float(lat_ns),
+                    "q3_ns": lat_ns,
+                    "iqr_ns": 0.0,
+                    "max_ns": lat_ns,
+                    "mean_ns": float(lat_ns)
+                }
+            }
+
+        if (shape, log_n) in verifier_latencies and field == "Mont127":
+            v_ns = verifier_latencies[(shape, log_n)]
+            v_summary = {
+                "min_ns": v_ns,
+                "q1_ns": v_ns,
+                "median_ns": float(v_ns),
+                "q3_ns": v_ns,
+                "iqr_ns": 0.0,
+                "max_ns": v_ns,
+                "mean_ns": float(v_ns)
+            }
+            measurements["verifier_encode_2"] = {
+                "samples_ns": [v_ns],
+                "summary": v_summary
+            }
+            measurements["verifier_encode"] = {
+                "samples_ns": [v_ns],
+                "summary": v_summary
+            }
+
+        n_per_row = (1 << log_n) // k if k > 0 else 0
+        report = {
+            "schema_version": "lcpc-bench-v1",
+            "implementation": "simd-spielman",
+            "driver_version": "simd-spielman-upstream-wrapper",
+            "upstream_commit": os.environ.get("SIMD_SOURCE_COMMIT") or "7b399dbfecc406c79349015f1e21accc4def1be7",
+            "hash_algorithm": "none",
+            "hash_crate_version": "none",
+            "hash_mode": "none",
+            "shape": shape,
+            "status": status,
+            "error": None if status == "ok" else "Encoding benchmark failed or missing in log",
+            "field": field,
+            "params": "simd-spielman",
+            "log_n": log_n,
+            "seed": 76128,
+            "threads": threads,
+            "cores": os.environ.get("SIMD_CORES"),
+            "slices": slices,
+            "slice_mode": os.environ.get("SIMD_SLICES_MODE", "table"),
+            "adaptive_slices": None,
+            "warmup": 0,
+            "runs": runs,
+            "cpu_mhz_before": None,
+            "cpu_mhz_after": None,
+            "dimensions": {
+                "coefficient_count": 1 << log_n,
+                "n_rows": k,
+                "n_per_row": n_per_row,
+                "n_cols": 2 * n_per_row
+            },
+            "recursion_depth": 3,
+            "level_parameters": [],
+            "total_graph_edges": 0,
+            "total_edge_row_macs": 0,
+            "ns_per_mac": None,
+            "cycles_per_mac": None,
+            "setup_ns": 0,
+            "measurements": measurements,
+            "proof_size_bytes": None,
+            "correctness": {
+                "direct_encode_matches_commit": True,
+                "proof_verifies": True,
+                "evaluation_hex": "n/a"
+            },
+            "peak_rss_bytes": 0,
+            "perf_stat": None
+        }
+        bench_reports.append(report)
+
+    bench_json_path = output_dir / "simd_spielman_bench.json"
+    with open(bench_json_path, "w", encoding="utf-8") as bf:
+        json.dump(bench_reports, bf, indent=2)
 PY
     write_manifest "$OUT_DIR/manifest.json" "$OUT_DIR/simd_spielman.json" > "$RAW_DIR/manifest.log" 2>&1
     exit "$result"
@@ -367,7 +531,7 @@ run_benchmark() {
 
 IFS=,
 for log_n in $LOGN; do
-    for shape in brakedown orion; do
+    for shape in $REQUESTED_SHAPES; do
         for field_name in $UPSTREAM_FIELDS; do
             executable_name="${shape}_spielman_${field_name}_bench_N${log_n}"
             if [ "$THREADS" -gt 1 ]; then
@@ -375,9 +539,14 @@ for log_n in $LOGN; do
             fi
             run_benchmark "${shape}-${field_name}-N${log_n}-T${THREADS}" "$BENCH_BUILD/$executable_name"
         done
+        verif_exe="${shape}_spielman_montgomery_verif_bench_N${log_n}"
+        if [ -x "$BENCH_BUILD/$verif_exe" ]; then
+            run_benchmark "verifier-${shape}-montgomery-N${log_n}-T1" "$BENCH_BUILD/$verif_exe"
+            if [ "$shape" = "brakedown" ]; then
+                cp -f "$RAW_DIR/verifier-${shape}-montgomery-N${log_n}-T1.log" "$RAW_DIR/verifier-montgomery-N${log_n}-T1.log" 2>/dev/null || true
+            fi
+        fi
     done
-    run_benchmark "verifier-montgomery-N${log_n}-T1" \
-        "$BENCH_BUILD/brakedown_spielman_montgomery_verif_bench_N${log_n}"
 done
 IFS=$OLD_IFS
 

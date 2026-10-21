@@ -1,0 +1,650 @@
+{
+  "metadata": {
+    "title": "High-Performance SIMD Software for Spielman Codes in Zero-Knowledge Proofs",
+    "authors": "Florian Krieger, Julian Danner, Christian Hanser, Stefan Rohringer, Sujoy Sinha Roy",
+    "venue": "IACR Transactions on Cryptographic Hardware and Embedded Systems (TCHES), 2026",
+    "eprint": "2026",
+    "source_document": "SIMD-Spielman-Paper/SIMDSpielman.md",
+    "notes": "All values in this file are quoted verbatim from the indicated tables and sections of the paper."
+  },
+  "table_1": {
+    "title": "Throughput improvement over single-threaded execution using encoding-level parallelism with different types of resource sharing",
+    "page": 10,
+    "hardware": "AMD EPYC 9754",
+    "N": "2^22",
+    "single_thread_latency_ms": 0.19,
+    "two_parallel_same_smt_thread_latency_ms": 0.39,
+    "two_parallel_same_smt_throughput_increase": 1.0,
+    "two_parallel_one_ccx_shared_llc_throughput_increase": 1.4,
+    "two_parallel_independent_llc_shared_numa_throughput_increase": [1.52, 1.6]
+  },
+  "table_2": {
+    "title": "Comparison to the encoding runtime of related Brakedown implementations",
+    "page": 11,
+    "description": "Encoding runtime for Montgomery reduction, 127-bit prime. Runtimes in milliseconds, averaged over 120 repetitions. Speedups over LCPC and PolyCommit are reported.",
+    "entries": [
+      {
+        "cpu": "EPYC 9754",
+        "freq_ghz": 2.25,
+        "log_n": 16,
+        "simd_spielman_1t_ms": 1.45,
+        "simd_spielman_8t_ms": 0.48,
+        "lcpc_1t_ms": 24.9,
+        "lcpc_1t_speedup": 17.2,
+        "lcpc_8t_ms": 5.3,
+        "lcpc_8t_speedup": 10.9,
+        "polycommit_1t_ms": 25.8,
+        "polycommit_1t_speedup": 17.8,
+        "polycommit_8t_ms": 5.0,
+        "polycommit_8t_speedup": 10.3
+      },
+      {
+        "cpu": "EPYC 9754",
+        "freq_ghz": 2.25,
+        "log_n": 18,
+        "simd_spielman_1t_ms": 5.96,
+        "simd_spielman_8t_ms": 1.81,
+        "lcpc_1t_ms": 91.1,
+        "lcpc_1t_speedup": 15.3,
+        "lcpc_8t_ms": 20.3,
+        "lcpc_8t_speedup": 11.2,
+        "polycommit_1t_ms": 97.1,
+        "polycommit_1t_speedup": 16.3,
+        "polycommit_8t_ms": 18.2,
+        "polycommit_8t_speedup": 10.1
+      },
+      {
+        "cpu": "EPYC 9754",
+        "freq_ghz": 2.25,
+        "log_n": 20,
+        "simd_spielman_1t_ms": 25.18,
+        "simd_spielman_8t_ms": 7.24,
+        "lcpc_1t_ms": 363.1,
+        "lcpc_1t_speedup": 14.4,
+        "lcpc_8t_ms": 61.1,
+        "lcpc_8t_speedup": 8.4,
+        "polycommit_1t_ms": 386.2,
+        "polycommit_1t_speedup": 15.3,
+        "polycommit_8t_ms": 70.1,
+        "polycommit_8t_speedup": 9.7
+      },
+      {
+        "cpu": "EPYC 9754",
+        "freq_ghz": 2.25,
+        "log_n": 22,
+        "simd_spielman_1t_ms": 103.37,
+        "simd_spielman_8t_ms": 20.77,
+        "lcpc_1t_ms": 1466.9,
+        "lcpc_1t_speedup": 14.2,
+        "lcpc_8t_ms": 205.5,
+        "lcpc_8t_speedup": 9.9,
+        "polycommit_1t_ms": 1638.2,
+        "polycommit_1t_speedup": 15.8,
+        "polycommit_8t_ms": 279.4,
+        "polycommit_8t_speedup": 13.4
+      },
+      {
+        "cpu": "EPYC 9754",
+        "freq_ghz": 2.25,
+        "log_n": 24,
+        "simd_spielman_1t_ms": 441.54,
+        "simd_spielman_8t_ms": 87.26,
+        "lcpc_1t_ms": 5944.7,
+        "lcpc_1t_speedup": 13.5,
+        "lcpc_8t_ms": 784.7,
+        "lcpc_8t_speedup": 9.0,
+        "polycommit_1t_ms": 6823.1,
+        "polycommit_1t_speedup": 15.5,
+        "polycommit_8t_ms": 1269.0,
+        "polycommit_8t_speedup": 14.5
+      },
+      {
+        "cpu": "EPYC 9754",
+        "freq_ghz": 2.25,
+        "log_n": 26,
+        "simd_spielman_1t_ms": 2007.44,
+        "simd_spielman_8t_ms": 392.05,
+        "lcpc_1t_ms": 25651.0,
+        "lcpc_1t_speedup": 12.8,
+        "lcpc_8t_ms": 3329.2,
+        "lcpc_8t_speedup": 8.5,
+        "polycommit_1t_ms": 26707.0,
+        "polycommit_1t_speedup": 13.3,
+        "polycommit_8t_ms": 6075.2,
+        "polycommit_8t_speedup": 15.5
+      },
+      {
+        "cpu": "EPYC 9754",
+        "freq_ghz": 2.25,
+        "log_n": 28,
+        "simd_spielman_1t_ms": 8880.82,
+        "simd_spielman_8t_ms": 2205.57,
+        "lcpc_1t_ms": 97657.0,
+        "lcpc_1t_speedup": 11.0,
+        "lcpc_8t_ms": 18135.0,
+        "lcpc_8t_speedup": 8.2,
+        "polycommit_1t_ms": null,
+        "polycommit_1t_speedup": null,
+        "polycommit_8t_ms": null,
+        "polycommit_8t_speedup": null
+      },
+      {
+        "cpu": "i7-11800H",
+        "freq_ghz": 2.30,
+        "log_n": 16,
+        "simd_spielman_1t_ms": 1.00,
+        "simd_spielman_8t_ms": 0.40,
+        "lcpc_1t_ms": 18.7,
+        "lcpc_1t_speedup": 18.7,
+        "lcpc_8t_ms": 4.4,
+        "lcpc_8t_speedup": 11.0,
+        "polycommit_1t_ms": 19.3,
+        "polycommit_1t_speedup": 19.3,
+        "polycommit_8t_ms": 4.0,
+        "polycommit_8t_speedup": 10.1
+      },
+      {
+        "cpu": "i7-11800H",
+        "freq_ghz": 2.30,
+        "log_n": 18,
+        "simd_spielman_1t_ms": 4.25,
+        "simd_spielman_8t_ms": 1.22,
+        "lcpc_1t_ms": 68.7,
+        "lcpc_1t_speedup": 16.2,
+        "lcpc_8t_ms": 18.3,
+        "lcpc_8t_speedup": 15.1,
+        "polycommit_1t_ms": 73.7,
+        "polycommit_1t_speedup": 17.3,
+        "polycommit_8t_ms": 15.2,
+        "polycommit_8t_speedup": 12.5
+      },
+      {
+        "cpu": "i7-11800H",
+        "freq_ghz": 2.30,
+        "log_n": 20,
+        "simd_spielman_1t_ms": 18.88,
+        "simd_spielman_8t_ms": 4.90,
+        "lcpc_1t_ms": 287.4,
+        "lcpc_1t_speedup": 15.2,
+        "lcpc_8t_ms": 65.5,
+        "lcpc_8t_speedup": 13.4,
+        "polycommit_1t_ms": 296.2,
+        "polycommit_1t_speedup": 15.7,
+        "polycommit_8t_ms": 58.5,
+        "polycommit_8t_speedup": 11.9
+      },
+      {
+        "cpu": "i7-11800H",
+        "freq_ghz": 2.30,
+        "log_n": 22,
+        "simd_spielman_1t_ms": 79.30,
+        "simd_spielman_8t_ms": 23.29,
+        "lcpc_1t_ms": 1158.8,
+        "lcpc_1t_speedup": 14.6,
+        "lcpc_8t_ms": 248.4,
+        "lcpc_8t_speedup": 10.7,
+        "polycommit_1t_ms": 1234.4,
+        "polycommit_1t_speedup": 15.6,
+        "polycommit_8t_ms": 272.9,
+        "polycommit_8t_speedup": 11.7
+      },
+      {
+        "cpu": "i7-11800H",
+        "freq_ghz": 2.30,
+        "log_n": 24,
+        "simd_spielman_1t_ms": 331.37,
+        "simd_spielman_8t_ms": 101.44,
+        "lcpc_1t_ms": 4699.8,
+        "lcpc_1t_speedup": 14.2,
+        "lcpc_8t_ms": 996.0,
+        "lcpc_8t_speedup": 9.8,
+        "polycommit_1t_ms": 5153.4,
+        "polycommit_1t_speedup": 15.6,
+        "polycommit_8t_ms": 1174.1,
+        "polycommit_8t_speedup": 11.6
+      },
+      {
+        "cpu": "i7-11800H",
+        "freq_ghz": 2.30,
+        "log_n": 26,
+        "simd_spielman_1t_ms": 1636.78,
+        "simd_spielman_8t_ms": 607.49,
+        "lcpc_1t_ms": 20259.0,
+        "lcpc_1t_speedup": 12.4,
+        "lcpc_8t_ms": 4338.4,
+        "lcpc_8t_speedup": 7.1,
+        "polycommit_1t_ms": 20810.0,
+        "polycommit_1t_speedup": 12.7,
+        "polycommit_8t_ms": 5593.7,
+        "polycommit_8t_speedup": 9.2
+      },
+      {
+        "cpu": "Xeon Gold 6530",
+        "freq_ghz": 2.10,
+        "log_n": 16,
+        "simd_spielman_1t_ms": 1.02,
+        "simd_spielman_8t_ms": 0.46,
+        "lcpc_1t_ms": 25.0,
+        "lcpc_1t_speedup": 24.4,
+        "lcpc_8t_ms": 8.7,
+        "lcpc_8t_speedup": 18.7,
+        "polycommit_1t_ms": 27.4,
+        "polycommit_1t_speedup": 26.7,
+        "polycommit_8t_ms": 7.4,
+        "polycommit_8t_speedup": 15.8
+      },
+      {
+        "cpu": "Xeon Gold 6530",
+        "freq_ghz": 2.10,
+        "log_n": 18,
+        "simd_spielman_1t_ms": 5.31,
+        "simd_spielman_8t_ms": 1.40,
+        "lcpc_1t_ms": 91.5,
+        "lcpc_1t_speedup": 17.2,
+        "lcpc_8t_ms": 21.4,
+        "lcpc_8t_speedup": 15.3,
+        "polycommit_1t_ms": 104.0,
+        "polycommit_1t_speedup": 19.6,
+        "polycommit_8t_ms": 27.0,
+        "polycommit_8t_speedup": 19.4
+      },
+      {
+        "cpu": "Xeon Gold 6530",
+        "freq_ghz": 2.10,
+        "log_n": 20,
+        "simd_spielman_1t_ms": 24.65,
+        "simd_spielman_8t_ms": 4.88,
+        "lcpc_1t_ms": 371.5,
+        "lcpc_1t_speedup": 15.1,
+        "lcpc_8t_ms": 64.7,
+        "lcpc_8t_speedup": 13.3,
+        "polycommit_1t_ms": 409.5,
+        "polycommit_1t_speedup": 16.6,
+        "polycommit_8t_ms": 100.8,
+        "polycommit_8t_speedup": 20.6
+      },
+      {
+        "cpu": "Xeon Gold 6530",
+        "freq_ghz": 2.10,
+        "log_n": 22,
+        "simd_spielman_1t_ms": 105.27,
+        "simd_spielman_8t_ms": 24.24,
+        "lcpc_1t_ms": 1444.6,
+        "lcpc_1t_speedup": 13.7,
+        "lcpc_8t_ms": 223.4,
+        "lcpc_8t_speedup": 9.2,
+        "polycommit_1t_ms": 1696.7,
+        "polycommit_1t_speedup": 16.1,
+        "polycommit_8t_ms": 334.8,
+        "polycommit_8t_speedup": 13.8
+      },
+      {
+        "cpu": "Xeon Gold 6530",
+        "freq_ghz": 2.10,
+        "log_n": 24,
+        "simd_spielman_1t_ms": 474.57,
+        "simd_spielman_8t_ms": 94.93,
+        "lcpc_1t_ms": 5858.3,
+        "lcpc_1t_speedup": 12.3,
+        "lcpc_8t_ms": 810.0,
+        "lcpc_8t_speedup": 8.5,
+        "polycommit_1t_ms": 7477.5,
+        "polycommit_1t_speedup": 15.8,
+        "polycommit_8t_ms": 1312.0,
+        "polycommit_8t_speedup": 13.8
+      },
+      {
+        "cpu": "Xeon Gold 6530",
+        "freq_ghz": 2.10,
+        "log_n": 26,
+        "simd_spielman_1t_ms": 2032.54,
+        "simd_spielman_8t_ms": 368.60,
+        "lcpc_1t_ms": 25327.0,
+        "lcpc_1t_speedup": 12.5,
+        "lcpc_8t_ms": 3649.6,
+        "lcpc_8t_speedup": 9.9,
+        "polycommit_1t_ms": 32158.0,
+        "polycommit_1t_speedup": 15.8,
+        "polycommit_8t_ms": 5734.1,
+        "polycommit_8t_speedup": 15.6
+      },
+      {
+        "cpu": "Xeon Gold 6530",
+        "freq_ghz": 2.10,
+        "log_n": 28,
+        "simd_spielman_1t_ms": 9914.76,
+        "simd_spielman_8t_ms": 1629.92,
+        "lcpc_1t_ms": 104680.0,
+        "lcpc_1t_speedup": 10.6,
+        "lcpc_8t_ms": 13664.0,
+        "lcpc_8t_speedup": 8.4,
+        "polycommit_1t_ms": null,
+        "polycommit_1t_speedup": null,
+        "polycommit_8t_ms": null,
+        "polycommit_8t_speedup": null
+      }
+    ]
+  },
+  "table_3": {
+    "title": "Comparison to the encoding runtime of related Orion design (single-threaded)",
+    "page": 12,
+    "description": "Matrix shape: 128 rows, N/128 columns. Field: 122-bit extension field Fp2 over Mersenne prime p=2^61-1. Runtimes in milliseconds.",
+    "entries": [
+      {
+        "log_n": 16,
+        "su_epyc_ms": 27.0,
+        "su_i7_ms": 18.4,
+        "su_xeon_ms": 20.0,
+        "simd_spielman_epyc_ms": 2.31,
+        "simd_spielman_epyc_speedup": 11.7,
+        "simd_spielman_i7_ms": 1.46,
+        "simd_spielman_i7_speedup": 12.6,
+        "simd_spielman_xeon_ms": 1.39,
+        "simd_spielman_xeon_speedup": 14.4
+      },
+      {
+        "log_n": 18,
+        "su_epyc_ms": 121.2,
+        "su_i7_ms": 83.3,
+        "su_xeon_ms": 112.2,
+        "simd_spielman_epyc_ms": 10.10,
+        "simd_spielman_epyc_speedup": 12.0,
+        "simd_spielman_i7_ms": 6.40,
+        "simd_spielman_i7_speedup": 13.0,
+        "simd_spielman_xeon_ms": 7.15,
+        "simd_spielman_xeon_speedup": 15.7
+      },
+      {
+        "log_n": 20,
+        "su_epyc_ms": 540.3,
+        "su_i7_ms": 364.3,
+        "su_xeon_ms": 490.3,
+        "simd_spielman_epyc_ms": 48.67,
+        "simd_spielman_epyc_speedup": 11.1,
+        "simd_spielman_i7_ms": 33.50,
+        "simd_spielman_i7_speedup": 10.9,
+        "simd_spielman_xeon_ms": 34.36,
+        "simd_spielman_xeon_speedup": 14.3
+      },
+      {
+        "log_n": 22,
+        "su_epyc_ms": 3057.7,
+        "su_i7_ms": 2149.3,
+        "su_xeon_ms": 2097.7,
+        "simd_spielman_epyc_ms": 292.39,
+        "simd_spielman_epyc_speedup": 10.5,
+        "simd_spielman_i7_ms": 214.63,
+        "simd_spielman_i7_speedup": 10.0,
+        "simd_spielman_xeon_ms": 205.80,
+        "simd_spielman_xeon_speedup": 10.2
+      },
+      {
+        "log_n": 24,
+        "su_epyc_ms": 15763.7,
+        "su_i7_ms": null,
+        "su_xeon_ms": 9653.7,
+        "simd_spielman_epyc_ms": 2221.47,
+        "simd_spielman_epyc_speedup": 7.1,
+        "simd_spielman_i7_ms": 1626.56,
+        "simd_spielman_i7_speedup": null,
+        "simd_spielman_xeon_ms": 1302.59,
+        "simd_spielman_xeon_speedup": 7.4
+      },
+      {
+        "log_n": 26,
+        "su_epyc_ms": 91794.3,
+        "su_i7_ms": null,
+        "su_xeon_ms": 53952.0,
+        "simd_spielman_epyc_ms": 10962.71,
+        "simd_spielman_epyc_speedup": 8.4,
+        "simd_spielman_i7_ms": 8563.58,
+        "simd_spielman_i7_speedup": null,
+        "simd_spielman_xeon_ms": 8546.77,
+        "simd_spielman_xeon_speedup": 6.3
+      }
+    ]
+  },
+  "table_4": {
+    "title": "Throughput comparison to FPGA accelerator for Orion",
+    "page": 13,
+    "description": "Throughput in encodings per second (Enc/s). 64 threads total (8 encoding-level x 8 expander-level).",
+    "entries": [
+      {
+        "log_n": 16,
+        "fpga_throughput_enc_per_s": 3144.7,
+        "simd_spielman_throughput_enc_per_s": 12048.2,
+        "speedup": 3.8
+      },
+      {
+        "log_n": 18,
+        "fpga_throughput_enc_per_s": 803.2,
+        "simd_spielman_throughput_enc_per_s": 3467.7,
+        "speedup": 4.3
+      },
+      {
+        "log_n": 20,
+        "fpga_throughput_enc_per_s": 202.2,
+        "simd_spielman_throughput_enc_per_s": 554.5,
+        "speedup": 2.7
+      },
+      {
+        "log_n": 22,
+        "fpga_throughput_enc_per_s": 50.5,
+        "simd_spielman_throughput_enc_per_s": 139.5,
+        "speedup": 2.8
+      },
+      {
+        "log_n": 24,
+        "fpga_throughput_enc_per_s": 12.6,
+        "simd_spielman_throughput_enc_per_s": 17.2,
+        "speedup": 1.4
+      },
+      {
+        "log_n": 26,
+        "fpga_throughput_enc_per_s": 3.2,
+        "simd_spielman_throughput_enc_per_s": 2.9,
+        "speedup": 0.9
+      }
+    ]
+  },
+  "table_5": {
+    "title": "Performance comparison to NTT-based Reed-Solomon encoding",
+    "page": 13,
+    "hardware": "Intel Xeon Platinum 8360Y @ 2.4GHz with 54MB cache",
+    "entries": [
+      {
+        "log_n": 18,
+        "ntt_size": "2^10",
+        "latency_single_ntt_ms": 0.0081,
+        "latency_rs_encoding_of_u_ms": 4.1,
+        "simd_spielman_latency_ms": 6.0,
+        "overhead_of_spielman_encoding": 1.44
+      },
+      {
+        "log_n": 22,
+        "ntt_size": "2^12",
+        "latency_single_ntt_ms": 0.0375,
+        "latency_rs_encoding_of_u_ms": 76.8,
+        "simd_spielman_latency_ms": 103.4,
+        "overhead_of_spielman_encoding": 1.35
+      },
+      {
+        "log_n": 26,
+        "ntt_size": "2^14",
+        "latency_single_ntt_ms": 0.2135,
+        "latency_rs_encoding_of_u_ms": 1749.4,
+        "simd_spielman_latency_ms": 2007.4,
+        "overhead_of_spielman_encoding": 1.15
+      }
+    ]
+  },
+  "table_6": {
+    "title": "Latency comparison of the verifier-side encoding runtime (single-threaded)",
+    "page": 14,
+    "unit": "microseconds",
+    "entries": [
+      {
+        "cpu": "EPYC 9754",
+        "log_n": 16,
+        "simd_spielman_us": 39,
+        "lcpc_us": 195,
+        "lcpc_speedup": 5.0,
+        "polycommit_us": 202,
+        "polycommit_speedup": 5.2
+      },
+      {
+        "cpu": "EPYC 9754",
+        "log_n": 18,
+        "simd_spielman_us": 78,
+        "lcpc_us": 356,
+        "lcpc_speedup": 4.6,
+        "polycommit_us": 379,
+        "polycommit_speedup": 4.9
+      },
+      {
+        "cpu": "EPYC 9754",
+        "log_n": 20,
+        "simd_spielman_us": 160,
+        "lcpc_us": 709,
+        "lcpc_speedup": 4.4,
+        "polycommit_us": 754,
+        "polycommit_speedup": 4.7
+      },
+      {
+        "cpu": "EPYC 9754",
+        "log_n": 22,
+        "simd_spielman_us": 323,
+        "lcpc_us": 1433,
+        "lcpc_speedup": 4.4,
+        "polycommit_us": 1600,
+        "polycommit_speedup": 5.0
+      },
+      {
+        "cpu": "EPYC 9754",
+        "log_n": 24,
+        "simd_spielman_us": 649,
+        "lcpc_us": 2903,
+        "lcpc_speedup": 4.5,
+        "polycommit_us": 3332,
+        "polycommit_speedup": 5.1
+      },
+      {
+        "cpu": "EPYC 9754",
+        "log_n": 26,
+        "simd_spielman_us": 1316,
+        "lcpc_us": 6262,
+        "lcpc_speedup": 4.8,
+        "polycommit_us": 6520,
+        "polycommit_speedup": 5.0
+      },
+      {
+        "cpu": "i7-11800H",
+        "log_n": 16,
+        "simd_spielman_us": 25,
+        "lcpc_us": 146,
+        "lcpc_speedup": 5.9,
+        "polycommit_us": 151,
+        "polycommit_speedup": 6.0
+      },
+      {
+        "cpu": "i7-11800H",
+        "log_n": 18,
+        "simd_spielman_us": 51,
+        "lcpc_us": 268,
+        "lcpc_speedup": 5.3,
+        "polycommit_us": 288,
+        "polycommit_speedup": 5.6
+      },
+      {
+        "cpu": "i7-11800H",
+        "log_n": 20,
+        "simd_spielman_us": 107,
+        "lcpc_us": 561,
+        "lcpc_speedup": 5.2,
+        "polycommit_us": 579,
+        "polycommit_speedup": 5.4
+      },
+      {
+        "cpu": "i7-11800H",
+        "log_n": 22,
+        "simd_spielman_us": 213,
+        "lcpc_us": 1132,
+        "lcpc_speedup": 5.3,
+        "polycommit_us": 1205,
+        "polycommit_speedup": 5.7
+      },
+      {
+        "cpu": "i7-11800H",
+        "log_n": 24,
+        "simd_spielman_us": 430,
+        "lcpc_us": 2295,
+        "lcpc_speedup": 5.3,
+        "polycommit_us": 2516,
+        "polycommit_speedup": 5.9
+      },
+      {
+        "cpu": "i7-11800H",
+        "log_n": 26,
+        "simd_spielman_us": 894,
+        "lcpc_us": 4946,
+        "lcpc_speedup": 5.5,
+        "polycommit_us": 5081,
+        "polycommit_speedup": 5.7
+      },
+      {
+        "cpu": "Xeon Gold 6530",
+        "log_n": 16,
+        "simd_spielman_us": 45,
+        "lcpc_us": 195,
+        "lcpc_speedup": 4.3,
+        "polycommit_us": 214,
+        "polycommit_speedup": 4.7
+      },
+      {
+        "cpu": "Xeon Gold 6530",
+        "log_n": 18,
+        "simd_spielman_us": 83,
+        "lcpc_us": 357,
+        "lcpc_speedup": 4.3,
+        "polycommit_us": 406,
+        "polycommit_speedup": 4.9
+      },
+      {
+        "cpu": "Xeon Gold 6530",
+        "log_n": 20,
+        "simd_spielman_us": 159,
+        "lcpc_us": 726,
+        "lcpc_speedup": 4.6,
+        "polycommit_us": 800,
+        "polycommit_speedup": 5.0
+      },
+      {
+        "cpu": "Xeon Gold 6530",
+        "log_n": 22,
+        "simd_spielman_us": 357,
+        "lcpc_us": 1411,
+        "lcpc_speedup": 4.0,
+        "polycommit_us": 1657,
+        "polycommit_speedup": 4.6
+      },
+      {
+        "cpu": "Xeon Gold 6530",
+        "log_n": 24,
+        "simd_spielman_us": 602,
+        "lcpc_us": 2860,
+        "lcpc_speedup": 4.8,
+        "polycommit_us": 3651,
+        "polycommit_speedup": 6.1
+      },
+      {
+        "cpu": "Xeon Gold 6530",
+        "log_n": 26,
+        "simd_spielman_us": 1166,
+        "lcpc_us": 6183,
+        "lcpc_speedup": 5.3,
+        "polycommit_us": 7851,
+        "polycommit_speedup": 6.7
+      }
+    ]
+  }
+}

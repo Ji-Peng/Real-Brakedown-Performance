@@ -454,6 +454,7 @@ dependencies = [
  "lcpc-2d 0.1.1",
  "lcpc-brakedown-pc 0.1.1",
  "lcpc-fields",
+ "lcpc-ligero-pc",
  "lcpc-test-fields 0.1.0",
  "merlin 3.0.0",
  "num-traits",

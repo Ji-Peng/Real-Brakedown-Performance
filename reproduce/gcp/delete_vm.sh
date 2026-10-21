@@ -18,18 +18,23 @@ set -eu
 # If gcloud is not on PATH on the workstation, set GCLOUD to
 # "$HOME/.local/share/google-cloud-sdk/bin/gcloud".
 GCLOUD=${GCLOUD:-gcloud}
-INSTANCE=${INSTANCE:-rbd-bench-c3d}
+MACHINE=${MACHINE:-c3d}
+INSTANCE=${INSTANCE:-}
 ZONE=${ZONE:-us-central1-a}
 ACTION=delete
 QUIET=0
 
 usage() {
     cat <<EOF
-Usage: $0 [--stop] [--yes] [--instance NAME] [--zone ZONE]
+Usage: $0 [--machine c3d|c4a] [--stop] [--yes] [--instance NAME] [--zone ZONE]
 
-By default, deletes the VM. --stop stops it and retains its boot disk.
---yes passes --quiet to gcloud to skip its confirmation prompt.
-Defaults: instance=$INSTANCE, zone=$ZONE.
+By default, deletes the VM and boot disk.
+  --stop              Stops the VM and retains its boot disk (prevents CPU/RAM billing)
+  --machine c3d|c4a   Target machine family (default: c3d; selects rbd-bench-c3d or rbd-bench-c4a)
+  --instance NAME     Override instance name
+  --zone ZONE         GCP zone (default: us-central1-a)
+  --yes               Passes --quiet to gcloud to skip interactive confirmation
+  -h, --help          Show this help message
 
 If gcloud is not on PATH, set GCLOUD to
   \$HOME/.local/share/google-cloud-sdk/bin/gcloud
@@ -38,6 +43,11 @@ EOF
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
+        --machine)
+            [ "$#" -ge 2 ] || { printf '%s\n' "--machine requires an argument (c3d|c4a)" >&2; exit 2; }
+            MACHINE=$2
+            shift 2
+            ;;
         --stop)
             ACTION=stop
             shift
@@ -67,6 +77,17 @@ while [ "$#" -gt 0 ]; do
             ;;
     esac
 done
+
+if [ -z "$INSTANCE" ]; then
+    case "$MACHINE" in
+        c3d) INSTANCE=rbd-bench-c3d ;;
+        c4a) INSTANCE=rbd-bench-c4a ;;
+        *)
+            printf 'Invalid --machine: %s (must be c3d or c4a)\n' "$MACHINE" >&2
+            exit 2
+            ;;
+    esac
+fi
 
 case "$INSTANCE" in
     ''|*[!A-Za-z0-9._-]*) printf 'Invalid instance name: %s\n' "$INSTANCE" >&2; exit 2 ;;

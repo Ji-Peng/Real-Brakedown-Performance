@@ -18,7 +18,8 @@ set -eu
 # If gcloud is not on PATH on the workstation, set GCLOUD to
 # "$HOME/.local/share/google-cloud-sdk/bin/gcloud".
 GCLOUD=${GCLOUD:-gcloud}
-INSTANCE=${INSTANCE:-rbd-bench-c3d}
+MACHINE=${MACHINE:-c3d}
+INSTANCE=${INSTANCE:-}
 ZONE=${ZONE:-us-central1-a}
 REMOTE_CODE_DIR=${REMOTE_CODE_DIR:-}
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -32,13 +33,21 @@ trap cleanup 0
 
 usage() {
     cat <<EOF
-Usage: $0 [--instance NAME] [--zone ZONE] [--remote-dir ABSOLUTE_PATH]
+Usage: $0 [--machine c3d|c4a] [--instance NAME] [--zone ZONE] [--remote-dir ABSOLUTE_PATH]
 
 Installs the pinned Rust toolchain and SIMD-Spielman build prerequisites on an
 existing VM, syncs this code/ checkout, and writes a first-boot manifest under
-code/results/gcp-c3d-highmem-30/ on the VM. It does not create a VM.
+code/results/<host>/ on the VM. It does not create a VM.
 
-Defaults: instance=$INSTANCE, zone=$ZONE, remote directory=~/RealBrakedownPerf/code.
+Options:
+  --machine c3d|c4a   Target machine family (default: c3d)
+                        c3d: rbd-bench-c3d (results/gcp-c3d-highmem-30)
+                        c4a: rbd-bench-c4a (results/gcp-c4a-highmem-16)
+  --instance NAME     Override instance name
+  --zone ZONE         GCP zone (default: us-central1-a)
+  --remote-dir PATH   Remote checkout path (default: ~/RealBrakedownPerf/code)
+  -h, --help          Show this help message
+
 If gcloud is not on PATH, set GCLOUD to
   \$HOME/.local/share/google-cloud-sdk/bin/gcloud
 EOF
@@ -46,6 +55,11 @@ EOF
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
+        --machine)
+            [ "$#" -ge 2 ] || { printf '%s\n' "--machine requires an argument (c3d|c4a)" >&2; exit 2; }
+            MACHINE=$2
+            shift 2
+            ;;
         --instance)
             [ "$#" -ge 2 ] || { printf '%s\n' "--instance requires a name" >&2; exit 2; }
             INSTANCE=$2
@@ -72,6 +86,23 @@ while [ "$#" -gt 0 ]; do
             ;;
     esac
 done
+
+case "$MACHINE" in
+    c3d)
+        DEFAULT_INSTANCE=rbd-bench-c3d
+        HOST_PROFILE_NAME=gcp-c3d-highmem-30
+        ;;
+    c4a)
+        DEFAULT_INSTANCE=rbd-bench-c4a
+        HOST_PROFILE_NAME=gcp-c4a-highmem-16
+        ;;
+    *)
+        printf 'Invalid --machine: %s (must be c3d or c4a)\n' "$MACHINE" >&2
+        exit 2
+        ;;
+esac
+
+INSTANCE=${INSTANCE:-$DEFAULT_INSTANCE}
 
 case "$INSTANCE" in
     ''|*[!A-Za-z0-9._-]*) printf 'Invalid instance name: %s\n' "$INSTANCE" >&2; exit 2 ;;
@@ -125,7 +156,9 @@ TOOLCHAIN=$1
 SOURCE_SHA=$2
 ZONE=$3
 INSTANCE=$4
-REMOTE_CODE_DIR=${5:-}
+MACHINE=$5
+HOST_PROFILE_NAME=$6
+REMOTE_CODE_DIR=${7:-}
 REMOTE_STAGE=/tmp/realbrakedownperf-gcp-setup
 BUNDLE=$REMOTE_STAGE/code.bundle
 SOURCE_ARCHIVE=$REMOTE_STAGE/code-working-tree.tar.gz
@@ -141,7 +174,10 @@ esac
 sudo -n apt-get update
 sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y \
     build-essential ca-certificates cmake curl g++ git libboost-all-dev \
-    pkg-config python3
+    pkg-config python3 python3-matplotlib python3-numpy || true
+
+# Attempt to install linux-perf if available
+sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y linux-perf || true
 
 mkdir -p "$REMOTE_STAGE"
 if [ ! -x "$HOME/.cargo/bin/rustup" ]; then
@@ -166,10 +202,11 @@ fi
 git -C "$REMOTE_CODE_DIR" checkout --detach "$SOURCE_SHA"
 tar -xzf "$SOURCE_ARCHIVE" --no-same-owner -C "$REMOTE_CODE_DIR"
 
-FIRST_BOOT_DIR=$REMOTE_CODE_DIR/results/gcp-c3d-highmem-30
+FIRST_BOOT_DIR=$REMOTE_CODE_DIR/results/$HOST_PROFILE_NAME
 mkdir -p "$FIRST_BOOT_DIR"
 FIRST_BOOT_MANIFEST=$FIRST_BOOT_DIR/first-boot-manifest.json \
 EXPECTED_ZONE=$ZONE EXPECTED_INSTANCE=$INSTANCE EXPECTED_TOOLCHAIN=$TOOLCHAIN \
+EXPECTED_MACHINE=$MACHINE EXPECTED_HOST_PROFILE=$HOST_PROFILE_NAME \
 REMOTE_CODE_DIR=$REMOTE_CODE_DIR python3 - <<'PY'
 import datetime
 import glob
@@ -247,9 +284,9 @@ physical_core_ids = set()
 all_siblings_are_singletons = True
 for cpu in sorted(online_cpus):
     base = f"/sys/devices/system/cpu/cpu{cpu}/topology"
-    package = read_text(f"{base}/physical_package_id")
-    core = read_text(f"{base}/core_id")
-    siblings_raw = read_text(f"{base}/thread_siblings_list")
+    package = read_text(f"{base}/physical_package_id") or "0"
+    core = read_text(f"{base}/core_id") or str(cpu)
+    siblings_raw = read_text(f"{base}/thread_siblings_list") or str(cpu)
     siblings = parse_cpu_list(siblings_raw)
     all_siblings_are_singletons = all_siblings_are_singletons and len(siblings) == 1
     if package is not None and core is not None:
@@ -268,8 +305,10 @@ for cache_dir in sorted(glob.glob("/sys/devices/system/cpu/cpu[0-9]*/cache/index
     level = read_text(f"{cache_dir}/level")
     cache_type = read_text(f"{cache_dir}/type")
     shared_raw = read_text(f"{cache_dir}/shared_cpu_list")
+    cpu_match = re.search(r"/cpu(\d+)/", cache_dir)
+    cpu_num = int(cpu_match.group(1)) if cpu_match else 0
     entry = {
-        "cpu": int(re.search(r"/cpu(\d+)/", cache_dir).group(1)),
+        "cpu": cpu_num,
         "index": os.path.basename(cache_dir),
         "level": level,
         "type": cache_type,
@@ -336,18 +375,38 @@ avx512ifma_grep = subprocess.run(
 avx512ifma_grep_output = avx512ifma_grep.stdout.strip()
 avx512ifma_present = avx512ifma_grep.returncode == 0 and bool(avx512ifma_grep_output)
 
-checks = {
-    "gcp_machine_type_c3d_highmem_30": metadata_machine_type == "c3d-highmem-30",
-    "gcp_zone_matches_selection": metadata_zone == os.environ["EXPECTED_ZONE"],
-    "gcp_instance_name_matches_selection": metadata_name == os.environ["EXPECTED_INSTANCE"],
-    "debian_12": os_release_values.get("ID") == "debian" and os_release_values.get("VERSION_ID") == "12",
-    "amd_epyc_9xx4_model": "AMD EPYC 9" in model_name.upper(),
-    "fifteen_physical_cores": len(physical_core_ids) == 15 and reported_core_count == 15,
-    "one_thread_per_core": cpu_count == 15 and threads_per_core == 1 and all_siblings_are_singletons and len(online_cpus) == 15,
-    "avx512ifma_present": avx512ifma_present,
-    "l3_cache_topology_available": bool(l3_domains),
-    "eight_distinct_cores_in_one_l3_domain": any(domain["physical_core_count"] >= 8 for domain in l3_domains),
-}
+expected_machine = os.environ["EXPECTED_MACHINE"]
+if expected_machine == "c3d":
+    checks = {
+        "gcp_machine_type_c3d_highmem_30": metadata_machine_type == "c3d-highmem-30",
+        "gcp_zone_matches_selection": metadata_zone == os.environ["EXPECTED_ZONE"],
+        "gcp_instance_name_matches_selection": metadata_name == os.environ["EXPECTED_INSTANCE"],
+        "debian_12": os_release_values.get("ID") == "debian" and os_release_values.get("VERSION_ID") == "12",
+        "amd_epyc_9xx4_model": "AMD EPYC 9" in model_name.upper(),
+        "fifteen_physical_cores": len(physical_core_ids) == 15 and reported_core_count == 15,
+        "one_thread_per_core": cpu_count == 15 and threads_per_core == 1 and all_siblings_are_singletons and len(online_cpus) == 15,
+        "avx512ifma_present": avx512ifma_present,
+        "l3_cache_topology_available": bool(l3_domains),
+        "eight_distinct_cores_in_one_l3_domain": any(domain["physical_core_count"] >= 8 for domain in l3_domains),
+    }
+    expected_machine_type = "c3d-highmem-30"
+    expected_boot_disk = {"size": "100GB", "type": "pd-balanced"}
+    expected_threads_per_core = 1
+else:
+    # c4a (Google Axion / Arm Neoverse V2, 16 physical cores, no SMT)
+    checks = {
+        "gcp_machine_type_c4a_highmem_16": metadata_machine_type == "c4a-highmem-16",
+        "gcp_zone_matches_selection": metadata_zone == os.environ["EXPECTED_ZONE"],
+        "gcp_instance_name_matches_selection": metadata_name == os.environ["EXPECTED_INSTANCE"],
+        "debian_12": os_release_values.get("ID") == "debian" and os_release_values.get("VERSION_ID") == "12",
+        "aarch64_architecture": platform.machine().lower() == "aarch64",
+        "sixteen_cores": (len(physical_core_ids) == 16 or cpu_count == 16) and len(online_cpus) == 16,
+        "one_thread_per_core": threads_per_core in (None, 1) and all_siblings_are_singletons,
+        "cache_topology_available": len(cache_by_key) > 0,
+    }
+    expected_machine_type = "c4a-highmem-16"
+    expected_boot_disk = {"size": "100GB", "type": "hyperdisk-balanced"}
+    expected_threads_per_core = 1
 
 rustc = subprocess.run(
     ["rustup", "run", os.environ["EXPECTED_TOOLCHAIN"], "rustc", "--version", "--verbose"],
@@ -367,6 +426,8 @@ manifest = {
     "created_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     "instance": os.environ["EXPECTED_INSTANCE"],
     "zone": os.environ["EXPECTED_ZONE"],
+    "machine_family": expected_machine,
+    "host_profile": os.environ["EXPECTED_HOST_PROFILE"],
     "gcp_metadata": {
         "instance_name": metadata_name,
         "machine_type": metadata_machine_type,
@@ -374,11 +435,11 @@ manifest = {
         "zone": metadata_zone,
         "zone_resource": metadata_zone_full,
     },
-    "expected_machine_type": "c3d-highmem-30",
+    "expected_machine_type": expected_machine_type,
     "expected_provisioning_model": "STANDARD",
     "expected_on_host_maintenance": "TERMINATE",
-    "expected_threads_per_core": 1,
-    "expected_boot_disk": {"size": "100GB", "type": "pd-balanced"},
+    "expected_threads_per_core": expected_threads_per_core,
+    "expected_boot_disk": expected_boot_disk,
     "lscpu": lscpu_output,
     "cpu": {
         "model_name": model_name,
@@ -421,7 +482,7 @@ if not all(checks.values()):
 PY
 
 printf 'First-boot manifest: %s\n' "$FIRST_BOOT_DIR/first-boot-manifest.json"
-printf 'Setup complete for %s in %s.\n' "$INSTANCE" "$ZONE"
+printf 'Setup complete for %s (%s) in %s.\n' "$INSTANCE" "$MACHINE" "$ZONE"
 REMOTE_SETUP
 
 chmod 755 "$REMOTE_HELPER"
@@ -429,6 +490,6 @@ printf 'Syncing %s to %s:%s\n' "$CODE_DIR" "$INSTANCE" "${REMOTE_CODE_DIR:-~/Rea
 "$GCLOUD" compute scp --zone="$ZONE" \
     "$BUNDLE" "$SOURCE_ARCHIVE" "$REMOTE_HELPER" \
     "$INSTANCE:/tmp/"
-printf 'Installing toolchain and packages, then checking the VM at %s.\n' "$ZONE"
+printf 'Installing toolchain and packages, then running first-boot checks for %s in %s.\n' "$MACHINE" "$ZONE"
 "$GCLOUD" compute ssh "$INSTANCE" --zone="$ZONE" \
-    --command "sh /tmp/setup_vm_remote.sh '$TOOLCHAIN' '$SOURCE_SHA' '$ZONE' '$INSTANCE' '$REMOTE_CODE_DIR'"
+    --command "sh /tmp/setup_vm_remote.sh '$TOOLCHAIN' '$SOURCE_SHA' '$ZONE' '$INSTANCE' '$MACHINE' '$HOST_PROFILE_NAME' '$REMOTE_CODE_DIR'"

@@ -1,0 +1,20 @@
+# Copyright 2026 RealBrakedownPerf Authors. Licensed under Apache-2.0.
+
+[package]
+name = "steps-driver"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "Apache-2.0"
+
+[dependencies]
+ff = "0.14"
+lcpc-2d = { path = "@WORKTREE@/lcpc-2d" }
+lcpc-brakedown-pc = { path = "@WORKTREE@/lcpc-brakedown-pc" }
+lcpc-test-fields = { path = "@WORKTREE@/lcpc-test-fields" }
+rand = "0.10"
+rand_chacha = "0.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[workspace]

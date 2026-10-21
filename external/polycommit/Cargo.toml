@@ -1,0 +1,21 @@
+# Copyright 2026 RealBrakedownPerf Authors
+# Licensed under Apache-2.0.
+
+[package]
+name = "polycommit-bench-driver"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+ark-crypto-primitives = "=0.5.0"
+ark-ff = "=0.5.0"
+ark-poly = "=0.5.0"
+ark-poly-commit = { git = "https://github.com/arkworks-rs/poly-commit", rev = "1eaec5090ba5bc87d75a69570ed38f6fcf8b9417" }
+ark-std = "=0.5.0"
+rand_chacha = "=0.3.1"
+rayon = "=1.10.0"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"

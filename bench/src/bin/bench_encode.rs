@@ -22,9 +22,10 @@ fn main() {
 fn run() -> Result<(), String> {
     let mut field = "mont127".to_string();
     let mut params_str = "lcpc-sdig6".to_string();
+    let mut shape = "brakedown".to_string();
     let mut logn: Vec<u32> = vec![16, 18, 20, 22, 24, 26];
-    let mut runs = 30usize;
-    let mut warmup = 5usize;
+    let mut runs: Option<usize> = None;
+    let mut warmup: Option<usize> = None;
     let mut threads = 1usize;
     let mut cores = String::new();
     let mut slices = 0usize;
@@ -34,6 +35,12 @@ fn run() -> Result<(), String> {
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
         match arg.as_str() {
+            "--shape" => {
+                shape = it
+                    .next()
+                    .ok_or_else(|| "--shape requires a value".to_string())?
+                    .to_ascii_lowercase();
+            }
             "--field" => {
                 field = it
                     .next()
@@ -56,11 +63,11 @@ fn run() -> Result<(), String> {
             }
             "--runs" => {
                 let v = it.next().ok_or_else(|| "--runs requires a value")?;
-                runs = v.parse::<usize>().map_err(|_| "invalid --runs")?;
+                runs = Some(v.parse::<usize>().map_err(|_| "invalid --runs")?);
             }
             "--warmup" => {
                 let v = it.next().ok_or_else(|| "--warmup requires a value")?;
-                warmup = v.parse::<usize>().map_err(|_| "invalid --warmup")?;
+                warmup = Some(v.parse::<usize>().map_err(|_| "invalid --warmup")?);
             }
             "--threads" => {
                 let v = it.next().ok_or_else(|| "--threads requires a value")?;
@@ -102,21 +109,23 @@ fn run() -> Result<(), String> {
 
     let mut reports: Vec<BenchReport> = Vec::with_capacity(logn.len());
     for &log_n in &logn {
+        let eff_runs = runs.unwrap_or(5);
+        let eff_warmup = warmup.unwrap_or(if log_n >= 26 { 1 } else { 2 });
         let report = match field.as_str() {
             "mont127" => run_benchmark::<Mont127>(
-                "Mont127", params, log_n, threads, &cores, slices, autotune, runs, warmup,
+                "Mont127", params, &shape, log_n, threads, &cores, slices, autotune, eff_runs, eff_warmup,
             )?,
             "mers127" => run_benchmark::<Mers127>(
-                "Mers127", params, log_n, threads, &cores, slices, autotune, runs, warmup,
+                "Mers127", params, &shape, log_n, threads, &cores, slices, autotune, eff_runs, eff_warmup,
             )?,
             "fp2m61" => run_benchmark::<Fp2M61>(
-                "Fp2M61", params, log_n, threads, &cores, slices, autotune, runs, warmup,
+                "Fp2M61", params, &shape, log_n, threads, &cores, slices, autotune, eff_runs, eff_warmup,
             )?,
             "ft127" => run_benchmark::<Ft127>(
-                "Ft127", params, log_n, threads, &cores, slices, autotune, runs, warmup,
+                "Ft127", params, &shape, log_n, threads, &cores, slices, autotune, eff_runs, eff_warmup,
             )?,
             "ft63" => run_benchmark::<Ft63>(
-                "Ft63", params, log_n, threads, &cores, slices, autotune, runs, warmup,
+                "Ft63", params, &shape, log_n, threads, &cores, slices, autotune, eff_runs, eff_warmup,
             )?,
             other => return Err(format!("unsupported field {other}")),
         };
