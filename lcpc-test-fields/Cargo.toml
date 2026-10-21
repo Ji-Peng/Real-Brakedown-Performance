@@ -1,0 +1,21 @@
+[package]
+name = "lcpc-test-fields"
+version = "0.1.1"
+edition = "2018"
+authors = ["kwantam <kwantam@gmail.com>"]
+description = "fields for testing polycommits"
+license = "Apache-2.0"
+repository = "https://github.com/conroi/lcpc"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bitvec = "1"
+byteorder = "1"
+ff = { version = "0.12", features = ["derive"] }
+ff-derive-num = "0.2"
+num-traits = "0.2"
+rand = "0.8"
+rand_core = "0.6"
+serde = { version = "1.0", features = ["derive"] }
+subtle = "2.2"
