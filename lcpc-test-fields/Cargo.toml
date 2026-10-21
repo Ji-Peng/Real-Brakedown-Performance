@@ -1,21 +1,30 @@
+# Copyright 2021 Riad S. Wahby <rsw@cs.stanford.edu>
+#
+# This file is part of lcpc-2d, which is part of lcpc.
+#
+# Licensed under the Apache License, Version 2.0 (see
+# LICENSE or https://www.apache.org/licenses/LICENSE-2.0).
+# This file may not be copied, modified, or distributed
+# except according to those terms.
+
 [package]
 name = "lcpc-test-fields"
-version = "0.1.1"
-edition = "2018"
-authors = ["kwantam <kwantam@gmail.com>"]
-description = "fields for testing polycommits"
+version = "0.1.0"
+authors = ["Riad S. Wahby <rsw@cs.stanford.edu>"]
+edition = "2021"
+description = "finite fields for lcpc tests"
 license = "Apache-2.0"
 repository = "https://github.com/conroi/lcpc"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+publish = false
 
 [dependencies]
-bitvec = "1"
-byteorder = "1"
-ff = { version = "0.12", features = ["derive"] }
-ff-derive-num = "0.2"
+blake3 = { version = "1.8.7", default-features = false, features = ["std", "pure", "no_sse2", "no_sse41", "no_avx2", "no_avx512"] }
+digest = "0.10"
+err-derive = "0.3"
+ff = { version = "0.14", features = ["derive"] }
+itertools = "0.14"
 num-traits = "0.2"
-rand = "0.8"
-rand_core = "0.6"
+ppv-lite86 = { version = "0.2", default-features = false, features = ["no_simd"] }
+rand = "0.10"
+rayon = "1.11"
 serde = { version = "1.0", features = ["derive"] }
-subtle = "2.2"

@@ -13,12 +13,13 @@ use crate::codespec::SdigSpecification;
 
 use ff::Field;
 use itertools::iterate;
-use lcpc_2d::SizedField;
+use lcpc_2d::{LegacyUniformUsize, SizedField};
 use num_traits::Num;
-use rand::{distributions::Uniform, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use rayon::prelude::*;
 use sprs::CsMat;
+use std::iter::repeat_with;
 
 const fn ceil_muldiv(n: usize, num: usize, den: usize) -> usize {
     (n * num + den - 1) / den
@@ -116,7 +117,7 @@ where
     F: Field + Num,
     R: Rng,
 {
-    let dist = Uniform::new(0, m);
+    let dist = LegacyUniformUsize::new(0, m);
     let mut data = Vec::<F>::with_capacity(d * n);
     let mut idxs = Vec::<usize>::with_capacity(d * n);
     let mut ptrs = Vec::<usize>::with_capacity(1 + n);
@@ -144,8 +145,7 @@ where
             let mut tmp = Vec::with_capacity(d);
             assert_eq!(
                 d,
-                (&mut rng)
-                    .sample_iter(&dist)
+                repeat_with(|| dist.sample(&mut rng))
                     .filter(|&x| {
                         if tmp.contains(&x) {
                             false

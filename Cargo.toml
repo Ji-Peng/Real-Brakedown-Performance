@@ -1,2 +1,15 @@
 [workspace]
-members = [ "lcpc-2d", "lcpc-ligero-pc", "lcpc-brakedown-pc", "lcpc-test-fields" ]
+resolver = "2"
+members = [
+    "lcpc-2d",
+    "lcpc-ligero-pc",
+    "lcpc-brakedown-pc",
+    "lcpc-test-fields",
+    "bench",
+]
+exclude = ["external/lcpc-orig"]
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = "fat"

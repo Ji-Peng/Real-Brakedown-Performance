@@ -62,9 +62,9 @@ where
         // first, evaluate last precode into temporary storage
         let precode = precodes.last().unwrap();
         let in_end = in_start + precode.cols();
-        let in_arr = precode
+        let (in_arr, _) = precode
             .dot(&ArrayView::from(&xi.as_mut()[in_start..in_end]))
-            .into_raw_vec();
+            .into_raw_vec_and_offset();
 
         // now evaluate Reed-Solomon code on the result
         let out_end = in_end + postcodes.last().unwrap().cols();
@@ -98,13 +98,13 @@ fn reed_solomon<F>(xi: &[F], xo: &mut [F])
 where
     F: Field,
 {
-    let mut x = <F as Field>::one();
+    let mut x = <F as Field>::ONE;
     for r in xo.as_mut().iter_mut() {
-        *r = <F as Field>::zero();
+        *r = <F as Field>::ZERO;
         for j in (0..xi.len()).rev() {
             *r *= x;
             *r += xi[j];
         }
-        x += <F as Field>::one();
+        x += <F as Field>::ONE;
     }
 }

@@ -2,7 +2,7 @@
 name = "lcpc-2d"
 version = "0.1.1"
 authors = ["kwantam <kwantam@gmail.com>"]
-edition = "2018"
+edition = "2021"
 description = "polynomial commitment scheme from linear codes"
 license = "Apache-2.0"
 repository = "https://github.com/conroi/lcpc"
@@ -10,19 +10,18 @@ repository = "https://github.com/conroi/lcpc"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-digest = "0.9"
-err-derive = "0.2"
-ff = "0.12"
-merlin = "2.0"
-rand = "0.8"
-rand_chacha = "0.3"
-rayon = "1.5"
+digest = "0.10"
+err-derive = "0.3"
+ff = "0.14"
+merlin = "3.0"
+ppv-lite86 = { version = "0.2", default-features = false, features = ["no_simd"] }
+rand = "0.10"
+rand_chacha = "0.10"
+rayon = "1.11"
 serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
 
 [dev-dependencies]
 bincode = "1.3"
-blake3 = { version = "1", features = ["traits-preview"] }
-fffft = "0.4"
-itertools = "0.10"
+itertools = "0.14"
 lcpc-test-fields = { path = "../lcpc-test-fields" }

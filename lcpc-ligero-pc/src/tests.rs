@@ -9,25 +9,24 @@
 
 use super::{LigeroCommit, LigeroEncoding, LigeroEncodingRho};
 
-use blake3::Hasher as Blake3;
 use ff::Field;
 use itertools::iterate;
 use lcpc_2d::{LcCommit, LcEncoding};
+use lcpc_test_fields::{ft255::*, ft63::*, random_coeffs, Blake3};
 use merlin::Transcript;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use std::iter::repeat_with;
-use lcpc_test_fields::{ft255::*, ft63::*, random_coeffs};
 
 #[test]
 fn get_dims() {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     for _ in 0..128 {
-        let lgl = 8 + rng.gen::<usize>() % 8;
+        let lgl = 8 + (rng.random::<u64>() as usize) % 8;
         for _ in 0..128 {
             let len_base = 1 << (lgl - 1);
-            let len = len_base + (rng.gen::<usize>() % len_base);
+            let len = len_base + ((rng.random::<u64>() as usize) % len_base);
             let (n_rows, n_per_row, n_cols) = LigeroEncoding::<Ft63>::_get_dims(len).unwrap();
             assert!(n_rows * n_per_row >= len);
             assert!((n_rows - 1) * n_per_row < len);
@@ -56,16 +55,7 @@ fn col_opens() {
     );
 }
 
-#[cfg(feature="isz")]
-use typenum::U38 as TLo;
-#[cfg(not(feature="isz"))]
 use typenum::U1 as TLo;
-
-#[cfg(feature="isz")]
-use typenum::U39 as THi;
-#[cfg(all(not(feature="isz"), feature="hlf"))]
-use typenum::U2 as THi;
-#[cfg(all(not(feature="isz"),not(feature="hlf")))]
 use typenum::U4 as THi;
 
 #[test]
@@ -111,18 +101,18 @@ fn prove_verify_size_bench() {
         let root = comm.get_root();
 
         // evaluate the random polynomial we just generated at a random point x
-        let x = Ft255::random(&mut rand::thread_rng());
+        let x = Ft255::random(&mut rand::rng());
 
         // compute the outer and inner tensors for powers of x
         // NOTE: we treat coeffs as a univariate polynomial, but it doesn't
         // really matter --- the only difference from a multilinear is the
         // way we compute outer_tensor and inner_tensor from the eval point
-        let inner_tensor: Vec<Ft255> = iterate(Ft255::one(), |&v| v * x)
+        let inner_tensor: Vec<Ft255> = iterate(Ft255::ONE, |&v| v * x)
             .take(comm.get_n_per_row())
             .collect();
         let outer_tensor: Vec<Ft255> = {
             let xr = x * inner_tensor.last().unwrap();
-            iterate(Ft255::one(), |&v| v * xr)
+            iterate(Ft255::ONE, |&v| v * xr)
                 .take(comm.get_n_rows())
                 .collect()
         };
@@ -186,18 +176,18 @@ fn proof_sizes() {
         let root = comm.get_root();
 
         // evaluate the random polynomial we just generated at a random point x
-        let x = Ft255::random(&mut rand::thread_rng());
+        let x = Ft255::random(&mut rand::rng());
 
         // compute the outer and inner tensors for powers of x
         // NOTE: we treat coeffs as a univariate polynomial, but it doesn't
         // really matter --- the only difference from a multilinear is the
         // way we compute outer_tensor and inner_tensor from the eval point
-        let inner_tensor: Vec<Ft255> = iterate(Ft255::one(), |&v| v * x)
+        let inner_tensor: Vec<Ft255> = iterate(Ft255::ONE, |&v| v * x)
             .take(comm.get_n_per_row())
             .collect();
         let outer_tensor: Vec<Ft255> = {
             let xr = x * inner_tensor.last().unwrap();
-            iterate(Ft255::one(), |&v| v * xr)
+            iterate(Ft255::ONE, |&v| v * xr)
                 .take(comm.get_n_rows())
                 .collect()
         };
@@ -223,18 +213,18 @@ fn end_to_end() {
     let root = comm.get_root();
 
     // evaluate the random polynomial we just generated at a random point x
-    let x = Ft63::random(&mut rand::thread_rng());
+    let x = Ft63::random(&mut rand::rng());
 
     // compute the outer and inner tensors for powers of x
     // NOTE: we treat coeffs as a univariate polynomial, but it doesn't
     // really matter --- the only difference from a multilinear is the
     // way we compute outer_tensor and inner_tensor from the eval point
-    let inner_tensor: Vec<Ft63> = iterate(Ft63::one(), |&v| v * x)
+    let inner_tensor: Vec<Ft63> = iterate(Ft63::ONE, |&v| v * x)
         .take(comm.get_n_per_row())
         .collect();
     let outer_tensor: Vec<Ft63> = {
         let xr = x * inner_tensor.last().unwrap();
-        iterate(Ft63::one(), |&v| v * xr)
+        iterate(Ft63::ONE, |&v| v * xr)
             .take(comm.get_n_rows())
             .collect()
     };
@@ -262,10 +252,10 @@ fn end_to_end() {
 
 #[test]
 fn end_to_end_one_proof_ml() {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // commit to a random polynomial at a random rate
-    let lgl = 12 + rng.gen::<usize>() % 8;
+    let lgl = 12 + (rng.random::<u64>() as usize) % 8;
     let coeffs = random_coeffs(lgl);
     let enc = LigeroEncoding::new_ml(lgl);
     let comm = LigeroCommit::<Blake3, _>::commit(&coeffs, &enc).unwrap();
@@ -274,18 +264,18 @@ fn end_to_end_one_proof_ml() {
     assert!(comm.get_n_rows() != 1);
 
     // evaluate the random polynomial we just generated at a random point x
-    let x = Ft63::random(&mut rand::thread_rng());
+    let x = Ft63::random(&mut rand::rng());
 
     // compute the outer and inner tensors for powers of x
     // NOTE: we treat coeffs as a univariate polynomial, but it doesn't
     // really matter --- the only difference from a multilinear is the
     // way we compute outer_tensor and inner_tensor from the eval point
-    let inner_tensor: Vec<Ft63> = iterate(Ft63::one(), |&v| v * x)
+    let inner_tensor: Vec<Ft63> = iterate(Ft63::ONE, |&v| v * x)
         .take(comm.get_n_per_row())
         .collect();
     let outer_tensor: Vec<Ft63> = {
         let xr = x * inner_tensor.last().unwrap();
-        iterate(Ft63::one(), |&v| v * xr)
+        iterate(Ft63::ONE, |&v| v * xr)
             .take(comm.get_n_rows())
             .collect()
     };
@@ -321,18 +311,18 @@ fn end_to_end_two_proofs() {
     let root = comm.get_root();
 
     // evaluate the random polynomial we just generated at a random point x
-    let x = Ft63::random(&mut rand::thread_rng());
+    let x = Ft63::random(&mut rand::rng());
 
     // compute the outer and inner tensors for powers of x
     // NOTE: we treat coeffs as a univariate polynomial, but it doesn't
     // really matter --- the only difference from a multilinear is the
     // way we compute outer_tensor and inner_tensor from the eval point
-    let inner_tensor: Vec<Ft63> = iterate(Ft63::one(), |&v| v * x)
+    let inner_tensor: Vec<Ft63> = iterate(Ft63::ONE, |&v| v * x)
         .take(comm.get_n_per_row())
         .collect();
     let outer_tensor: Vec<Ft63> = {
         let xr = x * inner_tensor.last().unwrap();
-        iterate(Ft63::one(), |&v| v * xr)
+        iterate(Ft63::ONE, |&v| v * xr)
             .take(comm.get_n_rows())
             .collect()
     };
@@ -399,11 +389,11 @@ fn end_to_end_two_proofs() {
 }
 
 fn get_random_coeffs() -> Vec<Ft63> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
-    let lgl = 8 + rng.gen::<usize>() % 8;
+    let lgl = 8 + (rng.random::<u64>() as usize) % 8;
     let len_base = 1 << (lgl - 1);
-    let len = len_base + (rng.gen::<usize>() % len_base);
+    let len = len_base + ((rng.random::<u64>() as usize) % len_base);
 
     repeat_with(|| Ft63::random(&mut rng)).take(len).collect()
 }

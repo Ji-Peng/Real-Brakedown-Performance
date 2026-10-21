@@ -1,0 +1,480 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1c172bb..b25c3a6 100755
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -14,8 +14,12 @@ include_directories(include .)
+ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -O3 -Wno-uninitialized")
+ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -lstdc++ -Wall -faligned-new -O3 -funroll-loops -g -Wno-uninitialized")
+ 
+-set(POLY_SIZES 12 14 16 18 20 22 24 26) # tested and benchmarked polynomial sizes (logarithmic)
+-set(THREADS 2 4 8 16)
++if(NOT DEFINED POLY_SIZES OR POLY_SIZES STREQUAL "")
++  set(POLY_SIZES 12 14 16 18 20 22 24 26) # tested and benchmarked polynomial sizes (logarithmic)
++endif()
++if(NOT DEFINED THREADS OR THREADS STREQUAL "")
++  set(THREADS 2 4 8 16)
++endif()
+ 
+ function(compile_field_test target file)
+     add_executable(${target} ${file})
+diff --git a/bench/SpielmanExtensionMT_Bench.cpp b/bench/SpielmanExtensionMT_Bench.cpp
+index e7f62b4..2751bd2 100644
+--- a/bench/SpielmanExtensionMT_Bench.cpp
++++ b/bench/SpielmanExtensionMT_Bench.cpp
+@@ -32,17 +32,12 @@ int main(int argc, char* argv[])
+   uint32_t rep = 1;
+   sscanf(argv[1], "%d", &rep);
+ 
+-  // for EYPC experiment with encoding- and expander-level parallelism
+-  uint32_t base_core = BASE_CORE;
+-  if (argc >= 2)
+-    sscanf(argv[2], "%d", &base_core);
+-    
+   int seed = 76128;
+ 
+   // initialize Spielman code
+-  SpielmanCodeMT<ExtensionField> spielman_mt(N, seed, slices, base_core);
++  SpielmanCodeMT<ExtensionField> spielman_mt(N, seed, slices);
+   ExtensionField* array_reordered = new ExtensionField[2 * N / 8];
+-  printf("GraphGen Done lgN=%d k=%d\n\n",lgN, spielman_mt.k);
++  printf("GraphGen Done lgN=%d k=%d slices=%d\n\n",lgN, spielman_mt.k, slices);
+   
+   int64_t time = 0;
+   __m512i checksum = _mm512_setzero_si512();
+diff --git a/bench/SpielmanExtension_Bench.cpp b/bench/SpielmanExtension_Bench.cpp
+index 72ef391..ecd429a 100644
+--- a/bench/SpielmanExtension_Bench.cpp
++++ b/bench/SpielmanExtension_Bench.cpp
+@@ -24,7 +24,7 @@ const uint32_t N = 1 << lgN;
+ 
+ int main(int argc, char* argv[])
+ {
+-  pinThread(BASE_CORE);
++  pinThread(0);
+   
+   if(argc < 2) {
+     printf("Missing parameter\n");
+@@ -39,7 +39,7 @@ int main(int argc, char* argv[])
+   // initialize Spielman code
+   SpielmanCode<UnpackedExtensionField> spielman(N, seed, slices);
+   UnpackedExtensionField* array_reordered = new UnpackedExtensionField[2 * N / 8];
+-  printf("GraphGen Done lgN=%d k=%d\n\n",lgN, spielman.k);
++  printf("GraphGen Done lgN=%d k=%d slices=%d\n\n",lgN, spielman.k, slices);
+   
+   int64_t time = 0;
+   __m512i checksum = _mm512_setzero_si512();
+diff --git a/bench/SpielmanMersenneMT_Bench.cpp b/bench/SpielmanMersenneMT_Bench.cpp
+index e03cecd..b1933e2 100644
+--- a/bench/SpielmanMersenneMT_Bench.cpp
++++ b/bench/SpielmanMersenneMT_Bench.cpp
+@@ -37,7 +37,7 @@ int main(int argc, char* argv[])
+   // initialize Spielman code
+   SpielmanCodeMT<UnpackedMersennePrimeField> spielman_mt(N, seed, slices);
+   UnpackedMersennePrimeField* array_reordered = new UnpackedMersennePrimeField[2 * N / 8];
+-  printf("GraphGen Done lgN=%d k=%d\n\n",lgN, spielman_mt.k);
++  printf("GraphGen Done lgN=%d k=%d slices=%d\n\n",lgN, spielman_mt.k, slices);
+   
+   int64_t time = 0;
+   __m512i checksum = _mm512_setzero_si512();
+diff --git a/bench/SpielmanMersenne_Bench.cpp b/bench/SpielmanMersenne_Bench.cpp
+index 3535a6a..df137ef 100644
+--- a/bench/SpielmanMersenne_Bench.cpp
++++ b/bench/SpielmanMersenne_Bench.cpp
+@@ -24,7 +24,7 @@ const uint32_t N = 1 << lgN;
+ 
+ int main(int argc, char* argv[])
+ {
+-  pinThread(BASE_CORE);
++  pinThread(0);
+   
+   if(argc < 2) {
+     printf("Missing parameter\n");
+@@ -39,7 +39,7 @@ int main(int argc, char* argv[])
+   // initialize Spielman code
+   SpielmanCode<UnpackedMersennePrimeField> spielman(N, seed, slices);
+   UnpackedMersennePrimeField* array_reordered = new UnpackedMersennePrimeField[2 * N / 8];
+-  printf("GraphGen Done lgN=%d k=%d\n\n",lgN, spielman.k);
++  printf("GraphGen Done lgN=%d k=%d slices=%d\n\n",lgN, spielman.k, slices);
+   
+   int64_t time = 0;
+   __m512i checksum = _mm512_setzero_si512();
+diff --git a/bench/SpielmanMontgomeryMT_Bench.cpp b/bench/SpielmanMontgomeryMT_Bench.cpp
+index a63edea..8b05ab6 100644
+--- a/bench/SpielmanMontgomeryMT_Bench.cpp
++++ b/bench/SpielmanMontgomeryMT_Bench.cpp
+@@ -37,7 +37,7 @@ int main(int argc, char* argv[])
+   // initialize Spielman code
+   SpielmanCodeMT<UnpackedMontgomeryPrimeField> spielman_mt(N, seed, slices);
+   UnpackedMontgomeryPrimeField* array_reordered = new UnpackedMontgomeryPrimeField[2 * N / 8];
+-  printf("GraphGen Done lgN=%d k=%d\n\n",lgN, spielman_mt.k);
++  printf("GraphGen Done lgN=%d k=%d slices=%d\n\n",lgN, spielman_mt.k, slices);
+   
+   int64_t time = 0;
+   __m512i checksum = _mm512_setzero_si512();
+diff --git a/bench/SpielmanMontgomeryVerif_Bench.cpp b/bench/SpielmanMontgomeryVerif_Bench.cpp
+index 42d5826..1c569bb 100644
+--- a/bench/SpielmanMontgomeryVerif_Bench.cpp
++++ b/bench/SpielmanMontgomeryVerif_Bench.cpp
+@@ -24,7 +24,7 @@ const uint32_t N = 1 << lgN;
+ 
+ int main(int argc, char* argv[])
+ {
+-  pinThread(BASE_CORE);
++  pinThread(0);
+ 
+   if(argc < 2) {
+     printf("Missing parameter\n");
+@@ -39,7 +39,7 @@ int main(int argc, char* argv[])
+   // initialize Spielman code
+   SpielmanCode<UnpackedMontgomeryPrimeFieldVerif> spielman(N, seed, 1);
+   UnpackedMontgomeryPrimeFieldVerif* array_reordered = new UnpackedMontgomeryPrimeFieldVerif[2 * spielman.k];
+-  printf("GraphGen Done lgN=%d k=%d\n\n",lgN, spielman.k);
++  printf("GraphGen Done lgN=%d k=%d slices=1\n\n",lgN, spielman.k);
+   
+   int64_t time = 0;
+   __m128i checksum = _mm_setzero_si128();
+diff --git a/bench/SpielmanMontgomery_Bench.cpp b/bench/SpielmanMontgomery_Bench.cpp
+index 00155da..0c2236d 100644
+--- a/bench/SpielmanMontgomery_Bench.cpp
++++ b/bench/SpielmanMontgomery_Bench.cpp
+@@ -24,7 +24,7 @@ const uint32_t N = 1 << lgN;
+ 
+ int main(int argc, char* argv[])
+ {
+-  pinThread(BASE_CORE);
++  pinThread(0);
+   
+   if(argc < 2) {
+     printf("Missing parameter\n");
+@@ -39,7 +39,7 @@ int main(int argc, char* argv[])
+   // initialize Spielman code
+   SpielmanCode<UnpackedMontgomeryPrimeField> spielman(N, seed, slices);
+   UnpackedMontgomeryPrimeField* array_reordered = new UnpackedMontgomeryPrimeField[2 * N / 8];
+-  printf("GraphGen Done lgN=%d k=%d\n\n",lgN, spielman.k);
++  printf("GraphGen Done lgN=%d k=%d slices=%d\n\n",lgN, spielman.k, slices);
+   
+   int64_t time = 0;
+   __m512i checksum = _mm512_setzero_si512();
+diff --git a/run_throughput_epyc.py b/run_throughput_epyc.py
+index 110c4c4..bf77954 100644
+--- a/run_throughput_epyc.py
++++ b/run_throughput_epyc.py
+@@ -15,18 +15,23 @@
+ # parallelism) and requires 96 GB of RAM. The core pinning is specific
+ # for the EPYC 9754 CPU and will not work on other CPUs without reconfiguration.
+ 
+-import subprocess, time
++import os
++import subprocess
++import time
+ 
+ build_folder = "./build/"
+ 
+-def execute(program,rep,base_core):
++def execute(program, rep, cores):
++  env = os.environ.copy()
++  env["SIMD_SPIELMAN_CORES"] = cores
+   try:
+       result = subprocess.Popen(
+-          [program, str(rep), str(base_core)],
++          [program, str(rep)],
+           stdout=subprocess.PIPE,
+           stderr=subprocess.PIPE,
+           text=True,
+-          cwd=build_folder
++          cwd=build_folder,
++          env=env
+       )
+   except subprocess.CalledProcessError as e:
+       print("Error:")
+@@ -39,15 +44,17 @@ if __name__ == "__main__":
+ 
+   logN_arr = [16, 18, 20, 22, 24, 26] # benchmarked polynomial sizes (logarithmic)
+   NUM_PARALLEL_ENCODINGS = 8 # number of parallel encodings (encoding-level parallelism)
+-  CORES_PER_CCD = 16 # cores per core complex die in EPYC 9754
+   THREADS_PER_CCD = 8 # number of threads per CCD
+-  
++
++  core_groups = os.environ.get("SIMD_SPIELMAN_THROUGHPUT_CORE_LISTS", "").split(";")
++  if len(core_groups) != NUM_PARALLEL_ENCODINGS or any(not group for group in core_groups):
++    raise SystemExit("Set SIMD_SPIELMAN_THROUGHPUT_CORE_LISTS to eight semicolon-separated explicit core lists.")
+ 
+   print(f"=== Encoding throughput using {THREADS_PER_CCD*NUM_PARALLEL_ENCODINGS} threads (Table 4) ===")
+   for j,logN in enumerate(logN_arr):
+     rep = 240 if logN < 22 else 120 # number of repetitions
+ 
+-    output = [execute("./orion_spielman_extension_bench_N"+str(logN)+"_T"+str(THREADS_PER_CCD), rep, ccd*CORES_PER_CCD) for ccd in range(NUM_PARALLEL_ENCODINGS)]
++    output = [execute("./orion_spielman_extension_bench_N"+str(logN)+"_T"+str(THREADS_PER_CCD), rep, core_groups[ccd]) for ccd in range(NUM_PARALLEL_ENCODINGS)]
+     latency = 0
+     for o in output:
+       out, err = o.communicate()
+@@ -60,4 +67,4 @@ if __name__ == "__main__":
+ 
+     avg_latency = latency / len(output)
+     throughput = NUM_PARALLEL_ENCODINGS * 10**6 / avg_latency
+-    print(f"  logN = {logN} : {throughput:10.2f} Enc/s")
+\ No newline at end of file
++    print(f"  logN = {logN} : {throughput:10.2f} Enc/s")
+diff --git a/spielman/SpielmanCodeMT.h b/spielman/SpielmanCodeMT.h
+index bd12da3..faeb638 100644
+--- a/spielman/SpielmanCodeMT.h
++++ b/spielman/SpielmanCodeMT.h
+@@ -36,11 +36,10 @@ public:
+   std::atomic<uint32_t> done_flag{0};
+   std::atomic<T*> array_local{0};
+ 
+-  const uint32_t base_core;
+ 
+   // Constructor for SpielmanCodeMT. N is the polynomial size, seed is used to seed the random number
+   // generation for code sampling, and slices is the total number of slices. 
+-  SpielmanCodeMT(uint32_t N, int seed, uint32_t slices, uint32_t base_core=BASE_CORE) : SpielmanCode<T>(N, seed, slices), base_core(base_core) {
++  SpielmanCodeMT(uint32_t N, int seed, uint32_t slices) : SpielmanCode<T>(N, seed, slices) {
+         
+     inst = this;
+ 
+@@ -93,6 +92,7 @@ private:
+   // Finally, the completion of the encoding is signaled to the main thread.
+   static void* workerFunc(void* offset) {
+     auto inst = SpielmanCodeMT::inst;
++    pinThread((size_t)offset);
+     size_t scratch_thread_tmp = (size_t)inst->scratch_area + (size_t)offset * inst->col_elements * inst->sizeof_ext_type;
+     void* scratch_thread = inst->scratch_area == nullptr ? nullptr : (void*)scratch_thread_tmp;
+ 
+@@ -146,9 +146,6 @@ public:
+   // This launches the worker threads. Each thread runs workerFunc() with a dedicated offset.
+   // The worker threads initially wait for a start signal sent by r2l_runEncodeMatrixEfficientMT().
+   void createThreads() {
+-    pthread_attr_t attr;
+-    cpu_set_t cpuset;
+-
+     for(uint32_t i = 0; i < this->num_graphs; i++) {
+       for(uint32_t j = 0; j < this->slices; j++) {
+         graphs1_mt[i]->slice_done_flag[j].store(0);
+@@ -157,11 +154,7 @@ public:
+     }
+ 
+     for(size_t i = 0; i < THREADS; i++) {
+-      pthread_attr_init(&attr);
+-      CPU_ZERO(&cpuset);
+-      CPU_SET(i + base_core, &cpuset);
+-      pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpuset);
+-      pthread_create(&tids[i],&attr, workerFunc, (void*)i);
++      pthread_create(&tids[i], nullptr, workerFunc, (void*)i);
+     }
+   }
+ 
+@@ -175,4 +168,4 @@ public:
+ 
+ 
+ 
+-#endif
+\ No newline at end of file
++#endif
+diff --git a/spielman/SpielmanParams.h b/spielman/SpielmanParams.h
+index ee316bc..307de7d 100644
+--- a/spielman/SpielmanParams.h
++++ b/spielman/SpielmanParams.h
+@@ -19,6 +19,10 @@
+ #define SPIELMANPARAMS_H
+ 
+ #include <inttypes.h>
++#include <cerrno>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
+ 
+ #define EPYC  (1)
+ #define I7    (2)
+@@ -26,7 +30,9 @@
+ #define OTHER (4)
+ 
+ //// CPU configuration: Please select the desired CPU here: ////
++#ifndef SELECTED_CPU
+ #define SELECTED_CPU EPYC     // for EPYC 9754 CPU
++#endif
+ // #define SELECTED_CPU I7    // for Intel i7-11800H CPU
+ // #define SELECTED_CPU XEON  // for Intel Xeon 6530 CPU
+ // #define SELECTED_CPU OTHER // for Other CPUs
+@@ -80,9 +86,69 @@ const uint32_t brakedown_slices_xeon = POLY_SIZE <  20 ? (BRAKEDOWN ? (THREADS =
+                               
+ const uint32_t brakedown_slices = SELECTED_CPU == XEON ? brakedown_slices_xeon : brakedown_slices_epyc_i7;
+ const uint32_t orion_slices = brakedown_slices > 16 ? 16 : brakedown_slices; // Orion matrix only has 128 rows and therefore at most 16 slices 
+-const uint32_t slices = BRAKEDOWN ? brakedown_slices : orion_slices;
+-
+-// Core number for thread pinning
+-#define BASE_CORE (SELECTED_CPU == I7 || SELECTED_CPU == OTHER ? 0 : 40)
++inline uint32_t configuredSliceCount(uint32_t default_count, uint32_t log_n) {
++  const char* single = std::getenv("SIMD_SPIELMAN_SLICES");
++  if (single != nullptr && *single != '\0') {
++    char* end = nullptr;
++    errno = 0;
++    unsigned long value = std::strtoul(single, &end, 10);
++    if (errno != 0 || end == single || *end != '\0' || value == 0 || (BRAKEDOWN && value > column_size_AVX512)) {
++      std::fprintf(stderr, "Invalid SIMD_SPIELMAN_SLICES value: %s\n", single);
++      std::exit(EXIT_FAILURE);
++    }
++    return static_cast<uint32_t>(BRAKEDOWN || value < column_size_AVX512 ? value : column_size_AVX512);
++  }
++
++  const char* table = std::getenv("SIMD_SPIELMAN_SLICE_TABLE");
++  if (table != nullptr && *table != '\0') {
++    char* copy = ::strdup(table);
++    if (copy == nullptr) {
++      std::perror("strdup");
++      std::exit(EXIT_FAILURE);
++    }
++    bool found = false;
++    uint32_t value = default_count;
++    for (char* entry = std::strtok(copy, ","); entry != nullptr; entry = std::strtok(nullptr, ",")) {
++      char* separator = std::strchr(entry, ':');
++      if (separator == nullptr) {
++        std::fprintf(stderr, "Invalid SIMD_SPIELMAN_SLICE_TABLE entry: %s\n", entry);
++        std::free(copy);
++        std::exit(EXIT_FAILURE);
++      }
++      *separator = '\0';
++      char* log_end = nullptr;
++      char* slice_end = nullptr;
++      errno = 0;
++      unsigned long entry_log_n = std::strtoul(entry, &log_end, 10);
++      unsigned long entry_slices = std::strtoul(separator + 1, &slice_end, 10);
++      if (errno != 0 || log_end == entry || *log_end != '\0' || slice_end == separator + 1 || *slice_end != '\0' || entry_slices == 0) {
++        std::fprintf(stderr, "Invalid SIMD_SPIELMAN_SLICE_TABLE entry: %s\n", entry);
++        std::free(copy);
++        std::exit(EXIT_FAILURE);
++      }
++      if (entry_log_n == log_n) {
++        if (BRAKEDOWN && entry_slices > column_size_AVX512) {
++          std::fprintf(stderr, "SIMD-Spielman slice count exceeds the Brakedown row count for logN=%u\n", log_n);
++          std::free(copy);
++          std::exit(EXIT_FAILURE);
++        }
++        value = static_cast<uint32_t>(BRAKEDOWN || entry_slices < column_size_AVX512 ? entry_slices : column_size_AVX512);
++        found = true;
++      }
++    }
++    std::free(copy);
++    if (found) {
++      return value;
++    }
++  }
++
++  if (default_count == 0) {
++    std::fprintf(stderr, "No default slice-table entry for SELECTED_CPU and logN=%u; set SIMD_SPIELMAN_SLICES or SIMD_SPIELMAN_SLICE_TABLE\n", log_n);
++    std::exit(EXIT_FAILURE);
++  }
++  return default_count;
++}
++
++const uint32_t slices = configuredSliceCount(BRAKEDOWN ? brakedown_slices : orion_slices, POLY_SIZE);
+ 
+-#endif
+\ No newline at end of file
++#endif
+diff --git a/utils/utils.h b/utils/utils.h
+index 8b8c78b..8d590ab 100644
+--- a/utils/utils.h
++++ b/utils/utils.h
+@@ -24,6 +24,11 @@
+ #include <stdio.h>
+ #include <chrono>
+ #include <sched.h>
++#include <cerrno>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <vector>
+ 
+ // Prints the AVX 512 vector x to stdout.
+ void printAVX512(__m512i x) {
+@@ -72,12 +77,84 @@ __uint128_t rand128() {
+ // addition, fencing is applied to avoid instruction reordering.
+ #define TIMESTAMP_FENCE(x) std::atomic_signal_fence(std::memory_order_seq_cst); TIMESTAMP(x); std::atomic_signal_fence(std::memory_order_seq_cst);
+ 
+-// Pins the calling thread to core_nr
+-void pinThread(uint32_t core_nr) {
++inline const std::vector<uint32_t>& configuredCoreList() {
++  static const std::vector<uint32_t> cores = []() {
++    std::vector<uint32_t> result;
++    const char* configured = std::getenv("SIMD_SPIELMAN_CORES");
++    if (configured != nullptr && *configured != '\0') {
++      char* copy = ::strdup(configured);
++      if (copy == nullptr) {
++        std::perror("strdup");
++        std::exit(EXIT_FAILURE);
++      }
++      for (char* part = std::strtok(copy, ","); part != nullptr; part = std::strtok(nullptr, ",")) {
++        char* dash = std::strchr(part, '-');
++        char* end = nullptr;
++        errno = 0;
++        unsigned long first = std::strtoul(part, &end, 10);
++        if (errno != 0 || end == part || (dash == nullptr ? *end != '\0' : end != dash)) {
++          std::fprintf(stderr, "Invalid SIMD_SPIELMAN_CORES entry: %s\n", part);
++          std::free(copy);
++          std::exit(EXIT_FAILURE);
++        }
++        unsigned long last = first;
++        if (dash != nullptr) {
++          char* last_end = nullptr;
++          errno = 0;
++          last = std::strtoul(dash + 1, &last_end, 10);
++          if (errno != 0 || last_end == dash + 1 || *last_end != '\0' || last < first) {
++            std::fprintf(stderr, "Invalid SIMD_SPIELMAN_CORES range: %s\n", part);
++            std::free(copy);
++            std::exit(EXIT_FAILURE);
++          }
++        }
++        if (last >= CPU_SETSIZE) {
++          std::fprintf(stderr, "CPU id exceeds CPU_SETSIZE: %lu\n", last);
++          std::free(copy);
++          std::exit(EXIT_FAILURE);
++        }
++        for (unsigned long core = first; core <= last; ++core) {
++          result.push_back(static_cast<uint32_t>(core));
++        }
++      }
++      std::free(copy);
++    } else {
++      cpu_set_t allowed;
++      CPU_ZERO(&allowed);
++      if (sched_getaffinity(0, sizeof(allowed), &allowed) != 0) {
++        std::perror("sched_getaffinity");
++        std::exit(EXIT_FAILURE);
++      }
++      for (uint32_t core = 0; core < CPU_SETSIZE; ++core) {
++        if (CPU_ISSET(core, &allowed)) {
++          result.push_back(core);
++        }
++      }
++    }
++    if (result.empty()) {
++      std::fprintf(stderr, "No CPUs configured for SIMD-Spielman\n");
++      std::exit(EXIT_FAILURE);
++    }
++    return result;
++  }();
++  return cores;
++}
++
++inline uint32_t configuredCore(size_t worker_index) {
++  const auto& cores = configuredCoreList();
++  return cores[worker_index % cores.size()];
++}
++
++// Correctness tests can map several workers to a core; benchmark scripts
++// validate that measured worker threads have distinct explicit core IDs.
++void pinThread(size_t worker_index) {
+   cpu_set_t cpuset;
+   CPU_ZERO(&cpuset);
+-  CPU_SET(core_nr, &cpuset);
+-  sched_setaffinity(0, sizeof(cpuset), &cpuset);
++  CPU_SET(configuredCore(worker_index), &cpuset);
++  if (sched_setaffinity(0, sizeof(cpuset), &cpuset) != 0) {
++    std::perror("sched_setaffinity");
++    std::exit(EXIT_FAILURE);
++  }
+ }
+ 
+-#endif
+\ No newline at end of file
++#endif

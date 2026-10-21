@@ -7,6 +7,7 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 #![deny(missing_docs)]
+#![allow(non_local_definitions)]
 
 /*!
 lcpc2d is a polynomial commitment scheme based on linear codes
@@ -16,14 +17,65 @@ use digest::{Digest, Output};
 use err_derive::Error;
 use ff::{Field, PrimeField};
 use merlin::Transcript;
-use rand::{
-    distributions::{Distribution, Uniform},
-    SeedableRng,
-};
+use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::iter::repeat_with;
+
+/// Legacy `rand 0.8`-compatible uniform `usize` sampler on 64-bit targets.
+///
+/// In `rand 0.8`, `Uniform<usize>` on 64-bit targets sampled a `u64` word from the
+/// RNG (`rng.next_u64()`) and applied Lemire's widen-multiply rejection method with
+/// `ints_to_reject = (u64::MAX - range + 1) % range` and `zone = u64::MAX - ints_to_reject`,
+/// accepting `lo <= zone`.
+///
+/// In `rand 0.9` and `rand 0.10`, `UniformUsize` switched to 32-bit sampling whenever
+/// `high <= u32::MAX as usize` and changed the rejection predicate to `lo >= thresh`.
+/// Preserving `rand 0.8`'s 64-bit `Uniform<usize>` algorithm keeps expander/RS graph
+/// generation (`lcpc-brakedown-pc::matgen`) and Fiat-Shamir column opening indices
+/// (`lcpc-2d::{prove, verify}`) 100% bit-exact with upstream LCPC (`f0e2116`).
+#[derive(Clone, Copy, Debug)]
+pub struct LegacyUniformUsize {
+    low: u64,
+    range: u64,
+    zone: u64,
+}
+
+impl LegacyUniformUsize {
+    /// Construct a half-open uniform sampler over `[low, high)`.
+    #[inline]
+    pub fn new(low: usize, high: usize) -> Self {
+        assert!(low < high, "LegacyUniformUsize::new called with `low >= high`");
+        let low_u64 = low as u64;
+        let range = (high as u64).wrapping_sub(low_u64);
+        let ints_to_reject = if range > 0 {
+            (u64::MAX - range + 1) % range
+        } else {
+            0
+        };
+        let zone = u64::MAX - ints_to_reject;
+        Self {
+            low: low_u64,
+            range,
+            zone,
+        }
+    }
+
+    /// Sample a uniform `usize` in `[low, high)` using `rand 0.8`'s 64-bit Lemire algorithm.
+    #[inline]
+    pub fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> usize {
+        loop {
+            let v: u64 = rng.next_u64();
+            let mul = (v as u128).wrapping_mul(self.range as u128);
+            let hi = (mul >> 64) as u64;
+            let lo = mul as u64;
+            if lo <= self.zone {
+                return self.low.wrapping_add(hi) as usize;
+            }
+        }
+    }
+}
 
 mod macros;
 
@@ -108,6 +160,7 @@ type FldT<E> = <E as LcEncoding>::F;
 type ErrT<E> = <E as LcEncoding>::Err;
 
 /// Err variant for prover operations
+#[allow(non_local_definitions)]
 #[derive(Debug, Error)]
 pub enum ProverError<ErrT>
 where
@@ -134,6 +187,7 @@ where
 pub type ProverResult<T, ErrT> = Result<T, ProverError<ErrT>>;
 
 /// Err variant for verifier operations
+#[allow(non_local_definitions)]
 #[derive(Debug, Error)]
 pub enum VerifierError<ErrT>
 where
@@ -633,8 +687,8 @@ where
 
     // matrix (encoded as a vector)
     // XXX(zk) pad coeffs
-    let mut coeffs = vec![FldT::<E>::zero(); n_rows * n_per_row];
-    let mut comm = vec![FldT::<E>::zero(); n_rows * n_cols];
+    let mut coeffs = vec![FldT::<E>::ZERO; n_rows * n_per_row];
+    let mut comm = vec![FldT::<E>::ZERO; n_rows * n_cols];
 
     // local copy of coeffs with padding
     coeffs
@@ -767,11 +821,11 @@ where
 
     if ins.len() <= (1 << LOG_MIN_NCOLS) {
         // base case: just compute all of the hashes
-        let mut digest = D::new();
         for idx in 0..outs.len() {
+            let mut digest = D::new();
             digest.update(ins[2 * idx].as_ref());
             digest.update(ins[2 * idx + 1].as_ref());
-            outs[idx] = digest.finalize_reset();
+            outs[idx] = digest.finalize();
         }
     } else {
         // recursive case: split and compute
@@ -882,7 +936,7 @@ where
         {
             let mut tmp = Vec::with_capacity(n_cols);
             tmp.extend_from_slice(&proof.p_random_vec[i][..]);
-            tmp.resize(n_cols, FldT::<E>::zero());
+            tmp.resize(n_cols, FldT::<E>::ZERO);
             enc.encode(&mut tmp)?;
             p_random_fft.push(tmp);
         };
@@ -904,7 +958,7 @@ where
         tr.challenge_bytes(E::LABEL_CO, &mut key);
         let mut cols_rng = ChaCha20Rng::from_seed(key);
         // XXX(optimization) could expand seed in parallel instead of in series
-        let col_range = Uniform::new(0usize, n_cols);
+        let col_range = LegacyUniformUsize::new(0usize, n_cols);
         repeat_with(|| col_range.sample(&mut cols_rng))
             .take(n_col_opens)
             .collect()
@@ -914,7 +968,7 @@ where
     let p_eval_fft = {
         let mut tmp = Vec::with_capacity(n_cols);
         tmp.extend_from_slice(&proof.p_eval[..]);
-        tmp.resize(n_cols, FldT::<E>::zero());
+        tmp.resize(n_cols, FldT::<E>::ZERO);
         enc.encode(&mut tmp)?;
         tmp
     };
@@ -947,8 +1001,8 @@ where
     Ok(inner_tensor
         .par_iter()
         .zip(&proof.p_eval[..])
-        .fold(FldT::<E>::zero, |a, (t, e)| a + *t * e)
-        .reduce(FldT::<E>::zero, |a, v| a + v))
+        .fold(|| FldT::<E>::ZERO, |a, (t, e)| a + *t * e)
+        .reduce(|| FldT::<E>::ZERO, |a, v| a + v))
 }
 
 // Check a column opening
@@ -964,9 +1018,10 @@ where
     }
 
     // check Merkle path
-    let mut hash = digest.finalize_reset();
+    let mut hash = digest.finalize();
     let mut col = col_num;
     for p in &column.path[..] {
+        let mut digest = D::new();
         if col % 2 == 0 {
             digest.update(&hash);
             digest.update(p);
@@ -974,7 +1029,7 @@ where
             digest.update(p);
             digest.update(&hash);
         }
-        hash = digest.finalize_reset();
+        hash = digest.finalize();
         col >>= 1;
     }
 
@@ -994,7 +1049,7 @@ where
     let tensor_eval = tensor
         .iter()
         .zip(&column.col[..])
-        .fold(FldT::<E>::zero(), |a, (t, e)| a + *t * e);
+        .fold(FldT::<E>::ZERO, |a, (t, e)| a + *t * e);
 
     poly_eval == &tensor_eval
 }
@@ -1030,7 +1085,7 @@ where
             let rand_tensor: Vec<FldT<E>> = repeat_with(|| FldT::<E>::random(&mut deg_test_rng))
                 .take(comm.n_rows)
                 .collect();
-            let mut tmp = vec![FldT::<E>::zero(); comm.n_per_row];
+            let mut tmp = vec![FldT::<E>::ZERO; comm.n_per_row];
             collapse_columns::<E>(
                 &comm.coeffs,
                 &rand_tensor,
@@ -1051,7 +1106,7 @@ where
 
     // next, evaluate the polynomial using the supplied tensor
     let p_eval = {
-        let mut tmp = vec![FldT::<E>::zero(); comm.n_per_row];
+        let mut tmp = vec![FldT::<E>::ZERO; comm.n_per_row];
         collapse_columns::<E>(
             &comm.coeffs,
             outer_tensor,
@@ -1074,7 +1129,7 @@ where
         tr.challenge_bytes(E::LABEL_CO, &mut key);
         let mut cols_rng = ChaCha20Rng::from_seed(key);
         // XXX(optimization) could expand seed in parallel instead of in series
-        let col_range = Uniform::new(0usize, comm.n_cols);
+        let col_range = LegacyUniformUsize::new(0usize, comm.n_cols);
         let cols_to_open: Vec<usize> = repeat_with(|| col_range.sample(&mut cols_rng))
             .take(n_col_opens)
             .collect();
@@ -1188,7 +1243,7 @@ where
     }
 
     // allocate result and compute
-    let mut poly = vec![FldT::<E>::zero(); comm.n_per_row];
+    let mut poly = vec![FldT::<E>::ZERO; comm.n_per_row];
     collapse_columns::<E>(
         &comm.coeffs,
         tensor,
@@ -1214,7 +1269,7 @@ where
         return Err(ProverError::OuterTensor);
     }
 
-    let mut poly = vec![FldT::<E>::zero(); comm.n_per_row];
+    let mut poly = vec![FldT::<E>::ZERO; comm.n_per_row];
     for (row, tensor_val) in tensor.iter().enumerate() {
         for (col, val) in poly.iter_mut().enumerate() {
             let entry = row * comm.n_per_row + col;
@@ -1238,7 +1293,7 @@ where
         return Err(ProverError::OuterTensor);
     }
 
-    let mut poly_fft = vec![FldT::<E>::zero(); comm.n_cols];
+    let mut poly_fft = vec![FldT::<E>::ZERO; comm.n_cols];
     for (coeffs, tensorval) in comm.comm.chunks(comm.n_cols).zip(tensor.iter()) {
         for (coeff, polyval) in coeffs.iter().zip(poly_fft.iter_mut()) {
             *polyval += *coeff * tensorval;

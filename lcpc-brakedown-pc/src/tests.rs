@@ -9,17 +9,19 @@
 
 use super::{BrakedownCommit, SdigEncoding, SdigEncodingS};
 
-use blake3::Hasher as Blake3;
-use ff::Field;
+use ff::{Field, PrimeField};
 use itertools::iterate;
-use lcpc_2d::{LcCommit, LcEncoding};
-use lcpc_test_fields::{ft255::*, ft63::*, random_coeffs};
+use lcpc_2d::{FieldHash, LcCommit, LcEncoding, SizedField};
+use lcpc_test_fields::{ft127::*, ft255::*, ft63::*, random_coeffs, Blake3};
 use merlin::Transcript;
 use ndarray::{linalg::Dot, Array};
-use rand::{thread_rng, Rng, SeedableRng};
+use num_traits::Num;
+use rand::{rng, RngExt, SeedableRng};
 use rand_chacha::ChaCha20Rng;
-use sprs::{CsMat, TriMat};
+use serde::Deserialize;
+use sprs::{CsMat, MulAcc, TriMat};
 use std::iter::repeat_with;
+use std::path::Path;
 
 #[test]
 fn col_opens() {
@@ -35,18 +37,18 @@ fn col_opens() {
 
 #[test]
 fn sprs_playground() {
-    let mut rng = thread_rng();
+    let mut rng = rng();
     let n_rows = 65537;
     let n_cols = 32749;
 
     let m: CsMat<_> = {
         let mut tmp = TriMat::new((n_rows, n_cols));
         for i in 0..n_rows {
-            let col1 = rng.gen_range(0..n_cols);
+            let col1 = rng.random_range(0..n_cols);
             let col2 = {
-                let mut tmp = rng.gen_range(0..n_cols);
+                let mut tmp = rng.random_range(0..n_cols);
                 while tmp == col1 {
-                    tmp = rng.gen_range(0..n_cols);
+                    tmp = rng.random_range(0..n_cols);
                 }
                 tmp
             };
@@ -66,7 +68,7 @@ fn sprs_playground() {
         Array::from(tmp)
     };
 
-    let mut t = Ft63::zero();
+    let mut t = Ft63::ZERO;
     for i in 0..10 {
         let mv = m.dot(&v);
         t += mv[i % n_cols];
@@ -76,12 +78,12 @@ fn sprs_playground() {
 
 #[test]
 fn test_matgen_encode() {
-    let mut rng = thread_rng();
+    let mut rng = rng();
     use super::codespec::SdigCode3 as TestCode;
     use super::encode::{codeword_length, encode};
     use super::matgen::generate;
 
-    let n = 256usize + (rng.gen::<usize>() % 4096);
+    let n = 256usize + ((rng.random::<u64>() as usize) % 4096);
     let (precodes, postcodes) = generate::<Ft63, TestCode>(n, 0u64);
 
     let xi_len = codeword_length(&precodes, &postcodes);
@@ -97,7 +99,6 @@ const N_ITERS: usize = 10;
 #[ignore]
 fn prove_verify_size_bench() {
     use super::codespec::SdigCode3 as TestCode;
-    use ff::PrimeField;
     use std::time::Instant;
 
     for lgl in (13..=29).step_by(2) {
@@ -108,18 +109,18 @@ fn prove_verify_size_bench() {
         let root = comm.get_root();
 
         // evaluate the random polynomial we just generated at a random point x
-        let x = Ft255::random(&mut rand::thread_rng());
+        let x = Ft255::random(&mut rand::rng());
 
         // compute the outer and inner tensors for powers of x
         // NOTE: we treat coeffs as a univariate polynomial, but it doesn't
         // really matter --- the only difference from a multilinear is the
         // way we compute outer_tensor and inner_tensor from the eval point
-        let inner_tensor: Vec<Ft255> = iterate(Ft255::one(), |&v| v * x)
+        let inner_tensor: Vec<Ft255> = iterate(Ft255::ONE, |&v| v * x)
             .take(comm.get_n_per_row())
             .collect();
         let outer_tensor: Vec<Ft255> = {
             let xr = x * inner_tensor.last().unwrap();
-            iterate(Ft255::one(), |&v| v * xr)
+            iterate(Ft255::ONE, |&v| v * xr)
                 .take(comm.get_n_rows())
                 .collect()
         };
@@ -199,18 +200,18 @@ fn end_to_end_one_proof() {
     let root = comm.get_root();
 
     // evaluate the random polynomial we just generated at a random point x
-    let x = Ft63::random(&mut rand::thread_rng());
+    let x = Ft63::random(&mut rand::rng());
 
     // compute the outer and inner tensors for powers of x
     // NOTE: we treat coeffs as a univariate polynomial, but it doesn't
     // really matter --- the only difference from a multilinear is the
     // way we compute outer_tensor and inner_tensor from the eval point
-    let inner_tensor: Vec<Ft63> = iterate(Ft63::one(), |&v| v * x)
+    let inner_tensor: Vec<Ft63> = iterate(Ft63::ONE, |&v| v * x)
         .take(comm.get_n_per_row())
         .collect();
     let outer_tensor: Vec<Ft63> = {
         let xr = x * inner_tensor.last().unwrap();
-        iterate(Ft63::one(), |&v| v * xr)
+        iterate(Ft63::ONE, |&v| v * xr)
             .take(comm.get_n_rows())
             .collect()
     };
@@ -238,10 +239,10 @@ fn end_to_end_one_proof() {
 
 #[test]
 fn end_to_end_one_proof_ml() {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // commit to a random polynomial at a random rate
-    let lgl = 5 + rng.gen::<usize>() % 16;
+    let lgl = 5 + ((rng.random::<u64>() as usize) % 16);
     let coeffs = random_coeffs(lgl);
     let enc = SdigEncoding::new_ml(lgl, 0);
     let comm = BrakedownCommit::<Blake3, _>::commit(&coeffs, &enc).unwrap();
@@ -250,18 +251,18 @@ fn end_to_end_one_proof_ml() {
     assert_eq!(1 << lgl, comm.get_n_rows() * comm.get_n_per_row());
 
     // evaluate the random polynomial we just generated at a random point x
-    let x = Ft63::random(&mut rand::thread_rng());
+    let x = Ft63::random(&mut rand::rng());
 
     // compute the outer and inner tensors for powers of x
     // NOTE: we treat coeffs as a univariate polynomial, but it doesn't
     // really matter --- the only difference from a multilinear is the
     // way we compute outer_tensor and inner_tensor from the eval point
-    let inner_tensor: Vec<Ft63> = iterate(Ft63::one(), |&v| v * x)
+    let inner_tensor: Vec<Ft63> = iterate(Ft63::ONE, |&v| v * x)
         .take(comm.get_n_per_row())
         .collect();
     let outer_tensor: Vec<Ft63> = {
         let xr = x * inner_tensor.last().unwrap();
-        iterate(Ft63::one(), |&v| v * xr)
+        iterate(Ft63::ONE, |&v| v * xr)
             .take(comm.get_n_rows())
             .collect()
     };
@@ -297,18 +298,18 @@ fn end_to_end_two_proofs() {
     let root = comm.get_root();
 
     // evaluate the random polynomial we just generated at a random point x
-    let x = Ft63::random(&mut rand::thread_rng());
+    let x = Ft63::random(&mut rand::rng());
 
     // compute the outer and inner tensors for powers of x
     // NOTE: we treat coeffs as a univariate polynomial, but it doesn't
     // really matter --- the only difference from a multilinear is the
     // way we compute outer_tensor and inner_tensor from the eval point
-    let inner_tensor: Vec<Ft63> = iterate(Ft63::one(), |&v| v * x)
+    let inner_tensor: Vec<Ft63> = iterate(Ft63::ONE, |&v| v * x)
         .take(comm.get_n_per_row())
         .collect();
     let outer_tensor: Vec<Ft63> = {
         let xr = x * inner_tensor.last().unwrap();
-        iterate(Ft63::one(), |&v| v * xr)
+        iterate(Ft63::ONE, |&v| v * xr)
             .take(comm.get_n_rows())
             .collect()
     };
@@ -375,11 +376,235 @@ fn end_to_end_two_proofs() {
 }
 
 fn get_random_coeffs() -> Vec<Ft63> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
-    let lgl = 16 + rng.gen::<usize>() % 8;
+    let lgl = 16 + ((rng.random::<u64>() as usize) % 8);
     let len_base = 1 << (lgl - 1);
-    let len = len_base + (rng.gen::<usize>() % len_base);
+    let len = len_base + ((rng.random::<u64>() as usize) % len_base);
 
     repeat_with(|| Ft63::random(&mut rng)).take(len).collect()
+}
+
+// =============================================================================
+// Bit-Exact Golden Vector Regression Tests against Original LCPC (f0e2116)
+// =============================================================================
+
+#[derive(Debug, Deserialize)]
+struct GoldenFile {
+    schema_version: String,
+    generator: String,
+    upstream_commit: String,
+    hash_algorithm: String,
+    hash_crate_version: String,
+    cases: Vec<GoldenCase>,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+struct GoldenCase {
+    case_id: String,
+    params: String,
+    field: String,
+    seed: u64,
+    evaluation_seed: u64,
+    n_rows: usize,
+    n_per_row: usize,
+    n_cols: usize,
+    coefficients_hex: Vec<String>,
+    encoded_rows_hex: Vec<Vec<String>>,
+    commitment_root_hex: String,
+    proof_bincode_blake3_hex: String,
+    proof_bincode_bytes: usize,
+    proof_verified: bool,
+    verified_evaluation_hex: String,
+}
+
+fn to_hex(bytes: &[u8]) -> String {
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        use std::fmt::Write;
+        let _ = write!(&mut s, "{:02x}", b);
+    }
+    s
+}
+
+fn ceil_muldiv(n: usize, numerator: usize, denominator: usize) -> usize {
+    (n * numerator + denominator - 1) / denominator
+}
+
+fn codeword_length_spec<S: super::codespec::SdigSpecification>(n_per_row: usize) -> usize {
+    let mut levels = Vec::new();
+    let mut n = n_per_row;
+    while n > S::baselen() {
+        let next = ceil_muldiv(n, S::alpha_num(), S::alpha_den());
+        levels.push((n, next));
+        n = next;
+    }
+    assert!(!levels.is_empty(), "input dimension must exceed baselen");
+
+    let mut post_dims = Vec::with_capacity(levels.len());
+    for &(ni, mi) in &levels {
+        let nip = ceil_muldiv(mi, S::r_num(), S::r_den());
+        let mip = ceil_muldiv(ni, S::r_num(), S::r_den()) - ni - nip;
+        post_dims.push((nip, mip));
+    }
+
+    n_per_row
+        + post_dims.last().unwrap().0
+        + levels
+            .iter()
+            .take(levels.len() - 1)
+            .map(|(_, mi)| *mi)
+            .sum::<usize>()
+        + post_dims.iter().map(|(_, mip)| *mip).sum::<usize>()
+}
+
+fn verify_golden_case_generic<F, S>(case: &GoldenCase)
+where
+    F: PrimeField
+        + FieldHash
+        + MulAcc
+        + Num
+        + SizedField
+        + serde::Serialize
+        + serde::de::DeserializeOwned,
+    S: super::codespec::SdigSpecification + std::fmt::Debug + Clone + Sync,
+{
+    let n_per_row = case.n_per_row;
+    let n_rows = case.n_rows;
+    let n_cols = codeword_length_spec::<S>(n_per_row);
+    assert_eq!(n_cols, case.n_cols, "n_cols mismatch for {}", case.case_id);
+
+    let enc = SdigEncodingS::<F, S>::new_from_dims(n_per_row, n_cols, case.seed);
+    let coefficient_count = n_per_row * n_rows;
+    let mut rng = ChaCha20Rng::seed_from_u64(case.seed);
+    let coefficients: Vec<F> = (0..coefficient_count)
+        .map(|_| F::random(&mut rng))
+        .collect();
+
+    let coeffs_hex: Vec<String> = coefficients
+        .iter()
+        .map(|c| to_hex(c.to_repr().as_ref()))
+        .collect();
+    assert_eq!(
+        coeffs_hex, case.coefficients_hex,
+        "coefficients_hex mismatch for {}",
+        case.case_id
+    );
+
+    // 1. Standalone row-by-row encoding check
+    let mut matrix = vec![F::ZERO; n_rows * n_cols];
+    for row in 0..n_rows {
+        matrix[row * n_cols..row * n_cols + n_per_row]
+            .copy_from_slice(&coefficients[row * n_per_row..(row + 1) * n_per_row]);
+    }
+    for row in matrix.chunks_mut(n_cols) {
+        enc.encode(row).unwrap();
+    }
+    let encoded_rows_hex: Vec<Vec<String>> = matrix
+        .chunks(n_cols)
+        .map(|row| row.iter().map(|c| to_hex(c.to_repr().as_ref())).collect())
+        .collect();
+    assert_eq!(
+        encoded_rows_hex, case.encoded_rows_hex,
+        "encoded_rows_hex mismatch for {}",
+        case.case_id
+    );
+
+    // 2. Full 2D commitment root check
+    let comm = LcCommit::<Blake3, _>::commit(&coeffs_from_slice(&coefficients), &enc).unwrap();
+    let root = comm.get_root();
+    let commitment_root_hex = to_hex(root.as_ref().as_slice());
+    assert_eq!(
+        commitment_root_hex, case.commitment_root_hex,
+        "commitment_root_hex mismatch for {}",
+        case.case_id
+    );
+
+    // 3. Prover & bincode proof bytes check
+    let mut point_rng = ChaCha20Rng::seed_from_u64(case.evaluation_seed);
+    let point = F::random(&mut point_rng);
+    let inner_tensor: Vec<F> = iterate(F::ONE, |&v| v * point).take(n_per_row).collect();
+    let outer_tensor: Vec<F> = {
+        let xr = point * inner_tensor.last().unwrap();
+        iterate(F::ONE, |&v| v * xr).take(n_rows).collect()
+    };
+
+    let mut tr_prv = Transcript::new(b"LCPC original baseline");
+    tr_prv.append_message(b"polycommit", root.as_ref().as_slice());
+    tr_prv.append_message(b"ncols", &(enc.get_n_col_opens() as u64).to_be_bytes());
+    let pf = comm.prove(&outer_tensor[..], &enc, &mut tr_prv).unwrap();
+    let pf_bytes: Vec<u8> = bincode::serialize(&pf).unwrap();
+    assert_eq!(
+        pf_bytes.len(),
+        case.proof_bincode_bytes,
+        "proof_bincode_bytes mismatch for {}",
+        case.case_id
+    );
+    let pf_hash = to_hex(blake3::hash(&pf_bytes).as_bytes());
+    assert_eq!(
+        pf_hash, case.proof_bincode_blake3_hex,
+        "proof_bincode_blake3_hex mismatch for {}",
+        case.case_id
+    );
+
+    // 4. Verifier & evaluation check
+    let mut tr_ver = Transcript::new(b"LCPC original baseline");
+    tr_ver.append_message(b"polycommit", root.as_ref().as_slice());
+    tr_ver.append_message(b"ncols", &(enc.get_n_col_opens() as u64).to_be_bytes());
+    let enc2 = SdigEncodingS::<F, S>::new_from_dims(n_per_row, n_cols, case.seed);
+    let verified_eval = pf
+        .verify(
+            root.as_ref(),
+            &outer_tensor[..],
+            &inner_tensor[..],
+            &enc2,
+            &mut tr_ver,
+        )
+        .unwrap();
+    let eval_hex = to_hex(verified_eval.to_repr().as_ref());
+    assert!(case.proof_verified);
+    assert_eq!(
+        eval_hex, case.verified_evaluation_hex,
+        "verified_evaluation_hex mismatch for {}",
+        case.case_id
+    );
+}
+
+fn coeffs_from_slice<F: Clone>(s: &[F]) -> Vec<F> {
+    s.to_vec()
+}
+
+#[test]
+fn golden_vectors_bit_exact_with_lcpc_orig() {
+    use super::codespec::{SdigCode3, SdigCode6};
+
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let golden_path = Path::new(manifest_dir)
+        .parent()
+        .unwrap()
+        .join("tests/golden/lcpc-orig/golden-v1.json");
+    let content = std::fs::read_to_string(&golden_path)
+        .unwrap_or_else(|e| panic!("failed to read {}: {}", golden_path.display(), e));
+    let golden: GoldenFile = serde_json::from_str(&content)
+        .unwrap_or_else(|e| panic!("failed to parse {}: {}", golden_path.display(), e));
+
+    assert_eq!(golden.schema_version, "lcpc-golden-v1");
+    assert_eq!(golden.generator, "external/lcpc-orig");
+    assert_eq!(
+        golden.upstream_commit,
+        "f0e2116001af5a1bbf39481535f837d6a25772e8"
+    );
+    assert_eq!(golden.hash_algorithm, "BLAKE3-256");
+    assert_eq!(golden.hash_crate_version, "1.8.7");
+    assert_eq!(golden.cases.len(), 12);
+
+    for case in &golden.cases {
+        match (case.field.as_str(), case.params.as_str()) {
+            ("Ft127", "SdigCode6") => verify_golden_case_generic::<Ft127, SdigCode6>(case),
+            ("Ft127", "SdigCode3") => verify_golden_case_generic::<Ft127, SdigCode3>(case),
+            ("Ft63", "SdigCode6") => verify_golden_case_generic::<Ft63, SdigCode6>(case),
+            ("Ft63", "SdigCode3") => verify_golden_case_generic::<Ft63, SdigCode3>(case),
+            other => panic!("unexpected golden case (field, params) = {:?}", other),
+        }
+    }
 }

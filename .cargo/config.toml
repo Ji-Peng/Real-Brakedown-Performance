@@ -1,0 +1,12 @@
+[target.x86_64-unknown-linux-gnu]
+rustflags = [
+    "-C", "target-cpu=native",
+    "-C", "no-vectorize-loops",
+    "-C", "no-vectorize-slp",
+]
+
+[build]
+rustflags = [
+    "-C", "no-vectorize-loops",
+    "-C", "no-vectorize-slp",
+]

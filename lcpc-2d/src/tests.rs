@@ -9,16 +9,16 @@
 
 use super::{def_labels, FieldHash, LcCommit, LcEncoding, LcEvalProof, LcRoot};
 
-use blake3::Hasher as Blake3;
 use digest::Output;
 use ff::Field;
-use fffft::{FFTError, FFTPrecomp, FieldFFT};
 use itertools::iterate;
+use lcpc_test_fields::fft::{FFTError, FFTPrecomp, FieldFFT};
+use lcpc_test_fields::ft63::*;
+use lcpc_test_fields::Blake3;
 use merlin::Transcript;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use std::iter::repeat_with;
-use lcpc_test_fields::ft63::*;
 
 #[derive(Clone, Debug)]
 struct LigeroEncoding<Ft> {
@@ -153,7 +153,7 @@ fn eval_outer() {
     use super::{eval_outer, eval_outer_ser};
 
     let test_comm = random_comm();
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let tensor: Vec<Ft63> = repeat_with(|| Ft63::random(&mut rng))
         .take(test_comm.n_rows)
         .collect();
@@ -168,7 +168,7 @@ fn eval_outer() {
 fn open_column() {
     use super::{merkleize, open_column, verify_column};
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     let test_comm = {
         let mut tmp = random_comm();
@@ -178,14 +178,14 @@ fn open_column() {
 
     let root = test_comm.get_root();
     for _ in 0..64 {
-        let col_num = rng.gen::<usize>() % test_comm.n_cols;
+        let col_num = rng.random::<u64>() as usize % test_comm.n_cols;
         let column = open_column(&test_comm, col_num).unwrap();
         assert!(verify_column::<Blake3, _>(
             &column,
             col_num,
             root.as_ref(),
             &[],
-            &Ft63::zero(),
+            &Ft63::ZERO,
         ));
     }
 }
@@ -198,20 +198,20 @@ fn commit() {
     let enc = LigeroEncoding::<Ft63>::new(coeffs.len(), rho);
     let comm = commit::<Blake3, LigeroEncoding<_>>(&coeffs, &enc).unwrap();
 
-    let x = Ft63::random(&mut rand::thread_rng());
+    let x = Ft63::random(&mut rand::rng());
 
     let eval = comm
         .coeffs
         .iter()
-        .zip(iterate(Ft63::one(), |&v| v * x).take(coeffs.len()))
-        .fold(Ft63::zero(), |acc, (c, r)| acc + *c * r);
+        .zip(iterate(Ft63::ONE, |&v| v * x).take(coeffs.len()))
+        .fold(Ft63::ZERO, |acc, (c, r)| acc + *c * r);
 
-    let roots_lo: Vec<Ft63> = iterate(Ft63::one(), |&v| v * x)
+    let roots_lo: Vec<Ft63> = iterate(Ft63::ONE, |&v| v * x)
         .take(comm.n_per_row)
         .collect();
     let roots_hi: Vec<Ft63> = {
         let xr = x * roots_lo.last().unwrap();
-        iterate(Ft63::one(), |&v| v * xr)
+        iterate(Ft63::ONE, |&v| v * xr)
             .take(comm.n_rows)
             .collect()
     };
@@ -219,7 +219,7 @@ fn commit() {
     let eval2 = coeffs_flattened
         .iter()
         .zip(roots_lo.iter())
-        .fold(Ft63::zero(), |acc, (c, r)| acc + *c * r);
+        .fold(Ft63::ZERO, |acc, (c, r)| acc + *c * r);
     assert_eq!(eval, eval2);
 
     let mut poly_fft = eval_outer_fft(&comm, &roots_hi[..]).unwrap();
@@ -227,11 +227,11 @@ fn commit() {
     assert!(poly_fft
         .iter()
         .skip(comm.n_per_row)
-        .all(|&v| v == Ft63::zero()));
+        .all(|&v| v == Ft63::ZERO));
     let eval3 = poly_fft
         .iter()
         .zip(roots_lo.iter())
-        .fold(Ft63::zero(), |acc, (c, r)| acc + *c * r);
+        .fold(Ft63::ZERO, |acc, (c, r)| acc + *c * r);
     assert_eq!(eval2, eval3);
 }
 
@@ -247,23 +247,23 @@ fn end_to_end() {
     let root = comm.get_root();
 
     // evaluate the random polynomial we just generated at a random point x
-    let x = Ft63::random(&mut rand::thread_rng());
+    let x = Ft63::random(&mut rand::rng());
     let eval = comm
         .coeffs
         .iter()
-        .zip(iterate(Ft63::one(), |&v| v * x).take(coeffs.len()))
-        .fold(Ft63::zero(), |acc, (c, r)| acc + *c * r);
+        .zip(iterate(Ft63::ONE, |&v| v * x).take(coeffs.len()))
+        .fold(Ft63::ZERO, |acc, (c, r)| acc + *c * r);
 
     // compute the outer and inner tensors for powers of x
     // NOTE: we treat coeffs as a univariate polynomial, but it doesn't
     // really matter --- the only difference from a multilinear is the
     // way we compute outer_tensor and inner_tensor from the eval point
-    let inner_tensor: Vec<Ft63> = iterate(Ft63::one(), |&v| v * x)
+    let inner_tensor: Vec<Ft63> = iterate(Ft63::ONE, |&v| v * x)
         .take(comm.n_per_row)
         .collect();
     let outer_tensor: Vec<Ft63> = {
         let xr = x * inner_tensor.last().unwrap();
-        iterate(Ft63::one(), |&v| v * xr)
+        iterate(Ft63::ONE, |&v| v * xr)
             .take(comm.n_rows)
             .collect()
     };
@@ -332,23 +332,23 @@ fn end_to_end_two_proofs() {
     let root = comm.get_root();
 
     // evaluate the random polynomial we just generated at a random point x
-    let x = Ft63::random(&mut rand::thread_rng());
+    let x = Ft63::random(&mut rand::rng());
     let eval = comm
         .coeffs
         .iter()
-        .zip(iterate(Ft63::one(), |&v| v * x).take(coeffs.len()))
-        .fold(Ft63::zero(), |acc, (c, r)| acc + *c * r);
+        .zip(iterate(Ft63::ONE, |&v| v * x).take(coeffs.len()))
+        .fold(Ft63::ZERO, |acc, (c, r)| acc + *c * r);
 
     // compute the outer and inner tensors for powers of x
     // NOTE: we treat coeffs as a univariate polynomial, but it doesn't
     // really matter --- the only difference from a multilinear is the
     // way we compute outer_tensor and inner_tensor from the eval point
-    let inner_tensor: Vec<Ft63> = iterate(Ft63::one(), |&v| v * x)
+    let inner_tensor: Vec<Ft63> = iterate(Ft63::ONE, |&v| v * x)
         .take(comm.n_per_row)
         .collect();
     let outer_tensor: Vec<Ft63> = {
         let xr = x * inner_tensor.last().unwrap();
-        iterate(Ft63::one(), |&v| v * xr)
+        iterate(Ft63::ONE, |&v| v * xr)
             .take(comm.n_rows)
             .collect()
     };
@@ -420,33 +420,33 @@ fn end_to_end_two_proofs() {
 }
 
 fn random_coeffs_rho() -> (Vec<Ft63>, f64) {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
-    let lgl = 8 + rng.gen::<usize>() % 8;
+    let lgl = 8 + (rng.random::<u64>() as usize) % 8;
     let len_base = 1 << (lgl - 1);
-    let len = len_base + (rng.gen::<usize>() % len_base);
+    let len = len_base + ((rng.random::<u64>() as usize) % len_base);
 
     (
         repeat_with(|| Ft63::random(&mut rng)).take(len).collect(),
-        rng.gen_range(0.1f64..0.9f64),
+        rng.random_range(0.1f64..0.9f64),
     )
 }
 
 fn random_comm() -> LigeroCommit<Blake3, Ft63> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
-    let lgl = 8 + rng.gen::<usize>() % 8;
+    let lgl = 8 + (rng.random::<u64>() as usize) % 8;
     let len_base = 1 << (lgl - 1);
-    let len = len_base + (rng.gen::<usize>() % len_base);
-    let rho = rng.gen_range(0.1f64..0.9f64);
+    let len = len_base + ((rng.random::<u64>() as usize) % len_base);
+    let rho = rng.random_range(0.1f64..0.9f64);
     let (n_rows, n_per_row, n_cols) = LigeroEncoding::<Ft63>::_get_dims(len, rho).unwrap();
 
-    let coeffs_len = (n_per_row - 1) * n_rows + 1 + (rng.gen::<usize>() % n_rows);
+    let coeffs_len = (n_per_row - 1) * n_rows + 1 + ((rng.random::<u64>() as usize) % n_rows);
     let coeffs = {
         let mut tmp = repeat_with(|| Ft63::random(&mut rng))
             .take(coeffs_len)
             .collect::<Vec<Ft63>>();
-        tmp.resize(n_per_row * n_rows, Ft63::zero());
+        tmp.resize(n_per_row * n_rows, Ft63::ZERO);
         tmp
     };
 
