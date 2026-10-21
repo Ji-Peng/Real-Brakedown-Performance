@@ -552,6 +552,14 @@ where
     // Setup times
     let setup_start = Instant::now();
     let mut enc = SpielmanEncoding::<F>::with_params(params, n_per_row, seed);
+    if threads > 1 {
+        if !cores.is_empty() {
+            let core_list = lcpc_brakedown_pc::parse_core_list(cores)?;
+            enc = enc.with_threads_and_cores(threads, &core_list);
+        } else {
+            enc = enc.with_threads(threads);
+        }
+    }
     let (effective_slices, slice_mode) = if autotune {
         let s = enc.autotune(n_rows);
         (s, "autotuned")
@@ -590,7 +598,9 @@ where
 
     // 2. Verifier encoding (encoding 2 vectors of length n_per_row into n_cols)
     let verifier_setup_start = Instant::now();
-    let verifier_enc = SpielmanEncoding::<F>::with_params(params, n_per_row, seed).with_slices(1);
+    let verifier_enc = SpielmanEncoding::<F>::with_params(params, n_per_row, seed)
+        .with_slices(1)
+        .with_threads(1);
     let verifier_encoding_init_ns = verifier_setup_start.elapsed().as_nanos();
 
     let mut verifier_matrix = vec![<F as Field>::ZERO; 2 * n_cols];

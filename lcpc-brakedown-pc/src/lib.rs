@@ -23,11 +23,18 @@ pub mod codespec;
 pub mod encode;
 pub mod graph;
 pub mod matgen;
+pub mod thread_pool;
 
 // Re-export cache detection and slicing utilities.
 pub use cache::{
     adaptive_slice_count, adaptive_slice_count_with_params, detect_cache, CacheInfo, CacheSource,
     DEFAULT_LLC_HEADROOM_GAMMA, MIN_ROWS_PER_SLICE,
+};
+
+// Re-export thread pool, barrier, and pinning utilities.
+pub use thread_pool::{
+    get_affinity_cores, parse_core_list, pin_current_thread_to_core, split_range,
+    SenseReversingBarrier, ThreadPool, WorkerJob,
 };
 
 // Re-export portable lazy-reduction fields for Brakedown PCS callers.
@@ -51,6 +58,10 @@ mod tests;
 /// via [`set_slices`](Self::set_slices) or [`with_slices`](Self::with_slices).
 /// A slice count of 0 (the default) indicates adaptive slice selection based on
 /// detected host Last-Level Cache (LLC) capacity.
+///
+/// Since `step/08-threads`, expander-level multithreading can be configured via
+/// [`set_threads`](Self::set_threads), [`with_threads`](Self::with_threads), or
+/// [`with_threads_and_cores`](Self::with_threads_and_cores).
 #[derive(Clone, Debug)]
 pub struct SdigEncodingS<Ft, S> {
     n_per_row: usize, // number of inputs to the encoding
@@ -58,6 +69,8 @@ pub struct SdigEncodingS<Ft, S> {
     params: CodeParams,
     code: ExpanderCode<Ft>,
     slices: usize,    // 0 = adaptive (Plan 04 §2.2), >0 = explicit slice count
+    threads: usize,   // 1 = single-threaded, >1 = expander-level multithreading
+    pool: Option<std::sync::Arc<ThreadPool>>,
     _p: std::marker::PhantomData<S>,
 }
 
@@ -151,6 +164,8 @@ where
             params,
             code,
             slices: 0, // 0 = adaptive (Plan 04 §2.2)
+            threads: 1,
+            pool: None,
             _p: std::marker::PhantomData,
         }
     }
@@ -184,6 +199,76 @@ where
         self
     }
 
+    /// Return the configured thread count (1 = single-threaded).
+    #[inline]
+    pub fn threads(&self) -> usize {
+        self.threads
+    }
+
+    /// Return a reference to the active pinned worker thread pool, if one is configured.
+    #[inline]
+    pub fn thread_pool(&self) -> Option<&std::sync::Arc<ThreadPool>> {
+        self.pool.as_ref()
+    }
+
+    /// Configure the thread count for expander-level multithreading.
+    ///
+    /// If `threads > 1`, initializes a persistent pinned worker pool with cores
+    /// derived from the process affinity mask.
+    pub fn set_threads(&mut self, threads: usize) {
+        let threads = threads.max(1);
+        self.threads = threads;
+        if threads > 1 {
+            let need_new = match self.pool {
+                Some(ref p) => p.num_threads() != threads,
+                None => true,
+            };
+            if need_new {
+                self.pool = Some(std::sync::Arc::new(ThreadPool::new(threads, &[])));
+            }
+        } else {
+            self.pool = None;
+        }
+    }
+
+    /// Configure the thread count (builder style).
+    #[inline]
+    pub fn with_threads(mut self, threads: usize) -> Self {
+        self.set_threads(threads);
+        self
+    }
+
+    /// Configure the thread count and explicit core list for pinned worker threads.
+    pub fn set_threads_and_cores(&mut self, threads: usize, cores: &[usize]) {
+        let threads = threads.max(1);
+        self.threads = threads;
+        if threads > 1 {
+            self.pool = Some(std::sync::Arc::new(ThreadPool::new(threads, cores)));
+        } else {
+            self.pool = None;
+        }
+    }
+
+    /// Configure the thread count and explicit core list (builder style).
+    #[inline]
+    pub fn with_threads_and_cores(mut self, threads: usize, cores: &[usize]) -> Self {
+        self.set_threads_and_cores(threads, cores);
+        self
+    }
+
+    /// Attach a pre-existing persistent pinned thread pool to this encoding instance.
+    pub fn set_thread_pool(&mut self, pool: std::sync::Arc<ThreadPool>) {
+        self.threads = pool.num_threads();
+        self.pool = Some(pool);
+    }
+
+    /// Attach a pre-existing persistent pinned thread pool (builder style).
+    #[inline]
+    pub fn with_thread_pool(mut self, pool: std::sync::Arc<ThreadPool>) -> Self {
+        self.set_thread_pool(pool);
+        self
+    }
+
     /// Compute the effective slice count that will be used for encoding a batch of `n_rows`.
     ///
     /// If `self.slices > 0`, returns `self.slices`.
@@ -200,7 +285,7 @@ where
     /// Auto-tune the optimal slice count empirically by timing candidate slice counts around $s^*$
     /// on this encoding instance (Plan 04 §2.2 Step 3).
     pub fn autotune_slices(&self, n_rows: usize) -> usize {
-        crate::encode::autotune_slices(&self.code, n_rows)
+        crate::encode::autotune_slices_with_pool(&self.code, n_rows, self.pool.as_deref())
     }
 
     /// Auto-tune the slice count empirically and configure this instance to use it.
@@ -219,7 +304,7 @@ where
     /// Encode all rows in sliced batched column-major passes.
     ///
     /// Slices the rows horizontally into `slices` chunks (or uses adaptive slicing if `slices == 0`).
-    /// Keeps working sets resident in LLC during expander evaluation.
+    /// If a thread pool is configured (`threads > 1`), uses expander-level multithreading with pinned workers.
     pub fn encode_rows_with_slices(
         &self,
         comm: &mut [Ft],
@@ -232,7 +317,11 @@ where
         if n_rows == 0 {
             return Ok(());
         }
-        encode_row_major_slices(comm, n_rows, &self.code, slices);
+        if let Some(ref pool) = self.pool {
+            crate::encode::encode_row_major_slices_mt(comm, n_rows, &self.code, slices, pool);
+        } else {
+            encode_row_major_slices(comm, n_rows, &self.code, slices);
+        }
         Ok(())
     }
 }

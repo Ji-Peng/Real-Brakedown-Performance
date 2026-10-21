@@ -1500,3 +1500,336 @@ fn test_pcs_commit_with_slicing() {
         check_pcs_slices::<Fp2M61>(s);
     }
 }
+
+#[test]
+fn test_sense_reversing_barrier_ordering() {
+    use crate::thread_pool::SenseReversingBarrier;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    let num_threads = 8;
+    let num_generations = 500;
+    let barrier = Arc::new(SenseReversingBarrier::new(num_threads));
+    let shared_data = Arc::new((0..num_threads).map(|_| AtomicUsize::new(0)).collect::<Vec<_>>());
+
+    let mut handles = Vec::new();
+    for tid in 0..num_threads {
+        let b = Arc::clone(&barrier);
+        let data = Arc::clone(&shared_data);
+        handles.push(std::thread::spawn(move || {
+            for gen in 1..=num_generations {
+                // Write generation into own slot before barrier
+                data[tid].store(gen, Ordering::Release);
+
+                // Synchronize
+                b.wait();
+
+                // Assert that ALL other threads' writes for this generation are visible
+                for other in 0..num_threads {
+                    let val = data[other].load(Ordering::Acquire);
+                    assert!(
+                        val >= gen,
+                        "thread {tid} at gen {gen} saw stale data {val} from thread {other}"
+                    );
+                }
+
+                // Synchronize before moving to next generation
+                b.wait();
+            }
+        }));
+    }
+
+    for h in handles {
+        h.join().unwrap();
+    }
+}
+
+#[test]
+fn test_pool_lifecycle() {
+    use crate::thread_pool::{get_affinity_cores, ThreadPool, WorkerJob, SenseReversingBarrier};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let allowed_cores = get_affinity_cores();
+
+    // 1. Lifecycle: create pool with 4 threads
+    let pool = ThreadPool::new(4, &allowed_cores);
+    assert_eq!(pool.num_threads(), 4);
+
+    struct CounterJob(AtomicUsize);
+    impl WorkerJob for CounterJob {
+        fn run(&self, _tid: usize, _num_threads: usize, _barrier: &SenseReversingBarrier) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    // Run job 1
+    let job1 = CounterJob(AtomicUsize::new(0));
+    pool.execute(&job1);
+    assert_eq!(job1.0.load(Ordering::SeqCst), 4);
+
+    // Run job 2 on same pool (workers persist)
+    let job2 = CounterJob(AtomicUsize::new(0));
+    pool.execute(&job2);
+    assert_eq!(job2.0.load(Ordering::SeqCst), 4);
+
+    drop(pool);
+
+    // 2. Lifecycle: create pools with T=1, 2, 7, 8
+    for &t in &[1, 2, 7, 8] {
+        let p = ThreadPool::new(t, &allowed_cores);
+        let job = CounterJob(AtomicUsize::new(0));
+        p.execute(&job);
+        assert_eq!(job.0.load(Ordering::SeqCst), t);
+    }
+}
+
+#[test]
+fn test_pinning_respects_core_list() {
+    use crate::thread_pool::{get_affinity_cores, parse_core_list, pin_current_thread_to_core, ThreadPool, WorkerJob, SenseReversingBarrier};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    let allowed = get_affinity_cores();
+    assert!(!allowed.is_empty(), "affinity mask must contain at least 1 core");
+
+    // Under taskset -c 0,1,3-7 on local host, CPU 2 must never be included
+    #[cfg(target_os = "linux")]
+    {
+        // Check if CPU 2 was filtered by the affinity mask
+        unsafe {
+            let mut cpuset: libc::cpu_set_t = std::mem::zeroed();
+            if libc::sched_getaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &mut cpuset) == 0 {
+                let cpu2_allowed = libc::CPU_ISSET(2, &cpuset);
+                assert_eq!(allowed.contains(&2), cpu2_allowed);
+            }
+        }
+    }
+
+    // Test pin_current_thread_to_core
+    let _ = pin_current_thread_to_core(allowed[0]);
+
+    // Test parse_core_list
+    assert_eq!(parse_core_list("0,1,3-5").unwrap(), vec![0, 1, 3, 4, 5]);
+    assert_eq!(parse_core_list("7").unwrap(), vec![7]);
+    assert_eq!(parse_core_list("3-3").unwrap(), vec![3]);
+    assert!(parse_core_list("5-3").is_err());
+
+    // Test pinning on allowed cores inside worker threads
+    #[cfg(target_os = "linux")]
+    {
+        let pool = ThreadPool::new(allowed.len(), &allowed);
+        let pass = Arc::new(AtomicBool::new(true));
+
+        struct PinVerifyJob {
+            expected_cores: Vec<usize>,
+            pass: Arc<AtomicBool>,
+        }
+        impl WorkerJob for PinVerifyJob {
+            fn run(&self, tid: usize, _num_threads: usize, _barrier: &SenseReversingBarrier) {
+                unsafe {
+                    let mut cpuset: libc::cpu_set_t = std::mem::zeroed();
+                    if libc::sched_getaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &mut cpuset) == 0 {
+                        let expected = self.expected_cores[tid % self.expected_cores.len()];
+                        if !libc::CPU_ISSET(expected, &cpuset) {
+                            self.pass.store(false, Ordering::SeqCst);
+                        }
+                    }
+                }
+            }
+        }
+
+        pool.execute(&PinVerifyJob {
+            expected_cores: allowed.clone(),
+            pass: Arc::clone(&pass),
+        });
+        assert!(pass.load(Ordering::SeqCst), "worker threads were not pinned to expected cores");
+    }
+}
+
+#[test]
+fn test_thread_invariance_all_fields_and_modes() {
+    use super::codespec::{CodeParams, SdigCode6};
+
+    fn check_invariance<F: LazyField>(params: CodeParams, k: usize, n_rows: usize) {
+        let seed = 0x5432_1098;
+        let n_cols = {
+            let enc = SpielmanEncoding::<F>::with_params(params, k, seed);
+            enc.code().codeword_len()
+        };
+
+        // Create random initial message
+        let mut rng = ChaCha20Rng::seed_from_u64(0xabcd_ef01);
+        let mut initial = vec![F::ZERO; n_cols * n_rows];
+        for r in 0..n_rows {
+            for c in 0..k {
+                initial[r * n_cols + c] = F::random(&mut rng);
+            }
+        }
+
+        // Reference: single-threaded T=1, s=1
+        let mut reference = initial.clone();
+        let enc_ref = SpielmanEncoding::<F>::with_params(params, k, seed).with_slices(1).with_threads(1);
+        enc_ref.encode_rows_with_slices(&mut reference, n_cols, 1).unwrap();
+
+        // Check T in {1, 2, 4, 7, 8} x slices in {1, 4}
+        for &t in &[1, 2, 4, 7, 8] {
+            for &s in &[1, 4] {
+                let mut candidate = initial.clone();
+                let enc = SpielmanEncoding::<F>::with_params(params, k, seed)
+                    .with_slices(s)
+                    .with_threads(t);
+
+                enc.encode_rows_with_slices(&mut candidate, n_cols, s).unwrap();
+
+                assert_eq!(
+                    candidate,
+                    reference,
+                    "thread invariance failed for field {}, mode {:?}, T={}, s={}",
+                    std::any::type_name::<F>(),
+                    params,
+                    t,
+                    s
+                );
+            }
+        }
+    }
+
+    let mode_a = CodeParams::Lcpc(super::codespec::LcpcParams::of::<SdigCode6>());
+    let mode_b = CodeParams::SimdSpielman;
+
+    // Mont127
+    check_invariance::<Mont127>(mode_a, 64, 64);
+    check_invariance::<Mont127>(mode_b, 64, 64);
+
+    // Mers127
+    check_invariance::<Mers127>(mode_a, 64, 64);
+    check_invariance::<Mers127>(mode_b, 64, 64);
+
+    // Fp2M61
+    check_invariance::<Fp2M61>(mode_a, 64, 64);
+    check_invariance::<Fp2M61>(mode_b, 64, 64);
+}
+
+#[test]
+fn test_threading_flakiness_50x_loop() {
+    use super::codespec::CodeParams;
+
+    fn check_flakiness_loop<F: LazyField>(params: CodeParams, k: usize, n_rows: usize) {
+        let seed = 0x9988_7766;
+        let n_cols = {
+            let enc = SpielmanEncoding::<F>::with_params(params, k, seed);
+            enc.code().codeword_len()
+        };
+
+        let mut rng = ChaCha20Rng::seed_from_u64(0x1122_3344);
+        let mut initial = vec![F::ZERO; n_cols * n_rows];
+        for r in 0..n_rows {
+            for c in 0..k {
+                initial[r * n_cols + c] = F::random(&mut rng);
+            }
+        }
+
+        // Reference
+        let mut reference = initial.clone();
+        let enc_ref = SpielmanEncoding::<F>::with_params(params, k, seed).with_slices(1).with_threads(1);
+        enc_ref.encode_rows_with_slices(&mut reference, n_cols, 1).unwrap();
+
+        // Test with persistent 4-thread pool across 50 iterations
+        let enc_t4 = SpielmanEncoding::<F>::with_params(params, k, seed)
+            .with_slices(4)
+            .with_threads(4);
+
+        for iter in 0..50 {
+            let mut candidate = initial.clone();
+            enc_t4.encode_rows_with_slices(&mut candidate, n_cols, 4).unwrap();
+            assert_eq!(
+                candidate,
+                reference,
+                "flakiness detected on iteration {iter} (field {}, T=4, s=4)",
+                std::any::type_name::<F>()
+            );
+        }
+
+        // Test with persistent 8-thread pool across 50 iterations
+        let enc_t8 = SpielmanEncoding::<F>::with_params(params, k, seed)
+            .with_slices(4)
+            .with_threads(8);
+
+        for iter in 0..50 {
+            let mut candidate = initial.clone();
+            enc_t8.encode_rows_with_slices(&mut candidate, n_cols, 4).unwrap();
+            assert_eq!(
+                candidate,
+                reference,
+                "flakiness detected on iteration {iter} (field {}, T=8, s=4)",
+                std::any::type_name::<F>()
+            );
+        }
+    }
+
+    check_flakiness_loop::<Mont127>(CodeParams::SimdSpielman, 64, 64);
+    check_flakiness_loop::<Fp2M61>(CodeParams::SimdSpielman, 64, 64);
+}
+
+#[test]
+fn test_pcs_commit_with_threads() {
+    fn check_pcs_threads<F>(threads: usize, slices: usize)
+    where
+        F: LazyField + FieldHash,
+    {
+        let lgl = 12;
+        let mut rng = ChaCha20Rng::seed_from_u64(0xcafe_d00d);
+        let coeffs: Vec<F> = (0..(1usize << lgl)).map(|_| F::random(&mut rng)).collect();
+        let enc = SpielmanEncoding::<F>::new_ml_with_params(CodeParams::SimdSpielman, lgl, 0x1234)
+            .with_slices(slices)
+            .with_threads(threads);
+
+        let comm = LcCommit::<Blake3, _>::commit(&coeffs, &enc).unwrap();
+        let root = comm.get_root();
+
+        // Reference root from T=1
+        let enc_ref = SpielmanEncoding::<F>::new_ml_with_params(CodeParams::SimdSpielman, lgl, 0x1234)
+            .with_slices(1)
+            .with_threads(1);
+        let comm_ref = LcCommit::<Blake3, _>::commit(&coeffs, &enc_ref).unwrap();
+        assert_eq!(root.as_ref(), comm_ref.get_root().as_ref(), "Merkle root diverged between T={threads} and T=1");
+
+        let pt = F::random(&mut rng);
+        let inner: Vec<F> = iterate(F::ONE, |&v| v * pt)
+            .take(comm.get_n_per_row())
+            .collect();
+        let outer: Vec<F> = {
+            let xr = pt * inner.last().unwrap();
+            iterate(F::ONE, |&v| v * xr)
+                .take(comm.get_n_rows())
+                .collect()
+        };
+
+        let expected = coeffs
+            .chunks(inner.len())
+            .zip(&outer)
+            .fold(F::ZERO, |acc, (row, &ow)| {
+                acc + row
+                    .iter()
+                    .zip(&inner)
+                    .fold(F::ZERO, |r, (&c, &iw)| r + c * iw)
+                    * ow
+            });
+
+        let mut tr1 = Transcript::new(b"threaded commit test");
+        tr1.append_message(b"polycommit", root.as_ref());
+        let pf = comm.prove(&outer, &enc, &mut tr1).unwrap();
+
+        let mut tr2 = Transcript::new(b"threaded commit test");
+        tr2.append_message(b"polycommit", root.as_ref());
+        let verified = pf
+            .verify(root.as_ref(), &outer, &inner, &enc, &mut tr2)
+            .unwrap();
+        assert_eq!(verified, expected);
+    }
+
+    for &t in &[1, 2, 4, 7, 8] {
+        check_pcs_threads::<Mont127>(t, 4);
+        check_pcs_threads::<Fp2M61>(t, 4);
+    }
+}

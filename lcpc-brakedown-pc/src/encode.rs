@@ -38,6 +38,7 @@ code-parameter mode or assembled from externally sampled graphs with
 */
 
 use crate::graph::R2lGraph;
+use crate::thread_pool::{split_range, SenseReversingBarrier, ThreadPool, WorkerJob};
 
 use ff::Field;
 use lcpc_fields::LazyField;
@@ -342,6 +343,225 @@ pub fn encode_row_major_slices<F: LazyField>(
     }
 }
 
+struct RowMajorSliceJob<'a, F: LazyField> {
+    comm: *mut F,
+    buf: *mut F,
+    n_rows: usize,
+    n_cols: usize,
+    n_per_row: usize,
+    code: &'a ExpanderCode<F>,
+    slices: usize,
+    base_r: usize,
+    max_h: usize,
+    temp_rs: *mut F,
+}
+
+unsafe impl<'a, F: LazyField> Send for RowMajorSliceJob<'a, F> {}
+unsafe impl<'a, F: LazyField> Sync for RowMajorSliceJob<'a, F> {}
+
+impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
+    fn run(&self, tid: usize, num_threads: usize, barrier: &SenseReversingBarrier) {
+        let precodes = self.code.precodes();
+        let postcodes = self.code.postcodes();
+        let levels = precodes.len();
+        let n_inplace = match self.code.base_case() {
+            BaseCase::ReedSolomon => levels - 1,
+            BaseCase::Identity => levels,
+        };
+
+        let mut scratch = vec![F::Acc::default(); self.max_h];
+
+        for slice_idx in 0..self.slices {
+            let r_start = slice_idx * self.base_r;
+            let r_end = if slice_idx == self.slices - 1 {
+                self.n_rows
+            } else {
+                (slice_idx + 1) * self.base_r
+            };
+            let h = r_end - r_start;
+            if h == 0 {
+                continue;
+            }
+
+            let slice_buf = self.buf;
+            let comm = self.comm;
+
+            // 1. Collaborative Transpose of messages from comm into slice_buf
+            let (c_start, c_end) = split_range(self.n_per_row, tid, num_threads);
+            for c in c_start..c_end {
+                for r in 0..h {
+                    unsafe {
+                        let val = *comm.add((r_start + r) * self.n_cols + c);
+                        *slice_buf.add(c * h + r) = val;
+                    }
+                }
+            }
+            barrier.wait();
+
+            // 2. Collaborative expander evaluation on slice_buf
+            let mut in_start = 0usize;
+            for precode in &precodes[..n_inplace] {
+                let in_end = in_start + precode.n_left();
+                let out_start = in_end;
+                let (r_start_node, r_end_node) = split_range(precode.n_right(), tid, num_threads);
+
+                unsafe {
+                    let in_slice = std::slice::from_raw_parts(slice_buf.add(in_start * h), precode.n_left() * h);
+                    let out_slice = std::slice::from_raw_parts_mut(slice_buf.add(out_start * h), precode.n_right() * h);
+                    encode_column_block_range_blocked::<F, BLOCK_FACTOR>(
+                        precode,
+                        in_slice,
+                        out_slice,
+                        h,
+                        r_start_node,
+                        r_end_node,
+                        &mut scratch,
+                    );
+                }
+
+                barrier.wait();
+                in_start = in_end;
+            }
+
+            // Base case
+            let (mut in_start, mut out_start) = match self.code.base_case() {
+                BaseCase::ReedSolomon => {
+                    let precode = &precodes[levels - 1];
+                    let in_end = in_start + precode.n_left();
+                    let (r_start_node, r_end_node) = split_range(precode.n_right(), tid, num_threads);
+
+                    unsafe {
+                        let in_slice = std::slice::from_raw_parts(slice_buf.add(in_start * h), precode.n_left() * h);
+                        let out_slice = std::slice::from_raw_parts_mut(self.temp_rs, precode.n_right() * h);
+                        encode_column_block_range_blocked::<F, BLOCK_FACTOR>(
+                            precode,
+                            in_slice,
+                            out_slice,
+                            h,
+                            r_start_node,
+                            r_end_node,
+                            &mut scratch,
+                        );
+                    }
+                    barrier.wait();
+
+                    let out_end = in_end + postcodes[levels - 1].n_left();
+                    let n_rs_out = postcodes[levels - 1].n_left();
+                    let (c_start_rs, c_end_rs) = split_range(n_rs_out, tid, num_threads);
+
+                    unsafe {
+                        let in_rs = std::slice::from_raw_parts(self.temp_rs, precode.n_right() * h);
+                        let out_rs = std::slice::from_raw_parts_mut(slice_buf.add(in_end * h), n_rs_out * h);
+                        reed_solomon_column_block_range(in_rs, out_rs, h, c_start_rs, c_end_rs);
+                    }
+                    barrier.wait();
+
+                    (in_end + precode.n_right(), out_end)
+                }
+                BaseCase::Identity => {
+                    let end = in_start + precodes[levels - 1].n_right();
+                    (end, end)
+                }
+            };
+
+            // Postcodes (bottom-up)
+            for (precode, postcode) in precodes.iter().rev().zip(postcodes.iter().rev()) {
+                in_start -= precode.n_right();
+                let (r_start_node, r_end_node) = split_range(postcode.n_right(), tid, num_threads);
+
+                unsafe {
+                    let in_slice = std::slice::from_raw_parts(slice_buf.add(in_start * h), (out_start - in_start) * h);
+                    let out_slice = std::slice::from_raw_parts_mut(slice_buf.add(out_start * h), postcode.n_right() * h);
+                    encode_column_block_range_blocked::<F, BLOCK_FACTOR>(
+                        postcode,
+                        in_slice,
+                        out_slice,
+                        h,
+                        r_start_node,
+                        r_end_node,
+                        &mut scratch,
+                    );
+                }
+
+                barrier.wait();
+                out_start += postcode.n_right();
+            }
+
+            // 3. Collaborative Transpose of redundancy from slice_buf into comm
+            let (row_start_t, row_end_t) = split_range(h, tid, num_threads);
+            for r in row_start_t..row_end_t {
+                for c in self.n_per_row..self.n_cols {
+                    unsafe {
+                        let val = *slice_buf.add(c * h + r);
+                        *comm.add((r_start + r) * self.n_cols + c) = val;
+                    }
+                }
+            }
+            barrier.wait();
+        }
+    }
+}
+
+/// Encode a batch of `n_rows` rows stored row-major in `comm` using multithreaded expander-level parallelism (Plan 04 §3).
+///
+/// Workers in `pool` collaboratively encode each slice, synchronizing between expander levels via a barrier.
+pub fn encode_row_major_slices_mt<F: LazyField>(
+    comm: &mut [F],
+    n_rows: usize,
+    code: &ExpanderCode<F>,
+    slices: usize,
+    pool: &ThreadPool,
+) {
+    if n_rows == 0 {
+        return;
+    }
+    if pool.num_threads() <= 1 {
+        encode_row_major_slices(comm, n_rows, code, slices);
+        return;
+    }
+
+    let n_cols = code.codeword_len();
+    let n_per_row = code.n_per_row();
+    assert_eq!(comm.len(), n_rows * n_cols);
+
+    let effective_s = if slices == 0 {
+        crate::cache::adaptive_slice_count(n_per_row, n_rows, std::mem::size_of::<F>())
+    } else {
+        slices
+    };
+
+    let s = effective_s.clamp(1, n_rows);
+    let base_r = n_rows / s;
+    let max_h = if s == 1 {
+        n_rows
+    } else {
+        base_r.max(n_rows - (s - 1) * base_r)
+    };
+
+    let mut buf = vec![F::ZERO; n_cols * max_h];
+    let last_precode_right = code.precodes().last().map(|p| p.n_right()).unwrap_or(0);
+    let mut temp_rs = if code.base_case() == BaseCase::ReedSolomon {
+        vec![F::ZERO; last_precode_right * max_h]
+    } else {
+        Vec::new()
+    };
+
+    let job = RowMajorSliceJob {
+        comm: comm.as_mut_ptr(),
+        buf: buf.as_mut_ptr(),
+        n_rows,
+        n_cols,
+        n_per_row,
+        code,
+        slices: s,
+        base_r,
+        max_h,
+        temp_rs: temp_rs.as_mut_ptr(),
+    };
+
+    pool.execute(&job);
+}
+
 /// Encode a batch of `n_rows` vectors laid out in slice-column-major format (Plan 04 §1.2).
 ///
 /// In slice-column-major layout, each horizontal slice $i \in [0, s)$ is contiguous and stored
@@ -385,14 +605,210 @@ pub fn encode_col_major_sliced<F: LazyField>(
     }
 }
 
+struct ColMajorSlicedJob<'a, F: LazyField> {
+    buf: *mut F,
+    n_rows: usize,
+    n_cols: usize,
+    code: &'a ExpanderCode<F>,
+    slices: usize,
+    base_r: usize,
+    max_h: usize,
+    temp_rs: *mut F,
+}
+
+unsafe impl<'a, F: LazyField> Send for ColMajorSlicedJob<'a, F> {}
+unsafe impl<'a, F: LazyField> Sync for ColMajorSlicedJob<'a, F> {}
+
+impl<'a, F: LazyField> WorkerJob for ColMajorSlicedJob<'a, F> {
+    fn run(&self, tid: usize, num_threads: usize, barrier: &SenseReversingBarrier) {
+        let precodes = self.code.precodes();
+        let postcodes = self.code.postcodes();
+        let levels = precodes.len();
+        let n_inplace = match self.code.base_case() {
+            BaseCase::ReedSolomon => levels - 1,
+            BaseCase::Identity => levels,
+        };
+
+        let mut scratch = vec![F::Acc::default(); self.max_h];
+        let mut offset = 0usize;
+
+        for slice_idx in 0..self.slices {
+            let r_start = slice_idx * self.base_r;
+            let r_end = if slice_idx == self.slices - 1 {
+                self.n_rows
+            } else {
+                (slice_idx + 1) * self.base_r
+            };
+            let h = r_end - r_start;
+            if h == 0 {
+                continue;
+            }
+
+            let slice_len = self.n_cols * h;
+            let slice_buf = unsafe { self.buf.add(offset) };
+
+            // Precodes
+            let mut in_start = 0usize;
+            for precode in &precodes[..n_inplace] {
+                let in_end = in_start + precode.n_left();
+                let out_start = in_end;
+                let (r_start_node, r_end_node) = split_range(precode.n_right(), tid, num_threads);
+
+                unsafe {
+                    let in_slice = std::slice::from_raw_parts(slice_buf.add(in_start * h), precode.n_left() * h);
+                    let out_slice = std::slice::from_raw_parts_mut(slice_buf.add(out_start * h), precode.n_right() * h);
+                    encode_column_block_range_blocked::<F, BLOCK_FACTOR>(
+                        precode,
+                        in_slice,
+                        out_slice,
+                        h,
+                        r_start_node,
+                        r_end_node,
+                        &mut scratch,
+                    );
+                }
+
+                barrier.wait();
+                in_start = in_end;
+            }
+
+            // Base case
+            let (mut in_start, mut out_start) = match self.code.base_case() {
+                BaseCase::ReedSolomon => {
+                    let precode = &precodes[levels - 1];
+                    let in_end = in_start + precode.n_left();
+                    let (r_start_node, r_end_node) = split_range(precode.n_right(), tid, num_threads);
+
+                    unsafe {
+                        let in_slice = std::slice::from_raw_parts(slice_buf.add(in_start * h), precode.n_left() * h);
+                        let out_slice = std::slice::from_raw_parts_mut(self.temp_rs, precode.n_right() * h);
+                        encode_column_block_range_blocked::<F, BLOCK_FACTOR>(
+                            precode,
+                            in_slice,
+                            out_slice,
+                            h,
+                            r_start_node,
+                            r_end_node,
+                            &mut scratch,
+                        );
+                    }
+                    barrier.wait();
+
+                    let out_end = in_end + postcodes[levels - 1].n_left();
+                    let n_rs_out = postcodes[levels - 1].n_left();
+                    let (c_start_rs, c_end_rs) = split_range(n_rs_out, tid, num_threads);
+
+                    unsafe {
+                        let in_rs = std::slice::from_raw_parts(self.temp_rs, precode.n_right() * h);
+                        let out_rs = std::slice::from_raw_parts_mut(slice_buf.add(in_end * h), n_rs_out * h);
+                        reed_solomon_column_block_range(in_rs, out_rs, h, c_start_rs, c_end_rs);
+                    }
+                    barrier.wait();
+
+                    (in_end + precode.n_right(), out_end)
+                }
+                BaseCase::Identity => {
+                    let end = in_start + precodes[levels - 1].n_right();
+                    (end, end)
+                }
+            };
+
+            // Postcodes
+            for (precode, postcode) in precodes.iter().rev().zip(postcodes.iter().rev()) {
+                in_start -= precode.n_right();
+                let (r_start_node, r_end_node) = split_range(postcode.n_right(), tid, num_threads);
+
+                unsafe {
+                    let in_slice = std::slice::from_raw_parts(slice_buf.add(in_start * h), (out_start - in_start) * h);
+                    let out_slice = std::slice::from_raw_parts_mut(slice_buf.add(out_start * h), postcode.n_right() * h);
+                    encode_column_block_range_blocked::<F, BLOCK_FACTOR>(
+                        postcode,
+                        in_slice,
+                        out_slice,
+                        h,
+                        r_start_node,
+                        r_end_node,
+                        &mut scratch,
+                    );
+                }
+
+                barrier.wait();
+                out_start += postcode.n_right();
+            }
+
+            offset += slice_len;
+        }
+    }
+}
+
+/// Encode a batch of `n_rows` vectors laid out in slice-column-major format using multithreading.
+pub fn encode_col_major_sliced_mt<F: LazyField>(
+    buf: &mut [F],
+    n_rows: usize,
+    code: &ExpanderCode<F>,
+    slices: usize,
+    pool: &ThreadPool,
+) {
+    if n_rows == 0 {
+        return;
+    }
+    if pool.num_threads() <= 1 {
+        encode_col_major_sliced(buf, n_rows, code, slices);
+        return;
+    }
+
+    let n_cols = code.codeword_len();
+    assert_eq!(buf.len(), n_cols * n_rows);
+
+    let effective_s = if slices == 0 {
+        crate::cache::adaptive_slice_count(code.n_per_row(), n_rows, std::mem::size_of::<F>())
+    } else {
+        slices
+    };
+
+    let s = effective_s.clamp(1, n_rows);
+    let base_r = n_rows / s;
+    let max_h = if s == 1 {
+        n_rows
+    } else {
+        base_r.max(n_rows - (s - 1) * base_r)
+    };
+
+    let last_precode_right = code.precodes().last().map(|p| p.n_right()).unwrap_or(0);
+    let mut temp_rs = if code.base_case() == BaseCase::ReedSolomon {
+        vec![F::ZERO; last_precode_right * max_h]
+    } else {
+        Vec::new()
+    };
+
+    let job = ColMajorSlicedJob {
+        buf: buf.as_mut_ptr(),
+        n_rows,
+        n_cols,
+        code,
+        slices: s,
+        base_r,
+        max_h,
+        temp_rs: temp_rs.as_mut_ptr(),
+    };
+
+    pool.execute(&job);
+}
+
 /// Auto-tune the optimal slice count empirically by timing candidate slice counts around $s^*$ (Plan 04 §2.2 Step 3).
 ///
 /// Evaluates candidate slice counts in $\{s^*/2, s^*, 2s^*, 4s^*\}$ filtered to valid slice counts
 /// between 1 and `n_rows`. Performs 1 warm-up iteration and 2 timed iterations per candidate,
 /// locking in the slice count with the lowest wall-clock latency.
-pub fn autotune_slices<F: LazyField>(
+pub fn autotune_slices<F: LazyField>(code: &ExpanderCode<F>, n_rows: usize) -> usize {
+    autotune_slices_with_pool(code, n_rows, None)
+}
+
+/// Auto-tune the optimal slice count empirically, optionally using worker `pool` if provided.
+pub fn autotune_slices_with_pool<F: LazyField>(
     code: &ExpanderCode<F>,
     n_rows: usize,
+    pool: Option<&ThreadPool>,
 ) -> usize {
     if n_rows <= 1 {
         return 1;
@@ -435,16 +851,24 @@ pub fn autotune_slices<F: LazyField>(
     let mut best_s = s_star;
     let mut min_time = std::time::Duration::MAX;
 
+    let run_enc = |mat: &mut [F], s: usize| {
+        if let Some(p) = pool {
+            encode_row_major_slices_mt(mat, n_rows, code, s, p);
+        } else {
+            encode_row_major_slices(mat, n_rows, code, s);
+        }
+    };
+
     for &s in &candidates {
         // 1 warm-up iteration
         matrix.copy_from_slice(&initial);
-        encode_row_major_slices(&mut matrix, n_rows, code, s);
+        run_enc(&mut matrix, s);
 
         // 2 timed iterations
         let start = std::time::Instant::now();
         for _ in 0..2 {
             matrix.copy_from_slice(&initial);
-            encode_row_major_slices(&mut matrix, n_rows, code, s);
+            run_enc(&mut matrix, s);
         }
         let elapsed = start.elapsed();
 
@@ -482,14 +906,44 @@ fn encode_column_block_blocked<F: LazyField, const B: usize>(
     output: &mut [F],
     n_rows: usize,
 ) {
+    let mut scratch = vec![F::Acc::default(); n_rows];
+    encode_column_block_range_blocked::<F, B>(
+        graph,
+        input,
+        output,
+        n_rows,
+        0,
+        graph.n_right(),
+        &mut scratch,
+    );
+}
+
+/// Evaluate incoming edges for a contiguous range of right nodes `[r_start, r_end)`.
+///
+/// Output column `r` is written to `output[r * n_rows .. (r + 1) * n_rows]`.
+/// Used by single-threaded execution (r_start=0, r_end=n_right) and multithreaded
+/// worker partitions.
+#[inline(always)]
+pub fn encode_column_block_range_blocked<F: LazyField, const B: usize>(
+    graph: &R2lGraph<F>,
+    input: &[F],
+    output: &mut [F],
+    n_rows: usize,
+    r_start: usize,
+    r_end: usize,
+    scratch: &mut [F::Acc],
+) {
     assert!(n_rows > 0);
     assert_eq!(input.len(), graph.n_left() * n_rows);
     assert_eq!(output.len(), graph.n_right() * n_rows);
+    assert!(r_start <= r_end && r_end <= graph.n_right());
+    assert!(scratch.len() >= n_rows);
 
-    let mut scratch = vec![F::Acc::default(); n_rows];
+    let scratch_slice = &mut scratch[..n_rows];
 
-    for (r, dst) in output.chunks_exact_mut(n_rows).enumerate() {
+    for r in r_start..r_end {
         let (lefts, weights) = graph.incoming(r);
+        let dst = &mut output[r * n_rows..(r + 1) * n_rows];
         let num_edges = lefts.len();
         if num_edges == 0 {
             dst.fill(F::ZERO);
@@ -502,7 +956,7 @@ fn encode_column_block_blocked<F: LazyField, const B: usize>(
         if B == 4 {
             while e + 4 <= num_edges {
                 if since_fold + 4 > F::MAX_ACCUMULATIONS {
-                    for acc in scratch.iter_mut() {
+                    for acc in scratch_slice.iter_mut() {
                         F::fold(acc);
                     }
                     since_fold = 1;
@@ -524,12 +978,12 @@ fn encode_column_block_blocked<F: LazyField, const B: usize>(
                 let src3 = &input[l3..l3 + n_rows];
 
                 for row in 0..n_rows {
-                    let mut acc = scratch[row];
+                    let mut acc = scratch_slice[row];
                     F::mac(&mut acc, &w0, &src0[row]);
                     F::mac(&mut acc, &w1, &src1[row]);
                     F::mac(&mut acc, &w2, &src2[row]);
                     F::mac(&mut acc, &w3, &src3[row]);
-                    scratch[row] = acc;
+                    scratch_slice[row] = acc;
                 }
 
                 e += 4;
@@ -538,7 +992,7 @@ fn encode_column_block_blocked<F: LazyField, const B: usize>(
         } else if B == 2 {
             while e + 2 <= num_edges {
                 if since_fold + 2 > F::MAX_ACCUMULATIONS {
-                    for acc in scratch.iter_mut() {
+                    for acc in scratch_slice.iter_mut() {
                         F::fold(acc);
                     }
                     since_fold = 1;
@@ -554,10 +1008,10 @@ fn encode_column_block_blocked<F: LazyField, const B: usize>(
                 let src1 = &input[l1..l1 + n_rows];
 
                 for row in 0..n_rows {
-                    let mut acc = scratch[row];
+                    let mut acc = scratch_slice[row];
                     F::mac(&mut acc, &w0, &src0[row]);
                     F::mac(&mut acc, &w1, &src1[row]);
-                    scratch[row] = acc;
+                    scratch_slice[row] = acc;
                 }
 
                 e += 2;
@@ -568,7 +1022,7 @@ fn encode_column_block_blocked<F: LazyField, const B: usize>(
         // Remainder loop (or B == 1)
         while e < num_edges {
             if since_fold >= F::MAX_ACCUMULATIONS {
-                for acc in scratch.iter_mut() {
+                for acc in scratch_slice.iter_mut() {
                     F::fold(acc);
                 }
                 since_fold = 1;
@@ -579,16 +1033,16 @@ fn encode_column_block_blocked<F: LazyField, const B: usize>(
             let src = &input[l..l + n_rows];
 
             for row in 0..n_rows {
-                let mut acc = scratch[row];
+                let mut acc = scratch_slice[row];
                 F::mac(&mut acc, &w, &src[row]);
-                scratch[row] = acc;
+                scratch_slice[row] = acc;
             }
 
             e += 1;
             since_fold += 1;
         }
 
-        for (d, acc) in dst.iter_mut().zip(scratch.iter_mut()) {
+        for (d, acc) in dst.iter_mut().zip(scratch_slice.iter_mut()) {
             *d = F::reduce(*acc);
             *acc = F::Acc::default();
         }
@@ -605,10 +1059,33 @@ pub fn reed_solomon_column_block<F>(xi: &[F], xo: &mut [F], n_rows: usize)
 where
     F: Field,
 {
+    let total_cols = xo.len() / n_rows;
+    reed_solomon_column_block_range(xi, xo, n_rows, 0, total_cols);
+}
+
+/// Reed-Solomon encoding for a contiguous range of output columns `[c_start, c_end)`.
+pub fn reed_solomon_column_block_range<F>(
+    xi: &[F],
+    xo: &mut [F],
+    n_rows: usize,
+    c_start: usize,
+    c_end: usize,
+) where
+    F: Field,
+{
+    let total_cols = xo.len() / n_rows;
+    assert!(c_start <= c_end && c_end <= total_cols);
+    let n_in_cols = xi.len() / n_rows;
+
     let mut x = F::ONE;
-    for r in xo.chunks_exact_mut(n_rows) {
+    for _ in 0..c_start {
+        x += F::ONE;
+    }
+
+    for col in c_start..c_end {
+        let r = &mut xo[col * n_rows..(col + 1) * n_rows];
         r.fill(F::ZERO);
-        for j in (0..xi.len() / n_rows).rev() {
+        for j in (0..n_in_cols).rev() {
             let coeff = &xi[j * n_rows..(j + 1) * n_rows];
             for (o, c) in r.iter_mut().zip(coeff) {
                 *o *= x;
