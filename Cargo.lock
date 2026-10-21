@@ -475,6 +475,7 @@ dependencies = [
  "lcpc-2d 0.1.1",
  "lcpc-fields",
  "lcpc-test-fields 0.1.0",
+ "libc",
  "merlin 3.0.0",
  "ndarray 0.17.2",
  "num-traits",

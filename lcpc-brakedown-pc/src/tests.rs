@@ -1246,3 +1246,257 @@ fn test_worst_case_accumulation_and_fold() {
     let fp2_max = Fp2M61::from_parts(Fp2M61::MODULUS_P - 1, Fp2M61::MODULUS_P - 1);
     run_worst_case::<Fp2M61>(fp2_max, fp2_max);
 }
+
+#[test]
+fn test_cache_detection_sanity() {
+    use super::cache::{
+        adaptive_slice_count_with_params, detect_cache, parse_size, DEFAULT_LLC_HEADROOM_GAMMA,
+    };
+
+    // 1. Test parse_size on various formats
+    assert_eq!(parse_size("48K"), Some(48 * 1024));
+    assert_eq!(parse_size("48KiB"), Some(48 * 1024));
+    assert_eq!(parse_size("512k"), Some(512 * 1024));
+    assert_eq!(parse_size("512KB"), Some(512 * 1024));
+    assert_eq!(parse_size("16384K"), Some(16384 * 1024));
+    assert_eq!(parse_size("16M"), Some(16 * 1024 * 1024));
+    assert_eq!(parse_size("32MiB"), Some(32 * 1024 * 1024));
+    assert_eq!(parse_size("1048576"), Some(1048576));
+    assert_eq!(parse_size("1048576 B"), Some(1048576));
+    assert_eq!(parse_size("1G"), Some(1024 * 1024 * 1024));
+    assert_eq!(parse_size(""), None);
+    assert_eq!(parse_size("  "), None);
+    assert_eq!(parse_size("unknown"), None);
+    assert_eq!(parse_size("123XYZ"), None);
+
+    // 2. Test detect_cache returns plausible values
+    let cache = detect_cache();
+    assert!(
+        cache.l1d_bytes >= 16 * 1024,
+        "L1d cache should be at least 16 KiB, got {}",
+        cache.l1d_bytes
+    );
+    assert!(
+        cache.l2_bytes >= 128 * 1024,
+        "L2 cache should be at least 128 KiB, got {}",
+        cache.l2_bytes
+    );
+    assert!(
+        cache.l3_bytes >= 1024 * 1024,
+        "L3 cache should be at least 1 MiB, got {}",
+        cache.l3_bytes
+    );
+
+    // 3. Test analytical model against Plan 04 §2.2 Table 166
+    let elem_bytes = 16;
+    let gamma = DEFAULT_LLC_HEADROOM_GAMMA;
+
+    // 16 MiB LLC (e.g. i7-11700K, EPYC 9754)
+    let llc_16m = 16 * 1024 * 1024;
+    let expected_16m = [
+        (16, 256, 1),
+        (18, 512, 1),
+        (20, 1024, 2),
+        (22, 2048, 8),
+        (24, 4096, 32),
+        (26, 8192, 128),
+        (28, 16384, 512),
+    ];
+    for &(logn, k, expected_s) in &expected_16m {
+        let s = adaptive_slice_count_with_params(k, k, elem_bytes, llc_16m, gamma);
+        assert_eq!(
+            s, expected_s,
+            "16 MiB LLC mismatch at logN={logn}: expected {expected_s}, got {s}"
+        );
+    }
+
+    // 32 MiB LLC (e.g. GCP c3d Genoa Zen 4)
+    let llc_32m = 32 * 1024 * 1024;
+    let expected_32m = [
+        (16, 256, 1),
+        (18, 512, 1),
+        (20, 1024, 1),
+        (22, 2048, 4),
+        (24, 4096, 16),
+        (26, 8192, 64),
+        (28, 16384, 256),
+    ];
+    for &(logn, k, expected_s) in &expected_32m {
+        let s = adaptive_slice_count_with_params(k, k, elem_bytes, llc_32m, gamma);
+        assert_eq!(
+            s, expected_s,
+            "32 MiB LLC mismatch at logN={logn}: expected {expected_s}, got {s}"
+        );
+    }
+}
+
+#[test]
+fn test_slice_invariance_all_fields_and_modes() {
+    use super::codespec::{SdigCode3, SdigCode6};
+
+    fn check_invariance<F: LazyField>(
+        params: CodeParams,
+        k: usize,
+        n_rows: usize,
+        seed: u64,
+    ) {
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
+        let enc = SpielmanEncoding::<F>::with_params(params, k, seed);
+        let n_cols = enc.code().codeword_len();
+
+        let mut initial_matrix = vec![F::ZERO; n_rows * n_cols];
+        for r in 0..n_rows {
+            for c in 0..k {
+                initial_matrix[r * n_cols + c] = F::random(&mut rng);
+            }
+        }
+
+        // Base run: s = 1 (single slice, previous behaviour)
+        let mut base_matrix = initial_matrix.clone();
+        enc.encode_rows_with_slices(&mut base_matrix, n_cols, 1)
+            .expect("encode s=1 failed");
+
+        // Systematic prefix check
+        for r in 0..n_rows {
+            assert_eq!(
+                &base_matrix[r * n_cols..r * n_cols + k],
+                &initial_matrix[r * n_cols..r * n_cols + k],
+                "systematic prefix corrupted at row {r}"
+            );
+        }
+
+        // Test across slice counts s in {0 (adaptive), 2, 4, 8, 16}
+        for &s in &[0, 2, 4, 8, 16] {
+            let mut sliced_matrix = initial_matrix.clone();
+            enc.encode_rows_with_slices(&mut sliced_matrix, n_cols, s)
+                .unwrap_or_else(|e| panic!("encode s={s} failed: {e}"));
+
+            assert_eq!(
+                sliced_matrix, base_matrix,
+                "slice invariance failed for field={}, params={:?}, k={k}, n_rows={n_rows}, s={s}",
+                std::any::type_name::<F>(),
+                params
+            );
+        }
+    }
+
+    let test_configs = [
+        // Mode (a) LCPC SdigCode6
+        CodeParams::Lcpc(LcpcParams::of::<SdigCode6>()),
+        // Mode (a) LCPC SdigCode3
+        CodeParams::Lcpc(LcpcParams::of::<SdigCode3>()),
+        // Mode (b) SIMD-Spielman
+        CodeParams::SimdSpielman,
+    ];
+
+    for params in test_configs {
+        // Square configurations
+        for &(k, n_rows) in &[(64, 64), (128, 128), (256, 256)] {
+            check_invariance::<Mont127>(params, k, n_rows, 0x1234_5678);
+            check_invariance::<Mers127>(params, k, n_rows, 0x2345_6789);
+            check_invariance::<Fp2M61>(params, k, n_rows, 0x3456_789a);
+        }
+
+        // Non-square configurations with non-multiples of s to test remainder row handling
+        for &(k, n_rows) in &[(64, 100), (64, 35)] {
+            check_invariance::<Mont127>(params, k, n_rows, 0x5678_9abc);
+            check_invariance::<Mers127>(params, k, n_rows, 0x6789_abcd);
+            check_invariance::<Fp2M61>(params, k, n_rows, 0x789a_bcde);
+        }
+    }
+}
+
+#[test]
+fn test_autotune_slices_empirical() {
+    fn check_autotune<F: LazyField>(params: CodeParams, k: usize, n_rows: usize) {
+        let seed = 0xbeef_cafe;
+        let mut enc = SpielmanEncoding::<F>::with_params(params, k, seed);
+        let n_cols = enc.code().codeword_len();
+
+        let s_star = enc.effective_slices(n_rows);
+        assert!(s_star >= 1);
+
+        let tuned_s = enc.autotune(n_rows);
+        assert!(tuned_s >= 1);
+        assert!(tuned_s <= n_rows);
+        assert_eq!(enc.slices(), tuned_s);
+
+        // Verify that encoding with the tuned slice count is bit-exact with s=1
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
+        let mut matrix_tuned = vec![F::ZERO; n_rows * n_cols];
+        for r in 0..n_rows {
+            for c in 0..k {
+                matrix_tuned[r * n_cols + c] = F::random(&mut rng);
+            }
+        }
+        let matrix_init = matrix_tuned.clone();
+
+        let mut matrix_s1 = matrix_init.clone();
+        enc.encode_rows_with_slices(&mut matrix_s1, n_cols, 1).unwrap();
+
+        enc.encode_rows(&mut matrix_tuned, n_cols).unwrap();
+        assert_eq!(
+            matrix_tuned, matrix_s1,
+            "autotuned s={tuned_s} failed bit-exactness check vs s=1"
+        );
+    }
+
+    check_autotune::<Mont127>(CodeParams::SimdSpielman, 128, 128);
+    check_autotune::<Mers127>(CodeParams::SimdSpielman, 128, 128);
+    check_autotune::<Fp2M61>(CodeParams::SimdSpielman, 128, 128);
+}
+
+#[test]
+fn test_pcs_commit_with_slicing() {
+    fn check_pcs_slices<F>(slices: usize)
+    where
+        F: LazyField + FieldHash,
+    {
+        let lgl = 12;
+        let mut rng = ChaCha20Rng::seed_from_u64(0xcafe_d00d);
+        let coeffs: Vec<F> = (0..(1usize << lgl)).map(|_| F::random(&mut rng)).collect();
+        let enc = SpielmanEncoding::<F>::new_ml_with_params(CodeParams::SimdSpielman, lgl, 0x1234)
+            .with_slices(slices);
+
+        let comm = LcCommit::<Blake3, _>::commit(&coeffs, &enc).unwrap();
+        let root = comm.get_root();
+
+        let pt = F::random(&mut rng);
+        let inner: Vec<F> = iterate(F::ONE, |&v| v * pt)
+            .take(comm.get_n_per_row())
+            .collect();
+        let outer: Vec<F> = {
+            let xr = pt * inner.last().unwrap();
+            iterate(F::ONE, |&v| v * xr)
+                .take(comm.get_n_rows())
+                .collect()
+        };
+
+        let expected = coeffs
+            .chunks(inner.len())
+            .zip(&outer)
+            .fold(F::ZERO, |acc, (row, &ow)| {
+                acc + row
+                    .iter()
+                    .zip(&inner)
+                    .fold(F::ZERO, |r, (&c, &iw)| r + c * iw)
+                    * ow
+            });
+
+        let mut tr1 = Transcript::new(b"sliced commit test");
+        tr1.append_message(b"polycommit", root.as_ref());
+        let pf = comm.prove(&outer, &enc, &mut tr1).unwrap();
+
+        let mut tr2 = Transcript::new(b"sliced commit test");
+        tr2.append_message(b"polycommit", root.as_ref());
+        let verified = pf
+            .verify(root.as_ref(), &outer, &inner, &enc, &mut tr2)
+            .unwrap();
+        assert_eq!(verified, expected);
+    }
+
+    for &s in &[0, 1, 2, 4, 8] {
+        check_pcs_slices::<Mont127>(s);
+        check_pcs_slices::<Fp2M61>(s);
+    }
+}

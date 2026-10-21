@@ -265,6 +265,198 @@ where
     assert_eq!(out_start, n_cols);
 }
 
+/// Encode a batch of `n_rows` rows stored row-major in `comm` using `slices` horizontal slices (Plan 04 §2).
+///
+/// If `slices == 0`, the recommended adaptive slice count from [`crate::cache::adaptive_slice_count`] is used.
+/// If `slices == 1`, all rows are processed in a single batch (previous behaviour).
+/// If `slices > 1`, rows are processed in `slices` horizontal slices, keeping the working set
+/// of each slice within the host CPU's LLC budget.
+///
+/// On entry, `comm[row * n_cols .. row * n_cols + n_per_row]` contains the message for `row`.
+/// On return, the remaining columns `n_per_row..n_cols` hold the redundancy of each codeword.
+pub fn encode_row_major_slices<F: LazyField>(
+    comm: &mut [F],
+    n_rows: usize,
+    code: &ExpanderCode<F>,
+    slices: usize,
+) {
+    if n_rows == 0 {
+        return;
+    }
+    let n_cols = code.codeword_len();
+    let n_per_row = code.n_per_row();
+    assert_eq!(comm.len(), n_rows * n_cols);
+
+    let effective_s = if slices == 0 {
+        crate::cache::adaptive_slice_count(n_per_row, n_rows, std::mem::size_of::<F>())
+    } else {
+        slices
+    };
+
+    let s = effective_s.clamp(1, n_rows);
+    let base_r = n_rows / s;
+    let max_h = if s == 1 {
+        n_rows
+    } else {
+        base_r.max(n_rows - (s - 1) * base_r)
+    };
+
+    let mut buf = vec![F::ZERO; n_cols * max_h];
+
+    for slice_idx in 0..s {
+        let r_start = slice_idx * base_r;
+        let r_end = if slice_idx == s - 1 {
+            n_rows
+        } else {
+            (slice_idx + 1) * base_r
+        };
+        let h = r_end - r_start;
+        if h == 0 {
+            continue;
+        }
+
+        let slice_buf = &mut buf[..n_cols * h];
+
+        // 1. Transpose row-major messages from comm into column-major slice_buf
+        transpose_into(
+            &comm[r_start * n_cols..],
+            n_cols,
+            slice_buf,
+            h,
+            h,
+            n_per_row,
+        );
+
+        // 2. Encode this slice
+        encode_col_major(slice_buf, h, code);
+
+        // 3. Transpose column-major redundancy back into row-major comm
+        transpose_into(
+            &slice_buf[n_per_row * h..],
+            h,
+            &mut comm[r_start * n_cols + n_per_row..],
+            n_cols,
+            n_cols - n_per_row,
+            h,
+        );
+    }
+}
+
+/// Encode a batch of `n_rows` vectors laid out in slice-column-major format (Plan 04 §1.2).
+///
+/// In slice-column-major layout, each horizontal slice $i \in [0, s)$ is contiguous and stored
+/// column-major with $R_s$ rows per column. Slices are evaluated sequentially to ensure LLC residence.
+pub fn encode_col_major_sliced<F: LazyField>(
+    buf: &mut [F],
+    n_rows: usize,
+    code: &ExpanderCode<F>,
+    slices: usize,
+) {
+    if n_rows == 0 {
+        return;
+    }
+    let n_cols = code.codeword_len();
+    assert_eq!(buf.len(), n_cols * n_rows);
+
+    let effective_s = if slices == 0 {
+        crate::cache::adaptive_slice_count(code.n_per_row(), n_rows, std::mem::size_of::<F>())
+    } else {
+        slices
+    };
+
+    let s = effective_s.clamp(1, n_rows);
+    let base_r = n_rows / s;
+
+    let mut offset = 0;
+    for slice_idx in 0..s {
+        let r_start = slice_idx * base_r;
+        let r_end = if slice_idx == s - 1 {
+            n_rows
+        } else {
+            (slice_idx + 1) * base_r
+        };
+        let h = r_end - r_start;
+        if h == 0 {
+            continue;
+        }
+        let slice_len = n_cols * h;
+        encode_col_major(&mut buf[offset..offset + slice_len], h, code);
+        offset += slice_len;
+    }
+}
+
+/// Auto-tune the optimal slice count empirically by timing candidate slice counts around $s^*$ (Plan 04 §2.2 Step 3).
+///
+/// Evaluates candidate slice counts in $\{s^*/2, s^*, 2s^*, 4s^*\}$ filtered to valid slice counts
+/// between 1 and `n_rows`. Performs 1 warm-up iteration and 2 timed iterations per candidate,
+/// locking in the slice count with the lowest wall-clock latency.
+pub fn autotune_slices<F: LazyField>(
+    code: &ExpanderCode<F>,
+    n_rows: usize,
+) -> usize {
+    if n_rows <= 1 {
+        return 1;
+    }
+    let s_star = crate::cache::adaptive_slice_count(
+        code.n_per_row(),
+        n_rows,
+        std::mem::size_of::<F>(),
+    );
+
+    let mut candidates = Vec::with_capacity(4);
+    if s_star >= 2 {
+        candidates.push(s_star / 2);
+    }
+    candidates.push(s_star);
+    if s_star * 2 <= n_rows {
+        candidates.push(s_star * 2);
+    }
+    if s_star * 4 <= n_rows {
+        candidates.push(s_star * 4);
+    }
+    candidates.sort_unstable();
+    candidates.dedup();
+
+    if candidates.len() <= 1 {
+        return candidates[0];
+    }
+
+    let n_cols = code.codeword_len();
+    let n_per_row = code.n_per_row();
+    let mut matrix = vec![F::ZERO; n_cols * n_rows];
+    // Seed initial message with a non-zero pattern
+    for r in 0..n_rows {
+        for c in 0..n_per_row {
+            matrix[r * n_cols + c] = F::ONE;
+        }
+    }
+    let initial = matrix.clone();
+
+    let mut best_s = s_star;
+    let mut min_time = std::time::Duration::MAX;
+
+    for &s in &candidates {
+        // 1 warm-up iteration
+        matrix.copy_from_slice(&initial);
+        encode_row_major_slices(&mut matrix, n_rows, code, s);
+
+        // 2 timed iterations
+        let start = std::time::Instant::now();
+        for _ in 0..2 {
+            matrix.copy_from_slice(&initial);
+            encode_row_major_slices(&mut matrix, n_rows, code, s);
+        }
+        let elapsed = start.elapsed();
+
+        if elapsed < min_time {
+            min_time = elapsed;
+            best_s = s;
+        }
+    }
+
+    best_s
+}
+
 /// Evaluate one expander graph on a column block, right to left (gather) with
 /// unreduced lazy accumulation and multi-edge register blocking (Plan 01 §3.4-§3.5, Plan 03).
 ///

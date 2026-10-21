@@ -15,7 +15,7 @@ Each report contains:
 | `schema_version` | Literal `lcpc-bench-v1`. |
 | `implementation`, `upstream_commit`, `driver_version` | Implementation identity (`lcpc-fork` vs. `lcpc-original-upstream`) and pinned upstream commit. |
 | `hash_algorithm`, `hash_crate_version`, `hash_mode` | BLAKE3 identity (`1.8.7`) and the build's backend configuration (`portable-only`). |
-| `field`, `params`, `log_n`, `seed`, `threads`, `cores`, `warmup`, `runs` | Input and execution configuration. `params` is the code-parameter mode (`lcpc-sdig6`, `lcpc-sdig3`, or, for the fork since `step/04-r2l`, `simd-spielman`). `cores` records the requested affinity; `taskset` applies it. |
+| `field`, `params`, `log_n`, `seed`, `threads`, `cores`, `slices`, `slice_mode`, `warmup`, `runs` | Input and execution configuration. `slices` is the effective horizontal slice count; `slice_mode` is `adaptive`, `explicit`, or `autotuned`. `params` is the code-parameter mode (`lcpc-sdig6`, `lcpc-sdig3`, or, for the fork since `step/04-r2l`, `simd-spielman`). `cores` records the requested affinity; `taskset` applies it. |
 | `dimensions` | `coefficient_count`, `n_rows`, `n_per_row`, and encoded `n_cols`. |
 | `recursion_depth`, `level_parameters` | The dimensions and degree choices at each recursion level (`n_i`, `m_i`, `c_n`, `n_i_prime`, `m_i_prime`, `d_n`). Since `step/04-r2l` the fork reads them from the sampled graphs (left degree = edges / left nodes, exact in both modes) instead of recomputing LCPC's formulas. |
 | `setup_ns` | One-time graph/encoding construction, deterministic coefficient and row-buffer setup, and verifier encoding construction. |

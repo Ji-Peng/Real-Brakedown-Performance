@@ -35,6 +35,8 @@ struct Args {
     warmup: usize,
     threads: usize,
     cores: String,
+    slices: usize,
+    autotune: bool,
     output: Option<String>,
     generate_golden: Option<String>,
     check_golden: Option<String>,
@@ -112,6 +114,8 @@ struct BenchReport {
     seed: u64,
     threads: usize,
     cores: String,
+    slices: usize,
+    slice_mode: &'static str,
     warmup: usize,
     runs: usize,
     dimensions: Dimensions,
@@ -225,6 +229,8 @@ fn parse_args() -> Result<Args, String> {
         warmup: 5,
         threads: 1,
         cores: String::new(),
+        slices: 0,
+        autotune: false,
         output: None,
         generate_golden: None,
         check_golden: None,
@@ -270,6 +276,17 @@ fn parse_args() -> Result<Args, String> {
                 args.threads = parse_usize(&value(&mut it, "--threads")?, "--threads")?
             }
             "--cores" => args.cores = value(&mut it, "--cores")?,
+            "--slices" => {
+                let raw = value(&mut it, "--slices")?;
+                if raw.eq_ignore_ascii_case("adaptive") {
+                    args.slices = 0;
+                } else {
+                    args.slices = parse_usize(&raw, "--slices")?;
+                }
+            }
+            "--autotune" => {
+                args.autotune = true;
+            }
             "--output" => args.output = Some(value(&mut it, "--output")?),
             "--generate-golden" => args.generate_golden = Some(value(&mut it, "--generate-golden")?),
             "--check-golden" => args.check_golden = Some(value(&mut it, "--check-golden")?),
@@ -293,7 +310,8 @@ fn print_help() {
     println!(
         "Usage: lcpc-bench [--field mont127|mers127|fp2m61|ft127|ft63] \\\n\
          [--params lcpc-sdig6|lcpc-sdig3|simd-spielman] \\\n\
-         [--logN 16,18,...] [--runs N] [--warmup N] [--threads N] [--cores LIST] [--output PATH] \\\n\
+         [--logN 16,18,...] [--runs N] [--warmup N] [--threads N] [--cores LIST] \\\n\
+         [--slices N|adaptive] [--autotune] [--output PATH] \\\n\
          [--generate-golden PATH | --check-golden PATH]"
     );
 }
@@ -356,7 +374,17 @@ where
     let seed = HASH_SEED ^ u64::from(log_n) ^ params_tag(&params);
 
     let setup_start = Instant::now();
-    let enc = SpielmanEncoding::<F>::with_params(params, n_per_row, seed);
+    let mut enc = SpielmanEncoding::<F>::with_params(params, n_per_row, seed);
+    let (effective_slices, slice_mode) = if args.autotune {
+        let s = enc.autotune(n_rows);
+        (s, "autotuned")
+    } else if args.slices > 0 {
+        enc.set_slices(args.slices);
+        (args.slices, "explicit")
+    } else {
+        enc.set_slices(0);
+        (enc.effective_slices(n_rows), "adaptive")
+    };
     let graph_sampling_ns = setup_start.elapsed().as_nanos();
     let n_cols = enc.code().codeword_len();
     let level_parameters = level_parameters(&enc);
@@ -477,6 +505,8 @@ where
         seed,
         threads: args.threads,
         cores: args.cores.clone(),
+        slices: effective_slices,
+        slice_mode,
         warmup: args.warmup,
         runs: args.runs,
         dimensions: Dimensions {
@@ -1035,6 +1065,14 @@ fn write_report(out: &mut String, report: &BenchReport, indent: usize) {
     )
     .unwrap();
     string_field!("cores", &report.cores);
+    writeln!(
+        out,
+        "{}\"slices\": {},",
+        " ".repeat(indent + 2),
+        report.slices
+    )
+    .unwrap();
+    string_field!("slice_mode", report.slice_mode);
     writeln!(out, "{}\"warmup\": {},", " ".repeat(indent + 2), report.warmup).unwrap();
     writeln!(out, "{}\"runs\": {},", " ".repeat(indent + 2), report.runs).unwrap();
 

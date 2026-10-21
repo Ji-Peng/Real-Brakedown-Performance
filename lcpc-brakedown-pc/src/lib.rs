@@ -13,16 +13,22 @@ sdig-pc is a polynomial commitment scheme from the SDIG expander code
 */
 
 use codespec::{CodeParams, LcpcParams, SdigCode3 as SdigCodeDflt, SdigSpecification};
-use encode::{encode, encode_col_major, transpose_into, ExpanderCode};
+use encode::{encode, encode_row_major_slices, ExpanderCode};
 use matgen::generate_code;
 
-use ff::Field;
 use lcpc_2d::{def_labels, n_degree_tests, LcCommit, LcEncoding, LcEvalProof};
 
+pub mod cache;
 pub mod codespec;
 pub mod encode;
 pub mod graph;
 pub mod matgen;
+
+// Re-export cache detection and slicing utilities.
+pub use cache::{
+    adaptive_slice_count, adaptive_slice_count_with_params, detect_cache, CacheInfo, CacheSource,
+    DEFAULT_LLC_HEADROOM_GAMMA, MIN_ROWS_PER_SLICE,
+};
 
 // Re-export portable lazy-reduction fields for Brakedown PCS callers.
 pub use lcpc_fields::{
@@ -40,12 +46,18 @@ mod tests;
 /// itself is driven by runtime [`CodeParams`] (stored in the value), so the
 /// same type can also hold a SIMD-Spielman (mode (b)) code; see
 /// [`SpielmanEncoding`] and [`with_params`](Self::with_params).
+///
+/// Since `step/07-slicing`, the horizontal matrix slice count can be configured
+/// via [`set_slices`](Self::set_slices) or [`with_slices`](Self::with_slices).
+/// A slice count of 0 (the default) indicates adaptive slice selection based on
+/// detected host Last-Level Cache (LLC) capacity.
 #[derive(Clone, Debug)]
 pub struct SdigEncodingS<Ft, S> {
     n_per_row: usize, // number of inputs to the encoding
     n_cols: usize,    // number of outputs from the encoding
     params: CodeParams,
     code: ExpanderCode<Ft>,
+    slices: usize,    // 0 = adaptive (Plan 04 §2.2), >0 = explicit slice count
     _p: std::marker::PhantomData<S>,
 }
 
@@ -138,6 +150,7 @@ where
             n_cols: code.codeword_len(),
             params,
             code,
+            slices: 0, // 0 = adaptive (Plan 04 §2.2)
             _p: std::marker::PhantomData,
         }
     }
@@ -150,6 +163,77 @@ where
     /// The expander code (graphs and base case) of this encoding.
     pub fn code(&self) -> &ExpanderCode<Ft> {
         &self.code
+    }
+
+    /// Return the configured horizontal slice count (0 = adaptive).
+    #[inline]
+    pub fn slices(&self) -> usize {
+        self.slices
+    }
+
+    /// Set the horizontal slice count (0 = adaptive).
+    #[inline]
+    pub fn set_slices(&mut self, slices: usize) {
+        self.slices = slices;
+    }
+
+    /// Set the horizontal slice count (builder style; 0 = adaptive).
+    #[inline]
+    pub fn with_slices(mut self, slices: usize) -> Self {
+        self.slices = slices;
+        self
+    }
+
+    /// Compute the effective slice count that will be used for encoding a batch of `n_rows`.
+    ///
+    /// If `self.slices > 0`, returns `self.slices`.
+    /// If `self.slices == 0`, calculates the adaptive slice count $s^*$ using the detected
+    /// host LLC budget (Plan 04 §2.2).
+    pub fn effective_slices(&self, n_rows: usize) -> usize {
+        if self.slices > 0 {
+            self.slices
+        } else {
+            adaptive_slice_count(self.n_per_row, n_rows, std::mem::size_of::<Ft>())
+        }
+    }
+
+    /// Auto-tune the optimal slice count empirically by timing candidate slice counts around $s^*$
+    /// on this encoding instance (Plan 04 §2.2 Step 3).
+    pub fn autotune_slices(&self, n_rows: usize) -> usize {
+        crate::encode::autotune_slices(&self.code, n_rows)
+    }
+
+    /// Auto-tune the slice count empirically and configure this instance to use it.
+    pub fn autotune(&mut self, n_rows: usize) -> usize {
+        let best_s = self.autotune_slices(n_rows);
+        self.set_slices(best_s);
+        best_s
+    }
+
+    /// Auto-tune the slice count empirically (builder style).
+    pub fn with_autotuned_slices(mut self, n_rows: usize) -> Self {
+        self.autotune(n_rows);
+        self
+    }
+
+    /// Encode all rows in sliced batched column-major passes.
+    ///
+    /// Slices the rows horizontally into `slices` chunks (or uses adaptive slicing if `slices == 0`).
+    /// Keeps working sets resident in LLC during expander evaluation.
+    pub fn encode_rows_with_slices(
+        &self,
+        comm: &mut [Ft],
+        n_cols: usize,
+        slices: usize,
+    ) -> Result<(), std::io::Error> {
+        assert_eq!(n_cols, self.n_cols);
+        assert_eq!(comm.len() % n_cols, 0);
+        let n_rows = comm.len() / n_cols;
+        if n_rows == 0 {
+            return Ok(());
+        }
+        encode_row_major_slices(comm, n_rows, &self.code, slices);
+        Ok(())
     }
 }
 
@@ -202,35 +286,13 @@ where
         Ok(())
     }
 
-    /// Encode all rows in one batched pass over a column-major copy of the matrix.
+    /// Encode all rows in sliced batched column-major passes.
     ///
-    /// The messages are transposed into a column-major (position-major, row-minor)
-    /// buffer, all rows are encoded together by [`encode_col_major`], and the
-    /// redundancy columns are transposed back into the row-major `comm` (the message
-    /// columns are unchanged because the code is systematic). The row-major layout is
-    /// kept at this boundary so that `LcCommit`, its serialization, column hashing, and
-    /// column openings are unchanged. The buffer costs one extra copy of the matrix.
+    /// Respects the configured slice count (or selects an adaptive slice count if `slices == 0`).
+    /// The messages are transposed into a column-major slice scratch buffer, encoded via [`encode_col_major`],
+    /// and the redundancy columns are transposed back into the row-major `comm`.
     fn encode_rows(&self, comm: &mut [Ft], n_cols: usize) -> Result<(), Self::Err> {
-        assert_eq!(n_cols, self.n_cols);
-        assert_eq!(comm.len() % n_cols, 0);
-        let n_rows = comm.len() / n_cols;
-        if n_rows == 0 {
-            return Ok(());
-        }
-        let n_per_row = self.n_per_row;
-
-        let mut buf = vec![<Ft as Field>::ZERO; n_cols * n_rows];
-        transpose_into(comm, n_cols, &mut buf, n_rows, n_rows, n_per_row);
-        encode_col_major(&mut buf, n_rows, &self.code);
-        transpose_into(
-            &buf[n_per_row * n_rows..],
-            n_rows,
-            &mut comm[n_per_row..],
-            n_cols,
-            n_cols - n_per_row,
-            n_rows,
-        );
-        Ok(())
+        self.encode_rows_with_slices(comm, n_cols, self.slices)
     }
 
     fn get_dims(&self, len: usize) -> (usize, usize, usize) {
