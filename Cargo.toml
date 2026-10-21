@@ -6,6 +6,8 @@ members = [
     "lcpc-brakedown-pc",
     "lcpc-test-fields",
     "lcpc-fields",
+    "lcpc-oracle-tests",
+    "lcpc-spielman-oracle",
     "bench",
 ]
 exclude = ["external/lcpc-orig"]

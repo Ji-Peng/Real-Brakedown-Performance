@@ -4,11 +4,22 @@ version = 4
 
 [[package]]
 name = "addchain"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e33f6a175ec6a9e0aca777567f9ff7c3deefc255660df887e7fa3585e9801d8"
+dependencies = [
+ "num-bigint 0.3.3",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "addchain"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5665045de74fda906c0abfaec40cf2551f88c34dccea869f3fe950dde7209764"
 dependencies = [
- "num-bigint",
+ "num-bigint 0.4.8",
  "num-integer",
  "num-traits",
 ]
@@ -182,6 +193,15 @@ dependencies = [
 
 [[package]]
 name = "digest"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066"
+dependencies = [
+ "generic-array",
+]
+
+[[package]]
+name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
@@ -195,6 +215,20 @@ name = "either"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e9c71c2167ca323c882b99918929403426e2373ea17242ff5653e0d5e1058be"
+
+[[package]]
+name = "err-derive"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22deed3a8124cff5fa835713fa105621e43bbdc46690c3a6b68328a012d350d4"
+dependencies = [
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "rustversion",
+ "syn 1.0.109",
+ "synstructure",
+]
 
 [[package]]
 name = "err-derive"
@@ -212,15 +246,56 @@ dependencies = [
 
 [[package]]
 name = "ff"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d013fc25338cc558c5c2cfbad646908fb23591e2404481826742b651c9af7160"
+dependencies = [
+ "bitvec",
+ "byteorder",
+ "ff_derive 0.12.1",
+ "rand_core 0.6.4",
+ "subtle",
+]
+
+[[package]]
+name = "ff"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1f686ab92a9fb0eaf188f6c6c87b89490baa6fdb0db4544ba4dc47f7942489f"
 dependencies = [
  "bitvec",
  "byteorder",
- "ff_derive",
+ "ff_derive 0.14.0",
  "rand_core 0.10.1",
  "subtle",
+]
+
+[[package]]
+name = "ff-derive-num"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e715451ab983be06481e927a275ec12372103ad426c7cb82cebfe14698ed4cf4"
+dependencies = [
+ "num-traits",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "ff_derive"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17db6fa0748f1f66e9dbafba1881009b50614948c0e900f59083afff2f8d784b"
+dependencies = [
+ "addchain 0.2.1",
+ "cfg-if",
+ "num-bigint 0.3.3",
+ "num-integer",
+ "num-traits",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -229,8 +304,8 @@ version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "241afe8c15ffa21933eaefe8a563af36fd9fc98a3e8a044e8f7db52eb1fae3d8"
 dependencies = [
- "addchain",
- "num-bigint",
+ "addchain 0.3.0",
+ "num-bigint 0.4.8",
  "num-integer",
  "num-traits",
  "proc-macro2",
@@ -262,13 +337,24 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
+version = "0.1.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8fc3cb4d91f53b50155bdcfd23f6a4c39ae1969c2ae85982b135750cccaf5fce"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "wasi 0.9.0+wasi-snapshot-preview1",
+]
+
+[[package]]
+name = "getrandom"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff2abc00be7fca6ebc474524697ae276ad847ad0a6b3faa4bcb027e9a4614ad0"
 dependencies = [
  "cfg-if",
  "libc",
- "wasi",
+ "wasi 0.11.1+wasi-snapshot-preview1",
 ]
 
 [[package]]
@@ -288,6 +374,15 @@ name = "hermit-abi"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e17592d60ebacc7d5e169f4663c5f84f9161cc90328abcfe8456f41e4dfcb284"
+
+[[package]]
+name = "itertools"
+version = "0.10.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
+dependencies = [
+ "either",
+]
 
 [[package]]
 name = "itertools"
@@ -318,15 +413,31 @@ name = "lcpc-2d"
 version = "0.1.1"
 dependencies = [
  "bincode",
- "digest",
- "err-derive",
- "ff",
- "itertools",
- "lcpc-test-fields",
- "merlin",
+ "digest 0.10.7",
+ "err-derive 0.3.1",
+ "ff 0.14.0",
+ "itertools 0.14.0",
+ "lcpc-test-fields 0.1.0",
+ "merlin 3.0.0",
  "ppv-lite86",
- "rand",
- "rand_chacha",
+ "rand 0.10.3",
+ "rand_chacha 0.10.0",
+ "rayon",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
+name = "lcpc-2d"
+version = "0.1.1"
+source = "git+https://github.com/conroi/lcpc?rev=f0e2116001af5a1bbf39481535f837d6a25772e8#f0e2116001af5a1bbf39481535f837d6a25772e8"
+dependencies = [
+ "digest 0.9.0",
+ "err-derive 0.2.4",
+ "ff 0.12.1",
+ "merlin 2.0.1",
+ "rand 0.8.8",
+ "rand_chacha 0.3.1",
  "rayon",
  "serde",
  "serde_bytes",
@@ -338,20 +449,20 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "blake3",
- "digest",
- "ff",
- "lcpc-2d",
- "lcpc-brakedown-pc",
+ "digest 0.10.7",
+ "ff 0.14.0",
+ "lcpc-2d 0.1.1",
+ "lcpc-brakedown-pc 0.1.1",
  "lcpc-fields",
- "lcpc-test-fields",
- "merlin",
+ "lcpc-test-fields 0.1.0",
+ "merlin 3.0.0",
  "num-traits",
  "ppv-lite86",
- "rand",
- "rand_chacha",
+ "rand 0.10.3",
+ "rand_chacha 0.10.0",
  "rayon",
  "serde",
- "sprs",
+ "sprs 0.11.6",
 ]
 
 [[package]]
@@ -360,21 +471,38 @@ version = "0.1.1"
 dependencies = [
  "bincode",
  "blake3",
- "ff",
- "itertools",
- "lcpc-2d",
+ "ff 0.14.0",
+ "itertools 0.14.0",
+ "lcpc-2d 0.1.1",
  "lcpc-fields",
- "lcpc-test-fields",
- "merlin",
- "ndarray",
+ "lcpc-test-fields 0.1.0",
+ "merlin 3.0.0",
+ "ndarray 0.17.2",
  "num-traits",
  "ppv-lite86",
- "rand",
- "rand_chacha",
+ "rand 0.10.3",
+ "rand_chacha 0.10.0",
  "rayon",
  "serde",
  "serde_json",
- "sprs",
+ "sprs 0.11.6",
+ "typenum",
+]
+
+[[package]]
+name = "lcpc-brakedown-pc"
+version = "0.1.1"
+source = "git+https://github.com/conroi/lcpc?rev=f0e2116001af5a1bbf39481535f837d6a25772e8#f0e2116001af5a1bbf39481535f837d6a25772e8"
+dependencies = [
+ "ff 0.12.1",
+ "itertools 0.10.5",
+ "lcpc-2d 0.1.1 (git+https://github.com/conroi/lcpc?rev=f0e2116001af5a1bbf39481535f837d6a25772e8)",
+ "ndarray 0.14.0",
+ "num-traits",
+ "rand 0.8.8",
+ "rand_chacha 0.3.1",
+ "rayon",
+ "sprs 0.10.0",
  "typenum",
 ]
 
@@ -383,14 +511,14 @@ name = "lcpc-fields"
 version = "0.1.1"
 dependencies = [
  "bincode",
- "ff",
- "lcpc-2d",
- "lcpc-test-fields",
- "num-bigint",
+ "ff 0.14.0",
+ "lcpc-2d 0.1.1",
+ "lcpc-test-fields 0.1.0",
+ "num-bigint 0.4.8",
  "num-integer",
  "num-traits",
- "rand",
- "rand_chacha",
+ "rand 0.10.3",
+ "rand_chacha 0.10.0",
  "rand_core 0.10.1",
  "serde",
  "serde_json",
@@ -402,14 +530,52 @@ name = "lcpc-ligero-pc"
 version = "0.1.1"
 dependencies = [
  "bincode",
- "ff",
- "itertools",
- "lcpc-2d",
- "lcpc-test-fields",
- "merlin",
- "rand",
- "rand_chacha",
+ "ff 0.14.0",
+ "itertools 0.14.0",
+ "lcpc-2d 0.1.1",
+ "lcpc-test-fields 0.1.0",
+ "merlin 3.0.0",
+ "rand 0.10.3",
+ "rand_chacha 0.10.0",
  "typenum",
+]
+
+[[package]]
+name = "lcpc-oracle-tests"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "blake3",
+ "digest 0.9.0",
+ "ff 0.12.1",
+ "ff 0.14.0",
+ "lcpc-2d 0.1.1",
+ "lcpc-2d 0.1.1 (git+https://github.com/conroi/lcpc?rev=f0e2116001af5a1bbf39481535f837d6a25772e8)",
+ "lcpc-brakedown-pc 0.1.1",
+ "lcpc-brakedown-pc 0.1.1 (git+https://github.com/conroi/lcpc?rev=f0e2116001af5a1bbf39481535f837d6a25772e8)",
+ "lcpc-fields",
+ "lcpc-test-fields 0.1.0",
+ "lcpc-test-fields 0.1.1",
+ "merlin 2.0.1",
+ "merlin 3.0.0",
+ "num-traits",
+ "rand 0.10.3",
+ "rand 0.8.8",
+ "rand_chacha 0.10.0",
+ "rand_chacha 0.3.1",
+ "serde",
+ "sprs 0.11.6",
+]
+
+[[package]]
+name = "lcpc-spielman-oracle"
+version = "0.1.0"
+dependencies = [
+ "ff 0.14.0",
+ "lcpc-2d 0.1.1",
+ "lcpc-fields",
+ "libc",
+ "num-traits",
 ]
 
 [[package]]
@@ -417,15 +583,31 @@ name = "lcpc-test-fields"
 version = "0.1.0"
 dependencies = [
  "blake3",
- "digest",
- "err-derive",
- "ff",
- "itertools",
+ "digest 0.10.7",
+ "err-derive 0.3.1",
+ "ff 0.14.0",
+ "itertools 0.14.0",
  "num-traits",
  "ppv-lite86",
- "rand",
+ "rand 0.10.3",
  "rayon",
  "serde",
+]
+
+[[package]]
+name = "lcpc-test-fields"
+version = "0.1.1"
+source = "git+https://github.com/conroi/lcpc?rev=f0e2116001af5a1bbf39481535f837d6a25772e8#f0e2116001af5a1bbf39481535f837d6a25772e8"
+dependencies = [
+ "bitvec",
+ "byteorder",
+ "ff 0.12.1",
+ "ff-derive-num",
+ "num-traits",
+ "rand 0.8.8",
+ "rand_core 0.6.4",
+ "serde",
+ "subtle",
 ]
 
 [[package]]
@@ -439,6 +621,15 @@ name = "libm"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
+
+[[package]]
+name = "matrixmultiply"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "916806ba0031cd542105d916a97c8572e1fa6dd79c9c51e7eb43a09ec2dd84c1"
+dependencies = [
+ "rawpointer",
+]
 
 [[package]]
 name = "matrixmultiply"
@@ -458,6 +649,18 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
 name = "merlin"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e261cf0f8b3c42ded9f7d2bb59dea03aa52bc8a1cbc7482f9fc3fd1229d3b42"
+dependencies = [
+ "byteorder",
+ "keccak",
+ "rand_core 0.5.1",
+ "zeroize",
+]
+
+[[package]]
+name = "merlin"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "58c38e2799fc0978b65dfff8023ec7843e2330bb462f19198840b34b6582397d"
@@ -470,17 +673,41 @@ dependencies = [
 
 [[package]]
 name = "ndarray"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c0d5c9540a691d153064dc47a4db2504587a75eae07bf1d73f7a596ebc73c04"
+dependencies = [
+ "matrixmultiply 0.2.4",
+ "num-complex 0.3.1",
+ "num-integer",
+ "num-traits",
+ "rawpointer",
+]
+
+[[package]]
+name = "ndarray"
 version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "520080814a7a6b4a6e9070823bb24b4531daac8c4627e08ba5de8c5ef2f2752d"
 dependencies = [
- "matrixmultiply",
+ "matrixmultiply 0.3.11",
  "num-complex 0.4.6",
  "num-integer",
  "num-traits",
  "portable-atomic",
  "portable-atomic-util",
  "rawpointer",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f6f7833f2cbf2360a6cfd58cd41a53aa7a90bd4c202f5b1c7dd2ed73c57b2c3"
+dependencies = [
+ "autocfg",
+ "num-integer",
+ "num-traits",
 ]
 
 [[package]]
@@ -500,6 +727,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6b19411a9719e753aff12e5187b74d60d3dc449ec3f4dc21e3989c3f554bc95"
 dependencies = [
  "autocfg",
+ "num-traits",
+]
+
+[[package]]
+name = "num-complex"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "747d632c0c558b87dbabbe6a82f3b4ae03720d0646ac5b7b4dae89394be5f2c5"
+dependencies = [
  "num-traits",
 ]
 
@@ -621,6 +857,17 @@ checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
 
 [[package]]
 name = "rand"
+version = "0.8.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e058c7de0b26af77780c769414d6257830bb240f3c38477dbc2c16e5f54d6d4c"
+dependencies = [
+ "libc",
+ "rand_chacha 0.3.1",
+ "rand_core 0.6.4",
+]
+
+[[package]]
+name = "rand"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65c9fb96cbc91e3478eaae79a69fcd3f1ae4ad052e471fe6732fff548984b4af"
@@ -632,12 +879,31 @@ dependencies = [
 
 [[package]]
 name = "rand_chacha"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
+dependencies = [
+ "ppv-lite86",
+ "rand_core 0.6.4",
+]
+
+[[package]]
+name = "rand_chacha"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e6af7f3e25ded52c41df4e0b1af2d047e45896c2f3281792ed68a1c243daedb"
 dependencies = [
  "ppv-lite86",
  "rand_core 0.10.1",
+]
+
+[[package]]
+name = "rand_core"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90bde5296fc891b0cef12a6d03ddccc162ce7b2aff54160af9338f8d40df6d19"
+dependencies = [
+ "getrandom 0.1.16",
 ]
 
 [[package]]
@@ -754,12 +1020,27 @@ checksum = "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b"
 
 [[package]]
 name = "sprs"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9fc9999597a9e160f7aae4ab43f395365b396cfd971406ffb4b066679a81ca3"
+dependencies = [
+ "alga",
+ "ndarray 0.14.0",
+ "num-complex 0.2.4",
+ "num-traits",
+ "num_cpus",
+ "rayon",
+ "smallvec",
+]
+
+[[package]]
+name = "sprs"
 version = "0.11.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59468ff1d42d9e2439415c7dbb6d9d965253dac6986f29dbcda72c2e36e94fb7"
 dependencies = [
  "alga",
- "ndarray",
+ "ndarray 0.17.2",
  "num-complex 0.4.6",
  "num-traits",
  "num_cpus",
@@ -847,6 +1128,12 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "wasi"
+version = "0.9.0+wasi-snapshot-preview1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cccddf32554fecc6acb585f82a32a72e28b48f8c4c1883ddfeeeaa96f7d8e519"
 
 [[package]]
 name = "wasi"

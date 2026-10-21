@@ -6,6 +6,7 @@ rustflags = [
 ]
 
 [build]
+rustc-wrapper = "tools/rustc-oracle-wrapper.sh"
 rustflags = [
     "-C", "no-vectorize-loops",
     "-C", "no-vectorize-slp",

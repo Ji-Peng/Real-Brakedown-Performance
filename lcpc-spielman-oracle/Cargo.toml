@@ -1,0 +1,21 @@
+# Copyright 2026 RealBrakedownPerf Authors
+#
+# Licensed under the Apache License, Version 2.0 (see
+# LICENSE or https://www.apache.org/licenses/LICENSE-2.0).
+# This file may not be copied, modified, or distributed
+# except according to those terms.
+
+[package]
+name = "lcpc-spielman-oracle"
+version = "0.1.0"
+edition = "2021"
+description = "Test-only glibc TYPE_3 RNG sampler, Alg. 1-4 reference encoder, and SIMD-Spielman tv/ oracle"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+ff = "0.14"
+lcpc-2d = { path = "../lcpc-2d", version = "0.1.1" }
+lcpc-fields = { path = "../lcpc-fields", version = "0.1.1" }
+libc = "0.2"
+num-traits = "0.2"
