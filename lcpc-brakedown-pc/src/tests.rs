@@ -877,3 +877,128 @@ fn test_end_to_end_fp2m61_with_proof_serde() {
     run_fp2_test::<SdigCode3>(8, 0x1122_3344);
     run_fp2_test::<SdigCode6>(10, 0x5566_7788);
 }
+
+// Upstream LCPC's per-row encoder (`f0e2116`, `encode.rs`), kept verbatim as a test-only
+// reference for the batched column-major encoder introduced in `step/03-column-major`:
+// one `sprs` CSC matrix-vector product per precode/postcode, on a single row.
+fn encode_row_sprs_reference<F>(xi: &mut [F], precodes: &[CsMat<F>], postcodes: &[CsMat<F>])
+where
+    F: Field + Num + MulAcc,
+{
+    use ndarray::ArrayView;
+
+    let mut in_start = 0usize;
+    for precode in precodes.iter().take(precodes.len() - 1) {
+        let in_end = in_start + precode.cols();
+        let (in_arr, out_arr) = xi.split_at_mut(in_end);
+        out_arr[..precode.rows()].copy_from_slice(
+            precode
+                .dot(&ArrayView::from(&in_arr[in_start..]))
+                .as_slice()
+                .unwrap(),
+        );
+        in_start = in_end;
+    }
+
+    let (mut in_start, mut out_start) = {
+        let precode = precodes.last().unwrap();
+        let in_end = in_start + precode.cols();
+        let (in_arr, _) = precode
+            .dot(&ArrayView::from(&xi[in_start..in_end]))
+            .into_raw_vec_and_offset();
+        let out_end = in_end + postcodes.last().unwrap().cols();
+        let xo = &mut xi[in_end..out_end];
+        let mut x = F::ONE;
+        for r in xo.iter_mut() {
+            *r = F::ZERO;
+            for j in (0..in_arr.len()).rev() {
+                *r *= x;
+                *r += in_arr[j];
+            }
+            x += F::ONE;
+        }
+        (in_end + precode.rows(), out_end)
+    };
+
+    for (precode, postcode) in precodes.iter().rev().zip(postcodes.iter().rev()) {
+        in_start -= precode.rows();
+        let (in_arr, out_arr) = xi.split_at_mut(out_start);
+        out_arr[..postcode.rows()].copy_from_slice(
+            postcode
+                .dot(&ArrayView::from(&in_arr[in_start..]))
+                .as_slice()
+                .unwrap(),
+        );
+        out_start += postcode.rows();
+    }
+    assert_eq!(in_start, precodes[0].cols());
+    assert_eq!(out_start, xi.len());
+}
+
+// The batched column-major encoder (direct kernel, single-vector wrapper, and the
+// `LcEncoding::encode_rows` override used by `commit`) must reproduce the upstream
+// per-row encoder bit for bit, for every batch size including the verifier's 1 and 2.
+#[test]
+fn batched_col_major_encode_matches_per_row_reference() {
+    use super::codespec::{SdigCode3, SdigCode6, SdigSpecification};
+    use super::encode::{codeword_length, encode, encode_col_major};
+    use super::matgen::generate;
+
+    fn check<F, S>(n_per_row: usize, seed: u64)
+    where
+        F: Field + FieldHash + MulAcc + Num + SizedField + std::fmt::Debug,
+        S: SdigSpecification + std::fmt::Debug + Clone + Sync,
+    {
+        let (pre, post) = generate::<F, S>(n_per_row, seed);
+        let n_cols = codeword_length(&pre, &post);
+        let enc = SdigEncodingS::<F, S>::new_from_dims(n_per_row, n_cols, seed);
+        let mut rng = ChaCha20Rng::seed_from_u64(seed ^ 0x0c01_3a70);
+
+        for n_rows in [1usize, 2, 3, 5, 16, 33] {
+            // row-major messages, followed by garbage that every encoder must overwrite
+            let mut rows: Vec<F> = (0..n_rows * n_cols).map(|_| F::random(&mut rng)).collect();
+
+            // reference: upstream per-row sprs encoding
+            let mut expect = rows.clone();
+            for row in expect.chunks_mut(n_cols) {
+                encode_row_sprs_reference(row, &pre, &post);
+            }
+
+            // single-vector wrapper, row by row
+            let mut single = rows.clone();
+            for row in single.chunks_mut(n_cols) {
+                encode(row, &pre, &post);
+            }
+            assert_eq!(single, expect, "encode, n_rows={n_rows}");
+
+            // direct column-major kernel
+            let mut buf = vec![F::ZERO; n_cols * n_rows];
+            for row in 0..n_rows {
+                for col in 0..n_cols {
+                    buf[col * n_rows + row] = rows[row * n_cols + col];
+                }
+            }
+            encode_col_major(&mut buf, n_rows, &pre, &post);
+            for row in 0..n_rows {
+                for col in 0..n_cols {
+                    assert_eq!(
+                        buf[col * n_rows + row],
+                        expect[row * n_cols + col],
+                        "encode_col_major, n_rows={n_rows}, row={row}, col={col}"
+                    );
+                }
+            }
+
+            // row-major batched entry point used by LcCommit::commit
+            enc.encode_rows(&mut rows, n_cols).unwrap();
+            assert_eq!(rows, expect, "encode_rows, n_rows={n_rows}");
+        }
+    }
+
+    check::<Ft63, SdigCode3>(300, 1);
+    check::<Ft127, SdigCode3>(257, 2);
+    check::<Ft127, SdigCode6>(512, 3);
+    check::<Mont127, SdigCode6>(512, 3);
+    check::<Mers127, SdigCode3>(400, 4);
+    check::<Fp2M61, SdigCode6>(333, 5);
+}

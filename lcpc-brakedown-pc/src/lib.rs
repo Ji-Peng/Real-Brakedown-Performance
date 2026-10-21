@@ -13,7 +13,7 @@ sdig-pc is a polynomial commitment scheme from the SDIG expander code
 */
 
 use codespec::{SdigCode3 as SdigCodeDflt, SdigSpecification};
-use encode::{codeword_length, encode};
+use encode::{codeword_length, encode, encode_col_major, transpose_into};
 use matgen::generate;
 
 use ff::Field;
@@ -148,6 +148,37 @@ where
 
     fn encode<T: AsMut<[Ft]>>(&self, inp: T) -> Result<(), Self::Err> {
         encode(inp, &self.precodes, &self.postcodes);
+        Ok(())
+    }
+
+    /// Encode all rows in one batched pass over a column-major copy of the matrix.
+    ///
+    /// The messages are transposed into a column-major (position-major, row-minor)
+    /// buffer, all rows are encoded together by [`encode_col_major`], and the
+    /// redundancy columns are transposed back into the row-major `comm` (the message
+    /// columns are unchanged because the code is systematic). The row-major layout is
+    /// kept at this boundary so that `LcCommit`, its serialization, column hashing, and
+    /// column openings are unchanged. The buffer costs one extra copy of the matrix.
+    fn encode_rows(&self, comm: &mut [Ft], n_cols: usize) -> Result<(), Self::Err> {
+        assert_eq!(n_cols, self.n_cols);
+        assert_eq!(comm.len() % n_cols, 0);
+        let n_rows = comm.len() / n_cols;
+        if n_rows == 0 {
+            return Ok(());
+        }
+        let n_per_row = self.n_per_row;
+
+        let mut buf = vec![<Ft as Field>::ZERO; n_cols * n_rows];
+        transpose_into(comm, n_cols, &mut buf, n_rows, n_rows, n_per_row);
+        encode_col_major(&mut buf, n_rows, &self.precodes, &self.postcodes);
+        transpose_into(
+            &buf[n_per_row * n_rows..],
+            n_rows,
+            &mut comm[n_per_row..],
+            n_cols,
+            n_cols - n_per_row,
+            n_rows,
+        );
         Ok(())
     }
 

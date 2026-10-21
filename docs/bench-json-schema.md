@@ -28,8 +28,14 @@ Each measurement is an object with `samples_ns` (the raw timed samples) and a
 and `mean_ns`. Samples are integer nanoseconds. Summary values are numeric;
 the median and mean may be fractional when the sample count is even.
 
-`encode_matrix` excludes graph setup, allocation, and coefficient copying. It
-times all row encodings of one full coefficient matrix. The standalone
+`encode_matrix` excludes graph setup, allocation of the row-major matrix, and
+coefficient copying. It times all row encodings of one full coefficient matrix.
+The `external/lcpc-orig` driver and fork commits before `step/03-column-major`
+encode the rows one at a time on the calling thread. From `step/03-column-major`
+on, the fork calls `LcEncoding::encode_rows`, the same entry point that
+`LcCommit::commit` uses, which encodes all rows in one batched column-major pass;
+its time includes allocating the column-major scratch buffer and the transposes
+between the row-major matrix and that buffer. The standalone
 `hash_matrix_decomposition` reproduces LCPC's leaf and Merkle hash operations,
 including local scratch allocation; it is a checked decomposition rather than
 an internal hook into upstream. `commit_total` includes all work performed by

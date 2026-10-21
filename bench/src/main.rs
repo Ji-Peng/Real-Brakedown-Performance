@@ -521,13 +521,13 @@ where
     })
 }
 
+// Encode every row of the row-major matrix through the same entry point that
+// `LcCommit::commit` uses (one batched column-major pass since step/03-column-major).
 fn encode_matrix<F, S>(enc: &S, matrix: &mut [F], n_cols: usize)
 where
     S: LcEncoding<F = F>,
 {
-    for row in matrix.chunks_mut(n_cols) {
-        enc.encode(row).expect("LCPC encode failed");
-    }
+    enc.encode_rows(matrix, n_cols).expect("LCPC encode failed");
 }
 
 fn sample_times(mut runs: usize, mut operation: impl FnMut()) -> Vec<u128> {

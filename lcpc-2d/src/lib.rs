@@ -142,6 +142,22 @@ pub trait LcEncoding: Clone + std::fmt::Debug + Sync {
     /// Encoding function
     fn encode<T: AsMut<[Self::F]>>(&self, inp: T) -> Result<(), Self::Err>;
 
+    /// Encode every row of a row-major matrix of codewords in place.
+    ///
+    /// `comm` holds `comm.len() / n_cols` rows of `n_cols` elements each. On entry,
+    /// the first `n_per_row` elements of each row hold that row's message (the rest
+    /// of the row is ignored); on return, each row holds the same codeword that
+    /// [`LcEncoding::encode`] produces for that message.
+    ///
+    /// The default implementation encodes the rows independently in parallel, as
+    /// upstream LCPC's `commit` did. Encodings that can process many rows at once
+    /// (for example, the batched column-major encoder of `lcpc-brakedown-pc`)
+    /// override it; the result must be identical.
+    fn encode_rows(&self, comm: &mut [Self::F], n_cols: usize) -> Result<(), Self::Err> {
+        assert_eq!(comm.len() % n_cols, 0);
+        comm.par_chunks_mut(n_cols).try_for_each(|r| self.encode(r))
+    }
+
     /// Get dimensions for this encoding instance on an input vector of length `len`
     fn get_dims(&self, len: usize) -> (usize, usize, usize);
 
@@ -698,13 +714,13 @@ where
             c[..c_in.len()].copy_from_slice(c_in);
         });
 
-    // now compute FFTs
+    // place each row's message at the start of its codeword row
     comm.par_chunks_mut(n_cols)
         .zip(coeffs.par_chunks(n_per_row))
-        .try_for_each(|(r, c)| {
-            r[..c.len()].copy_from_slice(c);
-            enc.encode(r)
-        })?;
+        .for_each(|(r, c)| r[..c.len()].copy_from_slice(c));
+
+    // now encode all rows (batched for encodings that support it)
+    enc.encode_rows(&mut comm, n_cols)?;
 
     // compute Merkle tree
     let n_cols_np2 = n_cols
