@@ -218,34 +218,32 @@ pub fn mac_mers127(acc: &mut Mers127Acc, w: &Mers127, x: &Mers127) {
     let t2 = p11 as u64;
     let t3 = (p11 >> 64) as u64;
 
-    let s0 = (acc.c[0] as u128) + (t0 as u128);
-    acc.c[0] = s0 as u64;
-    let carry0 = s0 >> 64;
+    let (s0, c) = acc.c[0].carrying_add(t0, false);
+    let (s1, c) = acc.c[1].carrying_add(t1, c);
+    let (s2, c) = acc.c[2].carrying_add(t2, c);
+    let (s3, c) = acc.c[3].carrying_add(t3, c);
+    let (s4, _) = acc.c[4].carrying_add(0, c);
 
-    let s1 = (acc.c[1] as u128) + (t1 as u128) + carry0;
-    acc.c[1] = s1 as u64;
-    let carry1 = s1 >> 64;
-
-    let s2 = (acc.c[2] as u128) + (t2 as u128) + carry1;
-    acc.c[2] = s2 as u64;
-    let carry2 = s2 >> 64;
-
-    let s3 = (acc.c[3] as u128) + (t3 as u128) + carry2;
-    acc.c[3] = s3 as u64;
-    let carry3 = (s3 >> 64) as u64;
-
-    acc.c[4] = acc.c[4].wrapping_add(carry3);
+    acc.c[0] = s0;
+    acc.c[1] = s1;
+    acc.c[2] = s2;
+    acc.c[3] = s3;
+    acc.c[4] = s4;
 }
 
 /// Unreduced 5-limb accumulator addition for [`Mers127Acc`]: `acc += other`.
 #[inline(always)]
 pub fn add_mers127_acc(acc: &mut Mers127Acc, other: &Mers127Acc) {
-    let mut carry = 0u128;
-    for i in 0..5 {
-        let sum = (acc.c[i] as u128) + (other.c[i] as u128) + carry;
-        acc.c[i] = sum as u64;
-        carry = sum >> 64;
-    }
+    let (s0, c) = acc.c[0].carrying_add(other.c[0], false);
+    let (s1, c) = acc.c[1].carrying_add(other.c[1], c);
+    let (s2, c) = acc.c[2].carrying_add(other.c[2], c);
+    let (s3, c) = acc.c[3].carrying_add(other.c[3], c);
+    let (s4, _) = acc.c[4].carrying_add(other.c[4], c);
+    acc.c[0] = s0;
+    acc.c[1] = s1;
+    acc.c[2] = s2;
+    acc.c[3] = s3;
+    acc.c[4] = s4;
 }
 
 /// Shift-and-add Mersenne reduction of a 320-bit [`Mers127Acc`] modulo $2^{127} - 1$

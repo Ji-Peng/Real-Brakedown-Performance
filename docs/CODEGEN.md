@@ -80,11 +80,11 @@ Disassembly of all 16 hot kernels was verified across all three architectures us
 | **Vector Arithmetic Violations** | **0 (PASS)** | **0 (PASS)** | **0 (PASS)** | **0 (PASS)** |
 | **Primary Widening Multiply** | `mulxq` (3-operand BMI2) | `mulq` (implicit `%rax`/`%rdx`) | `mul` + `umulh` (pair) | `mul` + `mulhu` (pair) |
 | **Primary Carry Synthesis** | `adcq` (hardware flag) | `adcq` (hardware flag) | `adds` + `adcs` / `cinc` | `add` + `sltu` (emulated) |
-| **Hot Kernel Multiply Insns** | 393 (`mulx` 241, `mul` 152) | 369 (`mul` 369) | 563 (`mul`/`umulh`) | 73 (`mul`/`mulhu`) |
-| **Hot Kernel Carry Insns** | 397 (`adcq`) | 373 (`adcq`) | 373 (`adcs`/`cinc`) | 53 (`sltu`) |
-| **Hot Kernel Vector Moves** | 1,959 (buffer zeroing) | 2,350 (buffer zeroing) | 264 (buffer zeroing) | 0 |
-| **Hot Kernel Stack Spills** | 0 | 0 | 95 (prologue/epilogue) | 245 |
-| **Total Hot Instructions** | 6,308 | 6,433 | 4,716 | 1,296 |
+| **Hot Kernel Multiply Insns** | 358 (`mulx` 255, `mul` 103) | 352 (`mul` 352) | 586 (`mul`/`umulh`) | 55 (`mul`/`mulhu`) |
+| **Hot Kernel Carry Insns** | 403 (`adcq`) | 391 (`adcq`) | 393 (`adcs`/`cinc`) | 57 (`sltu`) |
+| **Hot Kernel Vector Moves** | 1,711 (buffer zeroing) | 2,297 (buffer zeroing) | 327 (buffer zeroing) | 0 |
+| **Hot Kernel Stack Spills** | 0 | 6 | 91 (prologue/epilogue) | 224 |
+| **Total Hot Instructions** | 5,521 | 6,087 | 4,481 | 1,281 |
 
 ---
 

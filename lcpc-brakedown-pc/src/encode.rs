@@ -1026,21 +1026,21 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
 
     let scratch_slice = &mut scratch[..n_rows];
 
-    for r in r_start..r_end {
+    for (r, dst) in (r_start..r_end).zip(output.chunks_exact_mut(n_rows)) {
         let (lefts, weights) = graph.incoming(r);
-        let local_r = r - r_start;
-        let dst = &mut output[local_r * n_rows..(local_r + 1) * n_rows];
         let num_edges = lefts.len();
         if num_edges == 0 {
             dst.fill(F::ZERO);
             continue;
         }
 
-        let mut e = 0;
         let mut since_fold = 0;
 
         if B == 4 {
-            while e + 4 <= num_edges {
+            let left_chunks = lefts.chunks_exact(4);
+            let weight_chunks = weights.chunks_exact(4);
+
+            for (l_chunk, w_chunk) in left_chunks.zip(weight_chunks) {
                 if since_fold + 4 > F::MAX_ACCUMULATIONS {
                     for acc in scratch_slice.iter_mut() {
                         F::fold(acc);
@@ -1048,15 +1048,22 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
                     since_fold = 1;
                 }
 
-                let w0 = F::prepare_weight(&weights[e]);
-                let w1 = F::prepare_weight(&weights[e + 1]);
-                let w2 = F::prepare_weight(&weights[e + 2]);
-                let w3 = F::prepare_weight(&weights[e + 3]);
+                let &[l0_idx, l1_idx, l2_idx, l3_idx] = l_chunk else {
+                    unreachable!()
+                };
+                let &[ref w0_raw, ref w1_raw, ref w2_raw, ref w3_raw] = w_chunk else {
+                    unreachable!()
+                };
 
-                let l0 = lefts[e] as usize * n_rows;
-                let l1 = lefts[e + 1] as usize * n_rows;
-                let l2 = lefts[e + 2] as usize * n_rows;
-                let l3 = lefts[e + 3] as usize * n_rows;
+                let w0 = F::prepare_weight(w0_raw);
+                let w1 = F::prepare_weight(w1_raw);
+                let w2 = F::prepare_weight(w2_raw);
+                let w3 = F::prepare_weight(w3_raw);
+
+                let l0 = l0_idx as usize * n_rows;
+                let l1 = l1_idx as usize * n_rows;
+                let l2 = l2_idx as usize * n_rows;
+                let l3 = l3_idx as usize * n_rows;
 
                 let src0 = &input[l0..l0 + n_rows];
                 let src1 = &input[l1..l1 + n_rows];
@@ -1072,11 +1079,36 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
                     scratch_slice[row] = acc;
                 }
 
-                e += 4;
                 since_fold += 4;
             }
+
+            let left_rem = lefts.chunks_exact(4).remainder();
+            let weight_rem = weights.chunks_exact(4).remainder();
+            for (&l_idx, w_raw) in left_rem.iter().zip(weight_rem.iter()) {
+                if since_fold >= F::MAX_ACCUMULATIONS {
+                    for acc in scratch_slice.iter_mut() {
+                        F::fold(acc);
+                    }
+                    since_fold = 1;
+                }
+
+                let w = F::prepare_weight(w_raw);
+                let l = l_idx as usize * n_rows;
+                let src = &input[l..l + n_rows];
+
+                for row in 0..n_rows {
+                    let mut acc = scratch_slice[row];
+                    F::mac(&mut acc, &w, &src[row]);
+                    scratch_slice[row] = acc;
+                }
+
+                since_fold += 1;
+            }
         } else if B == 2 {
-            while e + 2 <= num_edges {
+            let left_chunks = lefts.chunks_exact(2);
+            let weight_chunks = weights.chunks_exact(2);
+
+            for (l_chunk, w_chunk) in left_chunks.zip(weight_chunks) {
                 if since_fold + 2 > F::MAX_ACCUMULATIONS {
                     for acc in scratch_slice.iter_mut() {
                         F::fold(acc);
@@ -1084,11 +1116,18 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
                     since_fold = 1;
                 }
 
-                let w0 = F::prepare_weight(&weights[e]);
-                let w1 = F::prepare_weight(&weights[e + 1]);
+                let &[l0_idx, l1_idx] = l_chunk else {
+                    unreachable!()
+                };
+                let &[ref w0_raw, ref w1_raw] = w_chunk else {
+                    unreachable!()
+                };
 
-                let l0 = lefts[e] as usize * n_rows;
-                let l1 = lefts[e + 1] as usize * n_rows;
+                let w0 = F::prepare_weight(w0_raw);
+                let w1 = F::prepare_weight(w1_raw);
+
+                let l0 = l0_idx as usize * n_rows;
+                let l1 = l1_idx as usize * n_rows;
 
                 let src0 = &input[l0..l0 + n_rows];
                 let src1 = &input[l1..l1 + n_rows];
@@ -1100,32 +1139,53 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
                     scratch_slice[row] = acc;
                 }
 
-                e += 2;
                 since_fold += 2;
             }
-        }
 
-        // Remainder loop (or B == 1)
-        while e < num_edges {
-            if since_fold >= F::MAX_ACCUMULATIONS {
-                for acc in scratch_slice.iter_mut() {
-                    F::fold(acc);
+            let left_rem = lefts.chunks_exact(2).remainder();
+            let weight_rem = weights.chunks_exact(2).remainder();
+            for (&l_idx, w_raw) in left_rem.iter().zip(weight_rem.iter()) {
+                if since_fold >= F::MAX_ACCUMULATIONS {
+                    for acc in scratch_slice.iter_mut() {
+                        F::fold(acc);
+                    }
+                    since_fold = 1;
                 }
-                since_fold = 1;
+
+                let w = F::prepare_weight(w_raw);
+                let l = l_idx as usize * n_rows;
+                let src = &input[l..l + n_rows];
+
+                for row in 0..n_rows {
+                    let mut acc = scratch_slice[row];
+                    F::mac(&mut acc, &w, &src[row]);
+                    scratch_slice[row] = acc;
+                }
+
+                since_fold += 1;
             }
+        } else {
+            // Remainder loop (or B == 1)
+            for (&l_idx, w_raw) in lefts.iter().zip(weights.iter()) {
+                if since_fold >= F::MAX_ACCUMULATIONS {
+                    for acc in scratch_slice.iter_mut() {
+                        F::fold(acc);
+                    }
+                    since_fold = 1;
+                }
 
-            let w = F::prepare_weight(&weights[e]);
-            let l = lefts[e] as usize * n_rows;
-            let src = &input[l..l + n_rows];
+                let w = F::prepare_weight(w_raw);
+                let l = l_idx as usize * n_rows;
+                let src = &input[l..l + n_rows];
 
-            for row in 0..n_rows {
-                let mut acc = scratch_slice[row];
-                F::mac(&mut acc, &w, &src[row]);
-                scratch_slice[row] = acc;
+                for row in 0..n_rows {
+                    let mut acc = scratch_slice[row];
+                    F::mac(&mut acc, &w, &src[row]);
+                    scratch_slice[row] = acc;
+                }
+
+                since_fold += 1;
             }
-
-            e += 1;
-            since_fold += 1;
         }
 
         for (d, acc) in dst.iter_mut().zip(scratch_slice.iter_mut()) {
@@ -1180,20 +1240,16 @@ fn reed_solomon_column_block_range_shard<F: Field>(
     assert_eq!(xi.len() % n_rows, 0);
     assert!(c_start <= c_end);
     assert_eq!(xo.len(), (c_end - c_start) * n_rows);
-    let n_in_cols = xi.len() / n_rows;
 
     let mut x = F::ONE;
     for _ in 0..c_start {
         x += F::ONE;
     }
 
-    for col in c_start..c_end {
-        let local_col = col - c_start;
-        let r = &mut xo[local_col * n_rows..(local_col + 1) * n_rows];
+    for r in xo.chunks_exact_mut(n_rows) {
         r.fill(F::ZERO);
-        for j in (0..n_in_cols).rev() {
-            let coeff = &xi[j * n_rows..(j + 1) * n_rows];
-            for (o, c) in r.iter_mut().zip(coeff) {
+        for coeff in xi.chunks_exact(n_rows).rev() {
+            for (o, c) in r.iter_mut().zip(coeff.iter()) {
                 *o *= x;
                 *o += c;
             }

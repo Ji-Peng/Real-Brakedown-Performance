@@ -2,3 +2,5 @@
 target*/
 __pycache__/
 *.pyc
+docs/codegen/x86_64_native.report.json
+docs/codegen/x86_64_portability.report.json

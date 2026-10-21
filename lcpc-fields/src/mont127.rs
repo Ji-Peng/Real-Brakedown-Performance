@@ -256,34 +256,32 @@ pub fn mac_mont127(acc: &mut Mont127Acc, w: &Mont127, x: &Mont127) {
     let t2 = p11 as u64;
     let t3 = (p11 >> 64) as u64;
 
-    let s0 = (acc.c[0] as u128) + (t0 as u128);
-    acc.c[0] = s0 as u64;
-    let carry0 = s0 >> 64;
+    let (s0, c) = acc.c[0].carrying_add(t0, false);
+    let (s1, c) = acc.c[1].carrying_add(t1, c);
+    let (s2, c) = acc.c[2].carrying_add(t2, c);
+    let (s3, c) = acc.c[3].carrying_add(t3, c);
+    let (s4, _) = acc.c[4].carrying_add(0, c);
 
-    let s1 = (acc.c[1] as u128) + (t1 as u128) + carry0;
-    acc.c[1] = s1 as u64;
-    let carry1 = s1 >> 64;
-
-    let s2 = (acc.c[2] as u128) + (t2 as u128) + carry1;
-    acc.c[2] = s2 as u64;
-    let carry2 = s2 >> 64;
-
-    let s3 = (acc.c[3] as u128) + (t3 as u128) + carry2;
-    acc.c[3] = s3 as u64;
-    let carry3 = (s3 >> 64) as u64;
-
-    acc.c[4] = acc.c[4].wrapping_add(carry3);
+    acc.c[0] = s0;
+    acc.c[1] = s1;
+    acc.c[2] = s2;
+    acc.c[3] = s3;
+    acc.c[4] = s4;
 }
 
 /// Unreduced 5-limb accumulator addition for [`Mont127Acc`]: `acc += other`.
 #[inline(always)]
 pub fn add_mont127_acc(acc: &mut Mont127Acc, other: &Mont127Acc) {
-    let mut carry = 0u128;
-    for i in 0..5 {
-        let sum = (acc.c[i] as u128) + (other.c[i] as u128) + carry;
-        acc.c[i] = sum as u64;
-        carry = sum >> 64;
-    }
+    let (s0, c) = acc.c[0].carrying_add(other.c[0], false);
+    let (s1, c) = acc.c[1].carrying_add(other.c[1], c);
+    let (s2, c) = acc.c[2].carrying_add(other.c[2], c);
+    let (s3, c) = acc.c[3].carrying_add(other.c[3], c);
+    let (s4, _) = acc.c[4].carrying_add(other.c[4], c);
+    acc.c[0] = s0;
+    acc.c[1] = s1;
+    acc.c[2] = s2;
+    acc.c[3] = s3;
+    acc.c[4] = s4;
 }
 
 /// 3-word CIOS Montgomery reduction of a 5-limb [`Mont127Acc`] with radix $R = 2^{192}$
@@ -292,32 +290,45 @@ pub fn add_mont127_acc(acc: &mut Mont127Acc, other: &Mont127Acc) {
 /// Divides `acc` by $2^{192} \bmod q$ in 3 word-aligned iterations (9 64-bit multiplications
 /// and zero unaligned bit shifts), followed by a single conditional subtraction of $q$.
 #[inline(always)]
-pub fn reduce_mont127(mut acc: Mont127Acc) -> Mont127 {
+pub fn reduce_mont127(acc: Mont127Acc) -> Mont127 {
+    let [c0, mut c1, mut c2, mut c3, mut c4] = acc.c;
     let q0 = Mont127::MODULUS[0] as u128;
     let q1 = Mont127::MODULUS[1] as u128;
 
-    // 3 iterations of 64-bit word Montgomery reduction (divides by R = 2^192 mod q)
-    for i in 0..3 {
-        let u_i = acc.c[i].wrapping_mul(Mont127::MU0);
-        let u = u_i as u128;
+    // Iteration 0: clear c0
+    let u0 = c0.wrapping_mul(Mont127::MU0) as u128;
+    let carry0 = ((c0 as u128) + u0 * q0) >> 64;
+    let s1 = (c1 as u128) + u0 * q1 + carry0;
+    c1 = s1 as u64;
+    let carry1 = (s1 >> 64) as u64;
+    let (s2, c) = c2.carrying_add(carry1, false);
+    c2 = s2;
+    let (s3, c) = c3.carrying_add(0, c);
+    c3 = s3;
+    let (s4, _) = c4.carrying_add(0, c);
+    c4 = s4;
 
-        let p0 = u * q0 + (acc.c[i] as u128); // bits 0..63 become exactly zero
-        let carry0 = (p0 >> 64) as u64;
+    // Iteration 1: clear c1
+    let u1 = c1.wrapping_mul(Mont127::MU0) as u128;
+    let carry0 = ((c1 as u128) + u1 * q0) >> 64;
+    let s2 = (c2 as u128) + u1 * q1 + carry0;
+    c2 = s2 as u64;
+    let carry1 = (s2 >> 64) as u64;
+    let (s3, c) = c3.carrying_add(carry1, false);
+    c3 = s3;
+    let (s4, _) = c4.carrying_add(0, c);
+    c4 = s4;
 
-        let p1 = u * q1 + (acc.c[i + 1] as u128) + (carry0 as u128);
-        acc.c[i + 1] = p1 as u64;
-        let mut carry = (p1 >> 64) as u64;
+    // Iteration 2: clear c2
+    let u2 = c2.wrapping_mul(Mont127::MU0) as u128;
+    let carry0 = ((c2 as u128) + u2 * q0) >> 64;
+    let s3 = (c3 as u128) + u2 * q1 + carry0;
+    c3 = s3 as u64;
+    let carry1 = (s3 >> 64) as u64;
+    let (s4, _) = c4.carrying_add(carry1, false);
+    c4 = s4;
 
-        // Propagate carry across remaining upper limbs
-        for j in (i + 2)..5 {
-            let sum = (acc.c[j] as u128) + (carry as u128);
-            acc.c[j] = sum as u64;
-            carry = (sum >> 64) as u64;
-        }
-    }
-
-    // Result resides in (acc.c[3], acc.c[4]) < 2q
-    Mont127::sub_modulus_if_ge(acc.c[3], acc.c[4])
+    Mont127::sub_modulus_if_ge(c3, c4)
 }
 
 /// Non-inlined [`Mont127`] column MAC kernel for scalar disassembly verification (`check_codegen.py`).
