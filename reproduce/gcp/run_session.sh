@@ -262,7 +262,8 @@ log_info "Clearing remote status markers..."
 "$GCLOUD" compute ssh "$INSTANCE" --zone="$ZONE" \
     --command "rm -f '$REMOTE_LOG' '$REMOTE_STATUS' '$REMOTE_PID'"
 
-REMOTE_ALL_ARGS="--profile $PROFILE --session $SESSION_ID"
+if [ "$MACHINE" = c3d ]; then REMOTE_HOST_PROFILE=gcp-c3d-highmem-16; else REMOTE_HOST_PROFILE=gcp-c4a-highmem-16; fi
+REMOTE_ALL_ARGS="--profile $PROFILE --session $SESSION_ID --host $REMOTE_HOST_PROFILE"
 if [ -n "$SEED" ]; then
     REMOTE_ALL_ARGS="$REMOTE_ALL_ARGS --seed $SEED"
 fi
