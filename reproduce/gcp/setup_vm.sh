@@ -207,6 +207,18 @@ git -C "$REMOTE_CODE_DIR" clean -fdq -e results/ -e target/ -e 'target-*/'
 
 tar -xzf "$SOURCE_ARCHIVE" --no-same-owner -C "$REMOTE_CODE_DIR"
 
+# The fork's tests read SIMD-Spielman's test vectors from ../SIMD-Spielman-for-ZKPs/tv
+# (the parent repository's read-only submodule). Provide the same pinned upstream
+# checkout next to code/ on the VM.
+UPSTREAM_COMMIT=7b399dbfecc406c79349015f1e21accc4def1be7
+UPSTREAM_DIR=$(dirname -- "$REMOTE_CODE_DIR")/SIMD-Spielman-for-ZKPs
+if [ ! -d "$UPSTREAM_DIR/.git" ]; then
+    git clone --quiet https://github.com/flokrieger/SIMD-Spielman-for-ZKPs "$UPSTREAM_DIR"
+fi
+git -C "$UPSTREAM_DIR" checkout --quiet --force --detach "$UPSTREAM_COMMIT"
+[ "$(git -C "$UPSTREAM_DIR" rev-parse HEAD)" = "$UPSTREAM_COMMIT" ] || { printf '%s\n' 'SIMD-Spielman upstream commit mismatch' >&2; exit 1; }
+ls "$UPSTREAM_DIR/tv/bd_spielman_extension_N12_in.txt" >/dev/null
+
 FIRST_BOOT_DIR=$REMOTE_CODE_DIR/results/$HOST_PROFILE_NAME
 mkdir -p "$FIRST_BOOT_DIR"
 FIRST_BOOT_MANIFEST=$FIRST_BOOT_DIR/first-boot-manifest.json \
