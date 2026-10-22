@@ -18,10 +18,20 @@ index 1c172bb..b25c3a6 100755
  function(compile_field_test target file)
      add_executable(${target} ${file})
 diff --git a/bench/SpielmanExtensionMT_Bench.cpp b/bench/SpielmanExtensionMT_Bench.cpp
-index e7f62b4..7bba5a7 100644
+index e7f62b4..7b51db8 100644
 --- a/bench/SpielmanExtensionMT_Bench.cpp
 +++ b/bench/SpielmanExtensionMT_Bench.cpp
-@@ -32,17 +32,12 @@ int main(int argc, char* argv[])
+@@ -24,6 +24,9 @@ const uint32_t N = 1 << lgN;
+ 
+ int main(int argc, char* argv[])
+ {
++  // RealBrakedownPerf: pin the spin-waiting coordinator (main) thread after the
++  // THREADS workers, i.e. to the (THREADS+1)-th listed core (wraps if too few).
++  pinThread(THREADS);
+   if(argc < 2) {
+     printf("Missing parameter\n");
+     return -1;
+@@ -32,17 +35,12 @@ int main(int argc, char* argv[])
    uint32_t rep = 1;
    sscanf(argv[1], "%d", &rep);
  
@@ -41,7 +51,7 @@ index e7f62b4..7bba5a7 100644
    
    int64_t time = 0;
    __m512i checksum = _mm512_setzero_si512();
-@@ -63,6 +58,8 @@ int main(int argc, char* argv[])
+@@ -63,6 +61,8 @@ int main(int argc, char* argv[])
      spielman_mt.r2l_runEncodeMatrixEfficientMT(array_reordered);
      TIMESTAMP_FENCE(t2);
      time += std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
@@ -82,10 +92,20 @@ index 72ef391..50b996e 100644
      // compute some checksum to prevent code removal
      for(size_t i = 0; i < 2 * N / 8 * (sizeof(UnpackedExtensionField) / sizeof(__m512i)); i++)
 diff --git a/bench/SpielmanMersenneMT_Bench.cpp b/bench/SpielmanMersenneMT_Bench.cpp
-index e03cecd..d38d7b5 100644
+index e03cecd..8bcf209 100644
 --- a/bench/SpielmanMersenneMT_Bench.cpp
 +++ b/bench/SpielmanMersenneMT_Bench.cpp
-@@ -37,7 +37,7 @@ int main(int argc, char* argv[])
+@@ -24,6 +24,9 @@ const uint32_t N = 1 << lgN;
+ 
+ int main(int argc, char* argv[])
+ {
++  // RealBrakedownPerf: pin the spin-waiting coordinator (main) thread after the
++  // THREADS workers, i.e. to the (THREADS+1)-th listed core (wraps if too few).
++  pinThread(THREADS);
+   if(argc < 2) {
+     printf("Missing parameter\n");
+     return -1;
+@@ -37,7 +40,7 @@ int main(int argc, char* argv[])
    // initialize Spielman code
    SpielmanCodeMT<UnpackedMersennePrimeField> spielman_mt(N, seed, slices);
    UnpackedMersennePrimeField* array_reordered = new UnpackedMersennePrimeField[2 * N / 8];
@@ -94,7 +114,7 @@ index e03cecd..d38d7b5 100644
    
    int64_t time = 0;
    __m512i checksum = _mm512_setzero_si512();
-@@ -58,6 +58,8 @@ int main(int argc, char* argv[])
+@@ -58,6 +61,8 @@ int main(int argc, char* argv[])
      spielman_mt.r2l_runEncodeMatrixEfficientMT(array_reordered);
      TIMESTAMP_FENCE(t2);
      time += std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
@@ -135,10 +155,20 @@ index 3535a6a..6266eed 100644
      // compute some checksum to prevent code removal
      for(size_t i = 0; i < 2 * N / 8 * (sizeof(UnpackedMersennePrimeField) / sizeof(__m512i)); i++)
 diff --git a/bench/SpielmanMontgomeryMT_Bench.cpp b/bench/SpielmanMontgomeryMT_Bench.cpp
-index a63edea..ba26cf6 100644
+index a63edea..3dd1eca 100644
 --- a/bench/SpielmanMontgomeryMT_Bench.cpp
 +++ b/bench/SpielmanMontgomeryMT_Bench.cpp
-@@ -37,7 +37,7 @@ int main(int argc, char* argv[])
+@@ -24,6 +24,9 @@ const uint32_t N = 1 << lgN;
+ 
+ int main(int argc, char* argv[])
+ {
++  // RealBrakedownPerf: pin the spin-waiting coordinator (main) thread after the
++  // THREADS workers, i.e. to the (THREADS+1)-th listed core (wraps if too few).
++  pinThread(THREADS);
+   if(argc < 2) {
+     printf("Missing parameter\n");
+     return -1;
+@@ -37,7 +40,7 @@ int main(int argc, char* argv[])
    // initialize Spielman code
    SpielmanCodeMT<UnpackedMontgomeryPrimeField> spielman_mt(N, seed, slices);
    UnpackedMontgomeryPrimeField* array_reordered = new UnpackedMontgomeryPrimeField[2 * N / 8];
@@ -147,7 +177,7 @@ index a63edea..ba26cf6 100644
    
    int64_t time = 0;
    __m512i checksum = _mm512_setzero_si512();
-@@ -58,6 +58,8 @@ int main(int argc, char* argv[])
+@@ -58,6 +61,8 @@ int main(int argc, char* argv[])
      spielman_mt.r2l_runEncodeMatrixEfficientMT(array_reordered);
      TIMESTAMP_FENCE(t2);
      time += std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();

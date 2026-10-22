@@ -19,7 +19,7 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/common.sh"
 
-EXPECTED_PATCH_SHA256=12f29de2e5529ceb90cebf8bd61083fb006381bdd4e7965d7b2eacc651e1be5b
+EXPECTED_PATCH_SHA256=d9cf97f0347fbb6b41d96397f6be9e3d7b604381471ef901e5ba61e9d7806fb6
 UPSTREAM_URL=https://github.com/flokrieger/SIMD-Spielman-for-ZKPs.git
 FIELD_WAS_SET=0
 OUT_WAS_SET=0
@@ -55,9 +55,11 @@ fi
 if [ "$HOST_NAME" = generic ]; then
     HOST_NAME=$(hostname -s)
 fi
+# Upstream splits right nodes into THREADS parts (the last takes the remainder),
+# so any count works; 7 = 8-core point (7 workers + spin-waiting coordinator).
 case "$THREADS" in
-    1|2|4|8|16) ;;
-    *) log_error "Unsupported --threads value '$THREADS'; use 1, 2, 4, 8, or 16."; exit 1 ;;
+    ''|*[!0-9]*|0) log_error "Unsupported --threads value '$THREADS'; use a positive integer <= 16."; exit 1 ;;
+    *) [ "$THREADS" -le 16 ] || { log_error "Unsupported --threads value '$THREADS'; use a positive integer <= 16."; exit 1; } ;;
 esac
 if [ "$THREADS" -gt 1 ] && [ "$EXPLICIT_CORES" -ne 1 ]; then
     log_error "SIMD-Spielman multithreaded runs require an explicit --cores list."
@@ -205,6 +207,12 @@ manifest = {
     "warmup": int(os.environ.get("SIMD_WARMUP", "2")),
     "measurement_method": "one process per case (graph generated once); warm-up + timed encodings in-process, each on fresh random input, timed individually; warm-up encodings excluded",
     "benchmark_cores": os.environ.get("SIMD_CORES"),
+    # Multi-threaded upstream encoders have a spin-waiting coordinator (main) thread
+    # pinned after the THREADS workers; with THREADS >= listed cores it shares a
+    # worker's core, which over-subscribes that core.
+    "coordinator_shares_worker_core": int(os.environ.get("SIMD_THREADS", "1")) > 1
+        and int(os.environ.get("SIMD_THREADS", "1")) >= len([c for part in os.environ.get("SIMD_CORES", "").split(",") if part
+            for c in (range(int(part.split("-")[0]), int(part.split("-")[-1]) + 1))]),
     "correctness_test_cores": os.environ.get("SIMD_TEST_CORES"),
     "fields": os.environ.get("SIMD_FIELDS", "").replace(",", " ").split(),
     "shapes": [x for x in os.environ.get("SIMD_REQUESTED_SHAPES", "brakedown orion").split() if x],

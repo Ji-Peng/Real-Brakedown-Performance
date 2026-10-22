@@ -392,6 +392,13 @@ else:
             "description": f"E2: SIMD-Spielman AVX-512 {field_name} T=8 (logN 16..28)",
             "cmd": f"'{script_dir}/simd_spielman.sh' --field {field_name} --logN 16,18,20,22,24,26,28 --threads 8 --runs 5 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_simd_spielman_{field_name}_t8'"
         })
+        # Upstream's MT encoder adds a spin-waiting coordinator thread to its workers;
+        # on an 8-core host the fair 8-core point is 7 workers + coordinator (E2).
+        blocks.append({
+            "id": f"full_simd_spielman_{field_name}_t7",
+            "description": f"E2: SIMD-Spielman AVX-512 {field_name} 7 workers + coordinator on 8 cores (logN 16..28)",
+            "cmd": f"'{script_dir}/simd_spielman.sh' --field {field_name} --logN 16,18,20,22,24,26,28 --threads 7 --runs 5 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_simd_spielman_{field_name}_t7'"
+        })
 
     # E3: Per-technique breakdown (steps.sh mode a Mont127 and mode b Mers127)
     step_tags_flag = f"--tags '{tags_arg}'" if tags_arg else ""
