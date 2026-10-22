@@ -18,7 +18,7 @@ index 1c172bb..b25c3a6 100755
  function(compile_field_test target file)
      add_executable(${target} ${file})
 diff --git a/bench/SpielmanExtensionMT_Bench.cpp b/bench/SpielmanExtensionMT_Bench.cpp
-index e7f62b4..2751bd2 100644
+index e7f62b4..7bba5a7 100644
 --- a/bench/SpielmanExtensionMT_Bench.cpp
 +++ b/bench/SpielmanExtensionMT_Bench.cpp
 @@ -32,17 +32,12 @@ int main(int argc, char* argv[])
@@ -41,8 +41,17 @@ index e7f62b4..2751bd2 100644
    
    int64_t time = 0;
    __m512i checksum = _mm512_setzero_si512();
+@@ -63,6 +58,8 @@ int main(int argc, char* argv[])
+     spielman_mt.r2l_runEncodeMatrixEfficientMT(array_reordered);
+     TIMESTAMP_FENCE(t2);
+     time += std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
++    // RealBrakedownPerf: one line per encoding so a single process yields every sample.
++    printf("Encode sample %u : %10ld us\n", j, (long)std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+ 
+     // compute some checksum to prevent code removal
+     for(size_t i = 0; i < 2 * N / 8 * (sizeof(ExtensionField) / sizeof(__m512i)); i++)
 diff --git a/bench/SpielmanExtension_Bench.cpp b/bench/SpielmanExtension_Bench.cpp
-index 72ef391..ecd429a 100644
+index 72ef391..50b996e 100644
 --- a/bench/SpielmanExtension_Bench.cpp
 +++ b/bench/SpielmanExtension_Bench.cpp
 @@ -24,7 +24,7 @@ const uint32_t N = 1 << lgN;
@@ -63,8 +72,17 @@ index 72ef391..ecd429a 100644
    
    int64_t time = 0;
    __m512i checksum = _mm512_setzero_si512();
+@@ -60,6 +60,8 @@ int main(int argc, char* argv[])
+     spielman.r2l_runEncodeMatrixEfficient(array_reordered);
+     TIMESTAMP_FENCE(t2);
+     time += std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
++    // RealBrakedownPerf: one line per encoding so a single process yields every sample.
++    printf("Encode sample %u : %10ld us\n", j, (long)std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+ 
+     // compute some checksum to prevent code removal
+     for(size_t i = 0; i < 2 * N / 8 * (sizeof(UnpackedExtensionField) / sizeof(__m512i)); i++)
 diff --git a/bench/SpielmanMersenneMT_Bench.cpp b/bench/SpielmanMersenneMT_Bench.cpp
-index e03cecd..b1933e2 100644
+index e03cecd..d38d7b5 100644
 --- a/bench/SpielmanMersenneMT_Bench.cpp
 +++ b/bench/SpielmanMersenneMT_Bench.cpp
 @@ -37,7 +37,7 @@ int main(int argc, char* argv[])
@@ -76,8 +94,17 @@ index e03cecd..b1933e2 100644
    
    int64_t time = 0;
    __m512i checksum = _mm512_setzero_si512();
+@@ -58,6 +58,8 @@ int main(int argc, char* argv[])
+     spielman_mt.r2l_runEncodeMatrixEfficientMT(array_reordered);
+     TIMESTAMP_FENCE(t2);
+     time += std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
++    // RealBrakedownPerf: one line per encoding so a single process yields every sample.
++    printf("Encode sample %u : %10ld us\n", j, (long)std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+ 
+     // compute some checksum to prevent code removal
+     for(size_t i = 0; i < 2 * N / 8 * (sizeof(UnpackedMersennePrimeField) / sizeof(__m512i)); i++)
 diff --git a/bench/SpielmanMersenne_Bench.cpp b/bench/SpielmanMersenne_Bench.cpp
-index 3535a6a..df137ef 100644
+index 3535a6a..6266eed 100644
 --- a/bench/SpielmanMersenne_Bench.cpp
 +++ b/bench/SpielmanMersenne_Bench.cpp
 @@ -24,7 +24,7 @@ const uint32_t N = 1 << lgN;
@@ -98,8 +125,17 @@ index 3535a6a..df137ef 100644
    
    int64_t time = 0;
    __m512i checksum = _mm512_setzero_si512();
+@@ -60,6 +60,8 @@ int main(int argc, char* argv[])
+     spielman.r2l_runEncodeMatrixEfficient(array_reordered);
+     TIMESTAMP_FENCE(t2);
+     time += std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
++    // RealBrakedownPerf: one line per encoding so a single process yields every sample.
++    printf("Encode sample %u : %10ld us\n", j, (long)std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+ 
+     // compute some checksum to prevent code removal
+     for(size_t i = 0; i < 2 * N / 8 * (sizeof(UnpackedMersennePrimeField) / sizeof(__m512i)); i++)
 diff --git a/bench/SpielmanMontgomeryMT_Bench.cpp b/bench/SpielmanMontgomeryMT_Bench.cpp
-index a63edea..8b05ab6 100644
+index a63edea..ba26cf6 100644
 --- a/bench/SpielmanMontgomeryMT_Bench.cpp
 +++ b/bench/SpielmanMontgomeryMT_Bench.cpp
 @@ -37,7 +37,7 @@ int main(int argc, char* argv[])
@@ -111,8 +147,17 @@ index a63edea..8b05ab6 100644
    
    int64_t time = 0;
    __m512i checksum = _mm512_setzero_si512();
+@@ -58,6 +58,8 @@ int main(int argc, char* argv[])
+     spielman_mt.r2l_runEncodeMatrixEfficientMT(array_reordered);
+     TIMESTAMP_FENCE(t2);
+     time += std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
++    // RealBrakedownPerf: one line per encoding so a single process yields every sample.
++    printf("Encode sample %u : %10ld us\n", j, (long)std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+ 
+     // compute some checksum to prevent code removal
+     for(size_t i = 0; i < 2 * N / 8 * (sizeof(UnpackedMontgomeryPrimeField) / sizeof(__m512i)); i++)
 diff --git a/bench/SpielmanMontgomeryVerif_Bench.cpp b/bench/SpielmanMontgomeryVerif_Bench.cpp
-index 42d5826..1c569bb 100644
+index 42d5826..85448f5 100644
 --- a/bench/SpielmanMontgomeryVerif_Bench.cpp
 +++ b/bench/SpielmanMontgomeryVerif_Bench.cpp
 @@ -24,7 +24,7 @@ const uint32_t N = 1 << lgN;
@@ -133,8 +178,17 @@ index 42d5826..1c569bb 100644
    
    int64_t time = 0;
    __m128i checksum = _mm_setzero_si128();
+@@ -60,6 +60,8 @@ int main(int argc, char* argv[])
+     spielman.r2l_runEncodeMatrixEfficient(array_reordered);
+     TIMESTAMP_FENCE(t2);
+     time += std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
++    // RealBrakedownPerf: one line per encoding so a single process yields every sample.
++    printf("Encode sample %u : %10ld us\n", j, (long)std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+ 
+     // compute some checksum to prevent code removal
+     for(size_t i = 0; i < 2 * spielman.k * (sizeof(UnpackedMontgomeryPrimeFieldVerif) / sizeof(__m128i)); i++)
 diff --git a/bench/SpielmanMontgomery_Bench.cpp b/bench/SpielmanMontgomery_Bench.cpp
-index 00155da..0c2236d 100644
+index 00155da..099dbc6 100644
 --- a/bench/SpielmanMontgomery_Bench.cpp
 +++ b/bench/SpielmanMontgomery_Bench.cpp
 @@ -24,7 +24,7 @@ const uint32_t N = 1 << lgN;
@@ -155,6 +209,15 @@ index 00155da..0c2236d 100644
    
    int64_t time = 0;
    __m512i checksum = _mm512_setzero_si512();
+@@ -60,6 +60,8 @@ int main(int argc, char* argv[])
+     spielman.r2l_runEncodeMatrixEfficient(array_reordered);
+     TIMESTAMP_FENCE(t2);
+     time += std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
++    // RealBrakedownPerf: one line per encoding so a single process yields every sample.
++    printf("Encode sample %u : %10ld us\n", j, (long)std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count());
+ 
+     // compute some checksum to prevent code removal
+     for(size_t i = 0; i < 2 * N / 8 * (sizeof(UnpackedMontgomeryPrimeField) / sizeof(__m512i)); i++)
 diff --git a/run_throughput_epyc.py b/run_throughput_epyc.py
 index 110c4c4..bf77954 100644
 --- a/run_throughput_epyc.py

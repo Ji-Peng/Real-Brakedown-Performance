@@ -19,7 +19,7 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/common.sh"
 
-EXPECTED_PATCH_SHA256=4f39c0d839d7e0e4adeff54ed381683931eea100253db8a18697a6b5d341adde
+EXPECTED_PATCH_SHA256=12f29de2e5529ceb90cebf8bd61083fb006381bdd4e7965d7b2eacc651e1be5b
 UPSTREAM_URL=https://github.com/flokrieger/SIMD-Spielman-for-ZKPs.git
 FIELD_WAS_SET=0
 OUT_WAS_SET=0
@@ -203,7 +203,7 @@ manifest = {
     "logN": [int(x) for x in os.environ.get("SIMD_LOGN", "").split(",") if x],
     "runs": int(os.environ.get("SIMD_RUNS", "1")),
     "warmup": int(os.environ.get("SIMD_WARMUP", "2")),
-    "measurement_method": "one native timed repetition per process; warm-up processes excluded",
+    "measurement_method": "one process per case (graph generated once); warm-up + timed encodings in-process, each on fresh random input, timed individually; warm-up encodings excluded",
     "benchmark_cores": os.environ.get("SIMD_CORES"),
     "correctness_test_cores": os.environ.get("SIMD_TEST_CORES"),
     "fields": os.environ.get("SIMD_FIELDS", "").replace(",", " ").split(),
@@ -247,6 +247,14 @@ field_map = {
     "extension": "Fp2M61",
 }
 verifier_latencies = {}
+def encode_samples_us(content):
+    """Timed per-encoding samples; the first SIMD_WARMUP in-process encodings are warm-ups."""
+    samples = [int(x) for x in re.findall(r"Encode sample\s+\d+\s*:\s*(\d+)\s*us", content)]
+    if samples:
+        return samples[int(os.environ.get("SIMD_WARMUP", "0")):]
+    m = re.search(r"Encode time for logN\s*=\s*\d+,\s*repetitions\s*(\d+)\s*:\s*(\d+)\s*us", content)
+    return [int(m.group(2))] if m else []
+
 if raw_dir.is_dir():
     for path in sorted(raw_dir.glob("verifier-*.log")):
         if "-warmup-" in path.name:
@@ -266,9 +274,7 @@ if raw_dir.is_dir():
         else:
             sh = m.group(1)
             ln = int(m.group(2))
-        m_enc = re.search(r"Encode time for logN\s*=\s*\d+,\s*repetitions\s*(\d+)\s*:\s*(\d+)\s*us", content)
-        if m_enc:
-            v_us = int(m_enc.group(2))
+        for v_us in encode_samples_us(content):
             verifier_latencies.setdefault((sh, ln), []).append(v_us * 1000)
 
     bench_reports = []
@@ -296,13 +302,11 @@ if raw_dir.is_dir():
             content = ""
 
         m_graph = re.search(r"GraphGen Done lgN=(\d+) k=(\d+)(?:\s+slices=(\d+))?", content)
-        m_enc = re.search(r"Encode time for logN\s*=\s*\d+,\s*repetitions\s*(\d+)\s*:\s*(\d+)\s*us", content)
 
         k = int(m_graph.group(2)) if m_graph else (128 if shape == "orion" else 1 << (log_n // 2))
         slices = int(m_graph.group(3)) if (m_graph and m_graph.group(3)) else 1
         case = bench_cases.setdefault(case_key, {"field": field, "k": k, "slices": slices, "samples_ns": []})
-        if m_enc:
-            case["samples_ns"].append(int(m_enc.group(2)) * 1000)
+        case["samples_ns"].extend(us * 1000 for us in encode_samples_us(content))
 
     def summarize(samples):
         ordered = sorted(samples)
@@ -531,43 +535,24 @@ run_benchmark() {
         log_error "$FAILURE_REASON"
         return 1
     fi
-    run_index=1
-    while [ "$run_index" -le "$WARMUP" ]; do
-        log_file="$RAW_DIR/$name-warmup-$(printf '%02d' "$run_index").log"
-        log_info "Running warm-up $run_index/$WARMUP for $name under taskset -c $CORES"
-        if taskset -c "$CORES" env SIMD_SPIELMAN_CORES="$CORES" \
-            SIMD_SPIELMAN_SLICES="$SLICE_OVERRIDE" \
-            SIMD_SPIELMAN_SLICE_TABLE="${SIMD_SPIELMAN_SLICE_TABLE:-}" \
-            "$executable" 1 > "$log_file" 2>&1; then
-            :
-        else
-            command_status=$?
-            cat "$log_file" >&2
-            RUN_STATUS=failed
-            FAILURE_REASON="Benchmark warm-up failed ($command_status): $name"
-            return "$command_status"
-        fi
-        run_index=$((run_index + 1))
-    done
-
-    run_index=1
-    while [ "$run_index" -le "$RUNS" ]; do
-        log_file="$RAW_DIR/$name-run-$(printf '%02d' "$run_index").log"
-        log_info "Running timed sample $run_index/$RUNS for $name under taskset -c $CORES"
-        if taskset -c "$CORES" env SIMD_SPIELMAN_CORES="$CORES" \
-            SIMD_SPIELMAN_SLICES="$SLICE_OVERRIDE" \
-            SIMD_SPIELMAN_SLICE_TABLE="${SIMD_SPIELMAN_SLICE_TABLE:-}" \
-            "$executable" 1 > "$log_file" 2>&1; then
-            cat "$log_file"
-        else
-            command_status=$?
-            cat "$log_file" >&2
-            RUN_STATUS=failed
-            FAILURE_REASON="Benchmark failed ($command_status): $name"
-            return "$command_status"
-        fi
-        run_index=$((run_index + 1))
-    done
+    # One process per case: graph generation (minutes at 2^26+) happens once, then
+    # WARMUP+RUNS encodings, each on fresh random input and timed individually by the
+    # patched benchmark ("Encode sample j"); the first WARMUP samples are discarded.
+    reps=$((WARMUP + RUNS))
+    log_file="$RAW_DIR/$name-run-01.log"
+    log_info "Running $name: $WARMUP warm-up + $RUNS timed encodings in one process under taskset -c $CORES"
+    if taskset -c "$CORES" env SIMD_SPIELMAN_CORES="$CORES" \
+        SIMD_SPIELMAN_SLICES="$SLICE_OVERRIDE" \
+        SIMD_SPIELMAN_SLICE_TABLE="${SIMD_SPIELMAN_SLICE_TABLE:-}" \
+        "$executable" "$reps" > "$log_file" 2>&1; then
+        cat "$log_file"
+    else
+        command_status=$?
+        cat "$log_file" >&2
+        RUN_STATUS=failed
+        FAILURE_REASON="Benchmark failed ($command_status): $name"
+        return "$command_status"
+    fi
 }
 
 LOGN_ITEMS=$(printf '%s' "$LOGN" | tr ',' ' ')
