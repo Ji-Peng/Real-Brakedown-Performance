@@ -139,6 +139,10 @@ PY
 # Build from / to avoid the fork's workspace config and codegen wrapper.
 log_info "Building patched arkworks PolyCommit driver with rustc $(rustc --version)"
 cd /
+# Populate the cargo cache from the committed lockfile when the network is
+# reachable (fresh VMs); the build itself stays --offline and --locked.
+cargo fetch --locked --manifest-path "$BUILD_DIR/Cargo.toml" >/dev/null 2>&1 || \
+    log_warn "cargo fetch failed (offline?); building from the existing cargo cache"
 taskset -c "$CORES" env POLYCOMMIT_PATCH_SHA256="$PATCH_SHA256" \
     cargo build --offline --manifest-path "$BUILD_DIR/Cargo.toml" --locked --release
 DRIVER_BINARY="$TARGET_DIR/release/polycommit-bench-driver"

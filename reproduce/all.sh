@@ -54,6 +54,7 @@ Options:
 EOF
 }
 
+ANY_BLOCK_FAILED=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --profile)
@@ -486,8 +487,14 @@ for b in sched['blocks']:
     DURATION=$((TIME_END - TIME_START))
     
     if [ "$BLOCK_FAILED" -ne 0 ]; then
-        log_error "Block '$block_id' failed (duration: ${DURATION}s)!"
-        exit 1
+        # Record the failure and continue: every block runs its own correctness
+        # gate before timing, so a failed block publishes nothing, and one
+        # failing baseline must not discard the rest of a multi-hour session.
+        log_error "Block '$block_id' failed (duration: ${DURATION}s)! Continuing with the next block."
+        printf '%s\t%s\n' "$block_id" "$DURATION" >> "$SESSION_DIR/failed_blocks.tsv"
+        ANY_BLOCK_FAILED=1
+        CURRENT_INDEX=$((CURRENT_INDEX + 1))
+        continue
     fi
     log_info "Block '$block_id' completed successfully in ${DURATION}s (Freq: ${FREQ_BEFORE} MHz -> ${FREQ_AFTER} MHz)."
     
@@ -546,3 +553,8 @@ log_info "Seed:        $SEED"
 log_info "Results:     $SESSION_DIR"
 log_info "Analysis:    $ANALYSIS_DIR"
 log_info "=========================================================="
+
+if [ "$ANY_BLOCK_FAILED" -ne 0 ]; then
+    log_error "One or more blocks failed; see $SESSION_DIR/failed_blocks.tsv"
+    exit 1
+fi
