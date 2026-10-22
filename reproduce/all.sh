@@ -96,6 +96,19 @@ done
 parse_args $PASSTHROUGH_ARGS
 export CORES
 
+# parse_args resolves CORES for its default threads=1, i.e. a single core.
+# Blocks pin per thread count: T=1 blocks use one benchmark core, T>1 blocks
+# use the multi-core benchmark set (an explicit --cores list, else the host
+# profile's default set).
+if [ "$EXPLICIT_CORES" -eq 1 ]; then
+    MULTI_CORES="$CORES"
+    SINGLE_CORE="$(expand_cores "$CORES" | awk '{print $1}')"
+else
+    MULTI_CORES="${HOST_DEFAULT_CORES:-$CORES}"
+    SINGLE_CORE="${HOST_DEFAULT_SINGLE_CORE:-$CORES}"
+fi
+export MULTI_CORES SINGLE_CORE
+
 # Auto-detect profile if not provided
 if [ -z "$PROFILE" ]; then
     if [ "$HOST_NAME" = "gcp-c3d-highmem-16" ]; then
@@ -387,7 +400,7 @@ else:
             else:
                 n += 1
         return n
-    _avail = _ncores(os.environ.get('CORES', '0'))
+    _avail = _ncores(os.environ.get('MULTI_CORES', '0'))
     for t_count in [t for t in [1, 2, 4, 8, 15] if t <= max(1, _avail)]:
         blocks.append({
             "id": f"full_thread_scaling_this_work_t{t_count}",
@@ -419,6 +432,13 @@ else:
         "description": "E12: Same-library Ligero Reed-Solomon encoding",
         "cmd": f"'{script_dir}/this_work.sh' --params rs-ligero --field mont127 --logN 20,22,24 --threads 1 --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_ligero_rs'"
     })
+
+# Pin each block by its thread count (see MULTI_CORES/SINGLE_CORE above).
+import re
+for b in blocks:
+    m = re.search(r"--threads (\d+)", b["cmd"])
+    cores = os.environ["MULTI_CORES"] if m and int(m.group(1)) > 1 else os.environ["SINGLE_CORE"]
+    b["cmd"] = re.sub(r"--cores '[^']*'", f"--cores '{cores}'", b["cmd"])
 
 # Randomize block order using the recorded seed (interleaving targets)
 rng = random.Random(seed)

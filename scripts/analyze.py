@@ -164,6 +164,7 @@ class BenchmarkAnalyzer:
         self.result_dirs: List[str] = []
         self.fork_shas: Set[str] = set()
         self.session_ids: Set[str] = set()
+        self.pinning_errors: List[str] = []
         self.hosts: Set[str] = set()
         self.has_smoke_watermark: bool = False
         self.profile: Optional[str] = None
@@ -209,6 +210,13 @@ class BenchmarkAnalyzer:
                                 self.hosts.add(str(data.get("host_profile") or data.get("hostname")))
                             if data.get("watermark") or data.get("profile") == "smoke":
                                 self.has_smoke_watermark = True
+                            # A run whose threads outnumber its pinned cores measures
+                            # oversubscription, not scaling; --check rejects it.
+                            pin = data.get("pinning")
+                            if isinstance(pin, dict) and isinstance(pin.get("affinity_cores_expanded"), list):
+                                if int(pin.get("threads") or 1) > len(pin["affinity_cores_expanded"]):
+                                    self.pinning_errors.append(
+                                        f"{path}: threads={pin.get('threads')} pinned to cores {pin.get('cores')}")
                         continue
 
                     if fname == "simd_spielman.json" and isinstance(data, dict):
@@ -1760,6 +1768,7 @@ class BenchmarkAnalyzer:
                         errors.append(f"CSV table has no data rows: {csv_file}")
 
         errors.extend(self._check_table_cells(allow_patterns or []))
+        errors.extend(f"Oversubscribed run: {e}" for e in self.pinning_errors)
 
         # Check figures
         for fig_name in required_figures:
