@@ -285,14 +285,16 @@ log_info "Remote job launched (PID: $REMOTE_PID_VAL). Streaming log output until
 DONE=0
 SESSION_EXIT_CODE=1
 while [ "$DONE" -eq 0 ]; do
-    sleep 15
+    sleep 60
     # Print recent log lines from remote execution
     "$GCLOUD" compute ssh "$INSTANCE" --zone="$ZONE" \
         --command "tail -n 20 '$REMOTE_LOG' 2>/dev/null || true" || true
 
     # Check for completion status file
+    # Tolerate transient SSH failures: under set -e a failed poll would exit and
+    # the EXIT trap would stop the VM, killing the remote session.
     STATUS_OUTPUT=$("$GCLOUD" compute ssh "$INSTANCE" --zone="$ZONE" \
-        --command "cat '$REMOTE_STATUS' 2>/dev/null || true")
+        --command "cat '$REMOTE_STATUS' 2>/dev/null || true" 2>/dev/null) || STATUS_OUTPUT=""
     if [ -n "$STATUS_OUTPUT" ]; then
         DONE=1
         SESSION_EXIT_CODE="$STATUS_OUTPUT"
