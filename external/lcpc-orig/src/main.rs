@@ -519,13 +519,16 @@ where
     })
 }
 
+// Rows are encoded in parallel exactly as upstream `lcpc_2d::commit` does
+// (`par_chunks_mut(n_cols)` + `enc.encode`), so T>1 measures the same work split.
 fn encode_matrix<F, S>(enc: &S, matrix: &mut [F], n_cols: usize)
 where
-    S: LcEncoding<F = F>,
+    F: Send,
+    S: LcEncoding<F = F> + Sync,
 {
-    for row in matrix.chunks_mut(n_cols) {
-        enc.encode(row).expect("LCPC encode failed");
-    }
+    matrix
+        .par_chunks_mut(n_cols)
+        .for_each(|row| enc.encode(row).expect("LCPC encode failed"));
 }
 
 fn sample_times(mut runs: usize, mut operation: impl FnMut()) -> Vec<u128> {
