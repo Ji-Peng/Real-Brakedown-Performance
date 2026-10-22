@@ -145,7 +145,7 @@ REMOTE_HELPER="$TEMP_DIR/setup_vm_remote.sh"
 
 git -C "$CODE_DIR" bundle create "$BUNDLE" --all HEAD
 git bundle verify "$BUNDLE" >/dev/null
-tar --exclude=./.git --exclude=./target --exclude=./target-* \
+tar --exclude=./.git --exclude=./target --exclude=./target-* --exclude=./results \
     -czf "$SOURCE_ARCHIVE" -C "$CODE_DIR" .
 sha256sum "$BUNDLE" "$SOURCE_ARCHIVE"
 
