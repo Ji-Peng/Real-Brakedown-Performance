@@ -32,6 +32,9 @@ SEED=""
 SPECIFIC_TAGS=""
 DRY_RUN=0
 PASSTHROUGH_ARGS=""
+BLOCK_FILTER=""
+LOGN_FILTER=""
+WARMUP_OVERRIDE=""
 
 usage() {
     cat <<EOF
@@ -49,6 +52,11 @@ Options:
   --host <name>            Host profile from reproduce/hosts/<name>.sh
   --out <dir>              Output directory (default: results)
   --tags <tags>            Comma-separated step tags for steps.sh progression
+  --blocks <regex>         Run only blocks whose id matches (staged campaigns)
+  --logn <list>            Keep only these logN values; a block's id and output dir get a
+                           _n<list> suffix so stages never overwrite each other
+  --warmup <int>           Override every block's warm-up count
+  --lcpc-variants <list>   Original-LCPC build variants to measure (default: all four)
   --dry-run                Print scheduled execution blocks and exit without running
   -h, --help               Show this help message
 EOF
@@ -75,6 +83,27 @@ while [ $# -gt 0 ]; do
         --tags)
             [ $# -ge 2 ] || { log_error "Option --tags requires an argument"; exit 1; }
             SPECIFIC_TAGS="$2"
+            shift 2
+            ;;
+        --blocks)
+            [ $# -ge 2 ] || { log_error "Option --blocks requires a regex"; exit 1; }
+            BLOCK_FILTER="$2"
+            shift 2
+            ;;
+        --logn)
+            [ $# -ge 2 ] || { log_error "Option --logn requires a list"; exit 1; }
+            LOGN_FILTER="$2"
+            shift 2
+            ;;
+        --warmup)
+            [ $# -ge 2 ] || { log_error "Option --warmup requires an integer"; exit 1; }
+            WARMUP_OVERRIDE="$2"
+            shift 2
+            ;;
+        --lcpc-variants)
+            [ $# -ge 2 ] || { log_error "Option --lcpc-variants requires a list"; exit 1; }
+            LCPC_VARIANTS="$2"
+            export LCPC_VARIANTS
             shift 2
             ;;
         --dry-run)
@@ -439,6 +468,33 @@ for b in blocks:
     m = re.search(r"--threads (\d+)", b["cmd"])
     cores = os.environ["MULTI_CORES"] if m and int(m.group(1)) > 1 else os.environ["SINGLE_CORE"]
     b["cmd"] = re.sub(r"--cores '[^']*'", f"--cores '{cores}'", b["cmd"])
+
+# Staged campaigns: select blocks, intersect logN lists, override warm-ups.
+block_filter = "$BLOCK_FILTER"
+logn_filter = [x for x in "$LOGN_FILTER".split(",") if x]
+warmup_override = "$WARMUP_OVERRIDE"
+if block_filter:
+    blocks = [b for b in blocks if re.search(block_filter, b["id"])]
+if logn_filter:
+    kept = []
+    suffix = "_n" + "-".join(logn_filter)
+    for b in blocks:
+        m = re.search(r"--logN ([0-9,]+)", b["cmd"])
+        if not m:
+            continue
+        keep = [x for x in m.group(1).split(",") if x in logn_filter]
+        if not keep:
+            continue
+        b["cmd"] = b["cmd"].replace(m.group(0), "--logN " + ",".join(keep))
+        b["cmd"] = re.sub(r"--out '([^']*)'", lambda o: f"--out '{o.group(1)}{suffix}'", b["cmd"])
+        b["id"] += suffix
+        kept.append(b)
+    blocks = kept
+if warmup_override:
+    for b in blocks:
+        b["cmd"] = re.sub(r"--warmup \d+", f"--warmup {warmup_override}", b["cmd"])
+        if "--warmup" not in b["cmd"]:
+            b["cmd"] = b["cmd"].replace(" --runs ", f" --warmup {warmup_override} --runs ", 1)
 
 # Randomize block order using the recorded seed (interleaving targets)
 rng = random.Random(seed)

@@ -105,10 +105,19 @@ build_variant() {
         --output "$DEST/$raw_name"
 }
 
-build_variant as-published-as-is plain-release as-is
-build_variant as-published-portable plain-release portable-only
-build_variant fork-flags-as-is fork-release as-is
-build_variant fork-flags-portable fork-release portable-only
+# LCPC_VARIANTS (comma list) restricts the measured build variants; default all four.
+LCPC_VARIANTS="${LCPC_VARIANTS:-as-published-as-is,as-published-portable,fork-flags-as-is,fork-flags-portable}"
+export LCPC_VARIANTS
+run_variant() {
+    case ",$LCPC_VARIANTS," in
+        *",$1,"*) build_variant "$@" ;;
+        *) log_info "Skipping original LCPC variant $1 (not in LCPC_VARIANTS)" ;;
+    esac
+}
+run_variant as-published-as-is plain-release as-is
+run_variant as-published-portable plain-release portable-only
+run_variant fork-flags-as-is fork-release as-is
+run_variant fork-flags-portable fork-release portable-only
 
 DRIVER_LOCK_SHA=$(sha256sum "$DRIVER_LOCK" | awk '{print $1}')
 DRIVER_MANIFEST_SHA=$(sha256sum "$DRIVER_DIR/Cargo.toml" | awk '{print $1}')
@@ -135,6 +144,8 @@ for name, profile, flags, features in [
     ("fork-flags-as-is", "fork-release", os.environ["LCPC_RUSTFLAGS"], ["std", "traits-preview"]),
     ("fork-flags-portable", "fork-release", os.environ["LCPC_RUSTFLAGS"], ["std", "traits-preview", "pure", "no_sse2", "no_sse41", "no_avx2", "no_avx512"]),
 ]:
+    if name not in os.environ["LCPC_VARIANTS"].split(","):
+        continue
     variants[name] = {
         "cargo_profile": profile,
         "rustflags": flags,

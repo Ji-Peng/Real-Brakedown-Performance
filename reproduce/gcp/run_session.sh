@@ -26,6 +26,8 @@ INSTANCE=${INSTANCE:-}
 REMOTE_CODE_DIR=${REMOTE_CODE_DIR:-}
 SEED=${SEED:-}
 SKIP_SYNC=0
+STAGE_ARGS=""
+KEEP_RUNNING=0
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 CODE_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
 
@@ -63,6 +65,10 @@ Options:
   --remote-dir PATH        Remote checkout directory (default: ~/RealBrakedownPerf/code)
   --seed INT               Random seed for block interleaving order
   --skip-sync              Skip setup_vm.sh code sync
+  --blocks/--logn/--warmup/--lcpc-variants ARG
+                           Passed to all.sh to run one stage of a staged campaign
+  --keep-running           Leave the VM running after a successful stage (the caller
+                           starts the next stage and stops the VM); failures still stop it
   -h, --help               Show this help message
 
 If gcloud is not on PATH, set GCLOUD to
@@ -106,6 +112,15 @@ while [ "$#" -gt 0 ]; do
             [ "$#" -ge 2 ] || { log_error "--seed requires an integer"; exit 2; }
             SEED=$2
             shift 2
+            ;;
+        --blocks|--logn|--warmup|--lcpc-variants)
+            [ "$#" -ge 2 ] || { log_error "$1 requires an argument"; exit 2; }
+            STAGE_ARGS="$STAGE_ARGS $1 '$2'"
+            shift 2
+            ;;
+        --keep-running)
+            KEEP_RUNNING=1
+            shift
             ;;
         --skip-sync)
             SKIP_SYNC=1
@@ -183,6 +198,10 @@ cleanup() {
     _rc=$?
     trap '' EXIT INT TERM  # Avoid recursive trap handling
     printf '\n'
+    if [ "$KEEP_RUNNING" -eq 1 ] && [ "$_rc" -eq 0 ]; then
+        log_info "Stage finished; VM '$INSTANCE' left running for the next stage (--keep-running)."
+        exit 0
+    fi
     log_info "Cost-minimization rule: stopping VM '$INSTANCE' in zone '$ZONE'..."
     "$GCLOUD" compute instances stop "$INSTANCE" --zone="$ZONE" --quiet >/dev/null 2>&1 || true
     cat <<EOF
@@ -267,6 +286,7 @@ REMOTE_ALL_ARGS="--profile $PROFILE --session $SESSION_ID --host $REMOTE_HOST_PR
 if [ -n "$SEED" ]; then
     REMOTE_ALL_ARGS="$REMOTE_ALL_ARGS --seed $SEED"
 fi
+REMOTE_ALL_ARGS="$REMOTE_ALL_ARGS$STAGE_ARGS"
 
 RUN_CMD="cd '$REMOTE_DIR_ACTUAL' && . \"\$HOME/.cargo/env\" && ./reproduce/all.sh $REMOTE_ALL_ARGS > '$REMOTE_LOG' 2>&1; echo \$? > '$REMOTE_STATUS'"
 
