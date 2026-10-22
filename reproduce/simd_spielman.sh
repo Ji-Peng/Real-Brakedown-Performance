@@ -512,14 +512,24 @@ run_logged() {
     fi
 }
 
-run_logged test-configure taskset -c "$TEST_CORES" cmake -S "$PATCHED_SOURCE" -B "$TEST_BUILD" \
-    "-DPOLY_SIZES=12;14;16" "-DTHREADS=2;4;8;16" "-DCMAKE_CXX_COMPILER=$SIMD_CXX" \
-    "-DCMAKE_CXX_FLAGS=-DSELECTED_CPU=$SELECTED_CPU"
-run_logged test-build taskset -c "$TEST_CORES" cmake --build "$TEST_BUILD" --parallel "$(count_cores "$TEST_CORES")"
-run_logged upstream-tests taskset -c "$TEST_CORES" env SIMD_SPIELMAN_CORES="$TEST_CORES" \
-    SIMD_SPIELMAN_SLICES= \
-    SIMD_SPIELMAN_SLICE_TABLE="${SIMD_SPIELMAN_SLICE_TABLE:-}" \
-    sh -c 'cd "$1" && python3 -u run_tests.py' sh "$PATCHED_SOURCE"
+# The upstream test suite takes ~20 min; run it once per host, upstream commit,
+# patch and compiler. A later invocation reuses the recorded pass (its log is
+# copied into this run's raw directory).
+TESTS_MARKER="$TARGET_ROOT/upstream-tests-passed-$(hostname)-$UPSTREAM_SHA-$PATCH_SHA256-$(printf '%s' "$SIMD_CXX $SELECTED_CPU" | sha256sum | cut -c1-16).log"
+if [ -f "$TESTS_MARKER" ]; then
+    log_info "Upstream SIMD-Spielman tests already passed on this host with this commit, patch and compiler: $TESTS_MARKER"
+    cp "$TESTS_MARKER" "$RAW_DIR/upstream-tests.log"
+else
+    run_logged test-configure taskset -c "$TEST_CORES" cmake -S "$PATCHED_SOURCE" -B "$TEST_BUILD" \
+        "-DPOLY_SIZES=12;14;16" "-DTHREADS=2;4;8;16" "-DCMAKE_CXX_COMPILER=$SIMD_CXX" \
+        "-DCMAKE_CXX_FLAGS=-DSELECTED_CPU=$SELECTED_CPU"
+    run_logged test-build taskset -c "$TEST_CORES" cmake --build "$TEST_BUILD" --parallel "$(count_cores "$TEST_CORES")"
+    run_logged upstream-tests taskset -c "$TEST_CORES" env SIMD_SPIELMAN_CORES="$TEST_CORES" \
+        SIMD_SPIELMAN_SLICES= \
+        SIMD_SPIELMAN_SLICE_TABLE="${SIMD_SPIELMAN_SLICE_TABLE:-}" \
+        sh -c 'cd "$1" && python3 -u run_tests.py' sh "$PATCHED_SOURCE"
+    cp "$RAW_DIR/upstream-tests.log" "$TESTS_MARKER"
+fi
 
 run_logged benchmark-configure taskset -c "$TEST_CORES" cmake -S "$PATCHED_SOURCE" -B "$BENCH_BUILD" \
     "-DPOLY_SIZES=$LOGN_CMAKE" "-DTHREADS=$THREADS" "-DCMAKE_CXX_COMPILER=$SIMD_CXX" \

@@ -68,7 +68,7 @@ Options:
   --blocks/--logn/--warmup/--lcpc-variants ARG
                            Passed to all.sh to run one stage of a staged campaign
   --keep-running           Leave the VM running after a successful stage (the caller
-                           starts the next stage and stops the VM); failures still stop it
+                           starts the next stage and stops the VM)
   -h, --help               Show this help message
 
 If gcloud is not on PATH, set GCLOUD to
@@ -198,8 +198,8 @@ cleanup() {
     _rc=$?
     trap '' EXIT INT TERM  # Avoid recursive trap handling
     printf '\n'
-    if [ "$KEEP_RUNNING" -eq 1 ] && [ "$_rc" -eq 0 ]; then
-        log_info "Stage finished; VM '$INSTANCE' left running for the next stage (--keep-running)."
+    if [ "$KEEP_RUNNING" -eq 1 ]; then
+        log_info "Stage finished (exit $_rc); VM '$INSTANCE' left running for the next stage (--keep-running)."
         exit 0
     fi
     log_info "Cost-minimization rule: stopping VM '$INSTANCE' in zone '$ZONE'..."
