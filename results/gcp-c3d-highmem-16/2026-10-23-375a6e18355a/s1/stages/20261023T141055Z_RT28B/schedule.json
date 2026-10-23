@@ -1,0 +1,86 @@
+{
+  "profile": "full",
+  "session_id": "s1",
+  "stage": "20261023T141055Z_RT28B",
+  "stage_label": "RT28B",
+  "stage_started_utc": "2026-10-23T14:10:55Z",
+  "seed": 760444522,
+  "arguments": {
+    "blocks": "^full_(this_work_threads_t[0-9]+|lcpc_orig_threads_t[48])$",
+    "logn": "28",
+    "warmup": "1",
+    "lcpc_variants": "as-published-as-is,fork-flags-portable",
+    "tags": null,
+    "multi_cores": "0,1,2,3,4,5,6,7",
+    "single_core": "1"
+  },
+  "total_blocks": 6,
+  "blocks": [
+    {
+      "id": "full_this_work_threads_t4_n28",
+      "description": "E6: Thread scaling This Work T=4",
+      "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 28 --threads 4 --runs 5 --warmup 1 --cores '0,1,2,3' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-23-375a6e18355a/s1/full_this_work_threads_t4_n28'",
+      "threads": 4,
+      "cores": "0,1,2,3",
+      "out": "/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-23-375a6e18355a/s1/full_this_work_threads_t4_n28",
+      "siblings": [
+        "full_this_work_threads_t4_n20-24-26"
+      ]
+    },
+    {
+      "id": "full_lcpc_orig_threads_t4_n28",
+      "description": "E6: Thread scaling Original LCPC T=4",
+      "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 28 --threads 4 --runs 5 --warmup 1 --cores '0,1,2,3' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-23-375a6e18355a/s1/full_lcpc_orig_threads_t4_n28'",
+      "threads": 4,
+      "cores": "0,1,2,3",
+      "out": "/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-23-375a6e18355a/s1/full_lcpc_orig_threads_t4_n28",
+      "siblings": [
+        "full_lcpc_orig_threads_t4_n20-24-26"
+      ]
+    },
+    {
+      "id": "full_this_work_threads_t1_n28",
+      "description": "E6: Thread scaling This Work T=1",
+      "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 28 --threads 1 --runs 5 --warmup 1 --cores '1' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-23-375a6e18355a/s1/full_this_work_threads_t1_n28'",
+      "threads": 1,
+      "cores": "1",
+      "out": "/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-23-375a6e18355a/s1/full_this_work_threads_t1_n28",
+      "siblings": [
+        "full_this_work_threads_t1_n20-24-26"
+      ]
+    },
+    {
+      "id": "full_this_work_threads_t8_n28",
+      "description": "E6: Thread scaling This Work T=8",
+      "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 28 --threads 8 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-23-375a6e18355a/s1/full_this_work_threads_t8_n28'",
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-23-375a6e18355a/s1/full_this_work_threads_t8_n28",
+      "siblings": [
+        "full_this_work_threads_t8_n20-24-26"
+      ]
+    },
+    {
+      "id": "full_lcpc_orig_threads_t8_n28",
+      "description": "E6: Thread scaling Original LCPC T=8",
+      "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 28 --threads 8 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-23-375a6e18355a/s1/full_lcpc_orig_threads_t8_n28'",
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-23-375a6e18355a/s1/full_lcpc_orig_threads_t8_n28",
+      "siblings": [
+        "full_lcpc_orig_threads_t8_n20-24-26"
+      ]
+    },
+    {
+      "id": "full_this_work_threads_t2_n28",
+      "description": "E6: Thread scaling This Work T=2",
+      "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 28 --threads 2 --runs 5 --warmup 1 --cores '0,1' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-23-375a6e18355a/s1/full_this_work_threads_t2_n28'",
+      "threads": 2,
+      "cores": "0,1",
+      "out": "/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-23-375a6e18355a/s1/full_this_work_threads_t2_n28",
+      "siblings": [
+        "full_this_work_threads_t2_n20-24-26"
+      ]
+    }
+  ]
+}

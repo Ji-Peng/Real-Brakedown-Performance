@@ -1,0 +1,108 @@
+{
+  "schema_version": "1.0.0",
+  "created_at_utc": "2026-10-23T15:27:23.019452+00:00",
+  "host_profile": "gcp-c4a-highmem-16",
+  "instance": "rbd-bench-c4a",
+  "zone": "us-central1-a",
+  "cpu_architecture": "aarch64",
+  "source": "Linux sysfs at profile load time",
+  "online_cpus": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+  ],
+  "selected_domain": {
+    "shared_cpu_list": "0-15",
+    "size": "81920K",
+    "selected_benchmark_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "selected_physical_cores": [
+      {
+        "cpu": 0,
+        "physical_package_id": "148",
+        "core_id": "0",
+        "thread_siblings": [
+          0
+        ]
+      },
+      {
+        "cpu": 1,
+        "physical_package_id": "148",
+        "core_id": "1",
+        "thread_siblings": [
+          1
+        ]
+      },
+      {
+        "cpu": 2,
+        "physical_package_id": "148",
+        "core_id": "2",
+        "thread_siblings": [
+          2
+        ]
+      },
+      {
+        "cpu": 3,
+        "physical_package_id": "148",
+        "core_id": "3",
+        "thread_siblings": [
+          3
+        ]
+      },
+      {
+        "cpu": 4,
+        "physical_package_id": "148",
+        "core_id": "4",
+        "thread_siblings": [
+          4
+        ]
+      },
+      {
+        "cpu": 5,
+        "physical_package_id": "148",
+        "core_id": "5",
+        "thread_siblings": [
+          5
+        ]
+      },
+      {
+        "cpu": 6,
+        "physical_package_id": "148",
+        "core_id": "6",
+        "thread_siblings": [
+          6
+        ]
+      },
+      {
+        "cpu": 7,
+        "physical_package_id": "148",
+        "core_id": "7",
+        "thread_siblings": [
+          7
+        ]
+      }
+    ],
+    "single_thread_core": 1
+  }
+}

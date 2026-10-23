@@ -1,0 +1,14 @@
+   Compiling lcpc-2d v0.1.1 (/home/jipeng/RealBrakedownPerf/code/target-harness/worktrees/wt-step_02-fields-qQAWbj/lcpc-2d)
+   Compiling lcpc-fields v0.1.1 (/home/jipeng/RealBrakedownPerf/code/target-harness/worktrees/wt-step_02-fields-qQAWbj/lcpc-fields)
+   Compiling lcpc-brakedown-pc v0.1.1 (/home/jipeng/RealBrakedownPerf/code/target-harness/worktrees/wt-step_02-fields-qQAWbj/lcpc-brakedown-pc)
+   Compiling steps-driver v0.1.0 (/home/jipeng/RealBrakedownPerf/code/target-harness/projects/step_02-fields-a-84959)
+warning: constant `PARAMS` is never used
+  --> src/adapter.rs:11:11
+   |
+11 | pub const PARAMS: &str = "lcpc-sdig6";
+   |           ^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `steps-driver` (bin "steps-driver") generated 1 warning
+    Finished `release` profile [optimized] target(s) in 2.67s

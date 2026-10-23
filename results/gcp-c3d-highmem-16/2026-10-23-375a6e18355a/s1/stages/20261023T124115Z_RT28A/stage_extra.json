@@ -1,0 +1,25 @@
+{
+  "stage": "20261023T124115Z_RT28A",
+  "stage_label": "RT28A",
+  "stage_started_utc": "2026-10-23T12:41:15Z",
+  "profile": "full",
+  "session_id": "s1",
+  "seed": 418582118,
+  "instance": "rbd-bench-c3d-3",
+  "arguments": {
+    "blocks": "^full_lcpc_orig_threads_t[12]$",
+    "logn": "28",
+    "warmup": "1",
+    "lcpc_variants": "as-published-as-is,fork-flags-portable",
+    "tags": null,
+    "multi_cores": "0,1,2,3,4,5,6,7",
+    "single_core": "1"
+  },
+  "arguments_string": "profile=full blocks=^full_lcpc_orig_threads_t[12]$ logn=28 warmup=1 lcpc_variants=as-published-as-is,fork-flags-portable tags= seed=418582118",
+  "block_ids": [
+    "full_lcpc_orig_threads_t2_n28",
+    "full_lcpc_orig_threads_t1_n28"
+  ],
+  "any_block_failed": false,
+  "note": "benchmark_parameters.logN/warmup/threads describe the stage filters; per-block values are in schedule.json and each block's manifest"
+}

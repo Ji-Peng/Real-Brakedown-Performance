@@ -1,0 +1,106 @@
+[
+  {
+    "field": "Mont127",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 536850,
+      "ns_per_op": 10.737
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 155150,
+      "ns_per_op": 3.103
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 256810,
+      "ns_per_op": 5.1362
+    },
+    "session_id": "s1",
+    "session_seed": "26082840",
+    "block_id": "full_slice_sweep_s32_t8_n20-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  },
+  {
+    "field": "Mers127",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 264410,
+      "ns_per_op": 5.2882
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 153600,
+      "ns_per_op": 3.072
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 36270,
+      "ns_per_op": 0.7254
+    },
+    "session_id": "s1",
+    "session_seed": "26082840",
+    "block_id": "full_slice_sweep_s32_t8_n20-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  },
+  {
+    "field": "Fp2M61",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 290480,
+      "ns_per_op": 5.8096
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 137550,
+      "ns_per_op": 2.751
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 29030,
+      "ns_per_op": 0.5806
+    },
+    "session_id": "s1",
+    "session_seed": "26082840",
+    "block_id": "full_slice_sweep_s32_t8_n20-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  },
+  {
+    "field": "Ft127",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 458320,
+      "ns_per_op": 9.1664
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 153370,
+      "ns_per_op": 3.0674
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 305450,
+      "ns_per_op": 6.109
+    },
+    "session_id": "s1",
+    "session_seed": "26082840",
+    "block_id": "full_slice_sweep_s32_t8_n20-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  }
+]

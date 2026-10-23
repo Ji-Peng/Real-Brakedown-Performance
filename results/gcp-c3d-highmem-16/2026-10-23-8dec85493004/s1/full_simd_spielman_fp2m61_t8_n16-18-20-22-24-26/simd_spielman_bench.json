@@ -1,0 +1,854 @@
+[
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "brakedown",
+    "status": "ok",
+    "error": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 16,
+    "seed": 76128,
+    "threads": 8,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 1,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 65536,
+      "n_rows": 256,
+      "n_per_row": 256,
+      "n_cols": 512
+    },
+    "recursion_depth": 3,
+    "level_parameters": [],
+    "total_graph_edges": 0,
+    "total_edge_row_macs": 0,
+    "ns_per_mac": null,
+    "cycles_per_mac": null,
+    "setup_ns": null,
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          17545000,
+          17546000,
+          17547000,
+          17550000,
+          17566000
+        ],
+        "summary": {
+          "min_ns": 17545000,
+          "q1_ns": 17546000,
+          "median_ns": 17547000.0,
+          "q3_ns": 17550000,
+          "iqr_ns": 4000,
+          "max_ns": 17566000,
+          "mean_ns": 17550800.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": true,
+      "proof_verifies": true,
+      "evaluation_hex": "n/a"
+    },
+    "peak_rss_bytes": null,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "579646586",
+    "block_id": "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "brakedown",
+    "status": "ok",
+    "error": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 18,
+    "seed": 76128,
+    "threads": 8,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 1,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 262144,
+      "n_rows": 512,
+      "n_per_row": 512,
+      "n_cols": 1024
+    },
+    "recursion_depth": 3,
+    "level_parameters": [],
+    "total_graph_edges": 0,
+    "total_edge_row_macs": 0,
+    "ns_per_mac": null,
+    "cycles_per_mac": null,
+    "setup_ns": null,
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          6834000,
+          6845000,
+          6850000,
+          6880000,
+          6981000
+        ],
+        "summary": {
+          "min_ns": 6834000,
+          "q1_ns": 6845000,
+          "median_ns": 6850000.0,
+          "q3_ns": 6880000,
+          "iqr_ns": 35000,
+          "max_ns": 6981000,
+          "mean_ns": 6878000.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": true,
+      "proof_verifies": true,
+      "evaluation_hex": "n/a"
+    },
+    "peak_rss_bytes": null,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "579646586",
+    "block_id": "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "brakedown",
+    "status": "ok",
+    "error": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 20,
+    "seed": 76128,
+    "threads": 8,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 2,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 1048576,
+      "n_rows": 1024,
+      "n_per_row": 1024,
+      "n_cols": 2048
+    },
+    "recursion_depth": 3,
+    "level_parameters": [],
+    "total_graph_edges": 0,
+    "total_edge_row_macs": 0,
+    "ns_per_mac": null,
+    "cycles_per_mac": null,
+    "setup_ns": null,
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          10174000,
+          18230000,
+          18247000,
+          18258000,
+          18264000
+        ],
+        "summary": {
+          "min_ns": 10174000,
+          "q1_ns": 18230000,
+          "median_ns": 18247000.0,
+          "q3_ns": 18258000,
+          "iqr_ns": 28000,
+          "max_ns": 18264000,
+          "mean_ns": 16634600.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": true,
+      "proof_verifies": true,
+      "evaluation_hex": "n/a"
+    },
+    "peak_rss_bytes": null,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "579646586",
+    "block_id": "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "brakedown",
+    "status": "ok",
+    "error": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 22,
+    "seed": 76128,
+    "threads": 8,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 8,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 4194304,
+      "n_rows": 2048,
+      "n_per_row": 2048,
+      "n_cols": 4096
+    },
+    "recursion_depth": 3,
+    "level_parameters": [],
+    "total_graph_edges": 0,
+    "total_edge_row_macs": 0,
+    "ns_per_mac": null,
+    "cycles_per_mac": null,
+    "setup_ns": null,
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          48884000,
+          52445000,
+          52750000,
+          68529000,
+          68828000
+        ],
+        "summary": {
+          "min_ns": 48884000,
+          "q1_ns": 52445000,
+          "median_ns": 52750000.0,
+          "q3_ns": 68529000,
+          "iqr_ns": 16084000,
+          "max_ns": 68828000,
+          "mean_ns": 58287200.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": true,
+      "proof_verifies": true,
+      "evaluation_hex": "n/a"
+    },
+    "peak_rss_bytes": null,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "579646586",
+    "block_id": "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "brakedown",
+    "status": "ok",
+    "error": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 24,
+    "seed": 76128,
+    "threads": 8,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 32,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 16777216,
+      "n_rows": 4096,
+      "n_per_row": 4096,
+      "n_cols": 8192
+    },
+    "recursion_depth": 3,
+    "level_parameters": [],
+    "total_graph_edges": 0,
+    "total_edge_row_macs": 0,
+    "ns_per_mac": null,
+    "cycles_per_mac": null,
+    "setup_ns": null,
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          185840000,
+          185939000,
+          186228000,
+          190558000,
+          202340000
+        ],
+        "summary": {
+          "min_ns": 185840000,
+          "q1_ns": 185939000,
+          "median_ns": 186228000.0,
+          "q3_ns": 190558000,
+          "iqr_ns": 4619000,
+          "max_ns": 202340000,
+          "mean_ns": 190181000.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": true,
+      "proof_verifies": true,
+      "evaluation_hex": "n/a"
+    },
+    "peak_rss_bytes": null,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "579646586",
+    "block_id": "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "brakedown",
+    "status": "ok",
+    "error": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 26,
+    "seed": 76128,
+    "threads": 8,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 128,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 67108864,
+      "n_rows": 8192,
+      "n_per_row": 8192,
+      "n_cols": 16384
+    },
+    "recursion_depth": 3,
+    "level_parameters": [],
+    "total_graph_edges": 0,
+    "total_edge_row_macs": 0,
+    "ns_per_mac": null,
+    "cycles_per_mac": null,
+    "setup_ns": null,
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          776636000,
+          777418000,
+          780621000,
+          787991000,
+          797388000
+        ],
+        "summary": {
+          "min_ns": 776636000,
+          "q1_ns": 777418000,
+          "median_ns": 780621000.0,
+          "q3_ns": 787991000,
+          "iqr_ns": 10573000,
+          "max_ns": 797388000,
+          "mean_ns": 784010800.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": true,
+      "proof_verifies": true,
+      "evaluation_hex": "n/a"
+    },
+    "peak_rss_bytes": null,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "579646586",
+    "block_id": "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "orion",
+    "status": "ok",
+    "error": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 16,
+    "seed": 76128,
+    "threads": 8,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 1,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 65536,
+      "n_rows": 512,
+      "n_per_row": 128,
+      "n_cols": 256
+    },
+    "recursion_depth": 3,
+    "level_parameters": [],
+    "total_graph_edges": 0,
+    "total_edge_row_macs": 0,
+    "ns_per_mac": null,
+    "cycles_per_mac": null,
+    "setup_ns": null,
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          17541000,
+          17548000,
+          17552000,
+          17558000,
+          17565000
+        ],
+        "summary": {
+          "min_ns": 17541000,
+          "q1_ns": 17548000,
+          "median_ns": 17552000.0,
+          "q3_ns": 17558000,
+          "iqr_ns": 10000,
+          "max_ns": 17565000,
+          "mean_ns": 17552800.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": true,
+      "proof_verifies": true,
+      "evaluation_hex": "n/a"
+    },
+    "peak_rss_bytes": null,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "579646586",
+    "block_id": "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "orion",
+    "status": "ok",
+    "error": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 18,
+    "seed": 76128,
+    "threads": 8,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 1,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 262144,
+      "n_rows": 2048,
+      "n_per_row": 128,
+      "n_cols": 256
+    },
+    "recursion_depth": 3,
+    "level_parameters": [],
+    "total_graph_edges": 0,
+    "total_edge_row_macs": 0,
+    "ns_per_mac": null,
+    "cycles_per_mac": null,
+    "setup_ns": null,
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          6893000,
+          10862000,
+          10885000,
+          10886000,
+          10907000
+        ],
+        "summary": {
+          "min_ns": 6893000,
+          "q1_ns": 10862000,
+          "median_ns": 10885000.0,
+          "q3_ns": 10886000,
+          "iqr_ns": 24000,
+          "max_ns": 10907000,
+          "mean_ns": 10086600.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": true,
+      "proof_verifies": true,
+      "evaluation_hex": "n/a"
+    },
+    "peak_rss_bytes": null,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "579646586",
+    "block_id": "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "orion",
+    "status": "ok",
+    "error": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 20,
+    "seed": 76128,
+    "threads": 8,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 2,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 1048576,
+      "n_rows": 8192,
+      "n_per_row": 128,
+      "n_cols": 256
+    },
+    "recursion_depth": 3,
+    "level_parameters": [],
+    "total_graph_edges": 0,
+    "total_edge_row_macs": 0,
+    "ns_per_mac": null,
+    "cycles_per_mac": null,
+    "setup_ns": null,
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          6108000,
+          18273000,
+          18287000,
+          18355000,
+          18424000
+        ],
+        "summary": {
+          "min_ns": 6108000,
+          "q1_ns": 18273000,
+          "median_ns": 18287000.0,
+          "q3_ns": 18355000,
+          "iqr_ns": 82000,
+          "max_ns": 18424000,
+          "mean_ns": 15889400.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": true,
+      "proof_verifies": true,
+      "evaluation_hex": "n/a"
+    },
+    "peak_rss_bytes": null,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "579646586",
+    "block_id": "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "orion",
+    "status": "ok",
+    "error": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 22,
+    "seed": 76128,
+    "threads": 8,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 8,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 4194304,
+      "n_rows": 32768,
+      "n_per_row": 128,
+      "n_cols": 256
+    },
+    "recursion_depth": 3,
+    "level_parameters": [],
+    "total_graph_edges": 0,
+    "total_edge_row_macs": 0,
+    "ns_per_mac": null,
+    "cycles_per_mac": null,
+    "setup_ns": null,
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          76596000,
+          77040000,
+          77324000,
+          77411000,
+          77413000
+        ],
+        "summary": {
+          "min_ns": 76596000,
+          "q1_ns": 77040000,
+          "median_ns": 77324000.0,
+          "q3_ns": 77411000,
+          "iqr_ns": 371000,
+          "max_ns": 77413000,
+          "mean_ns": 77156800.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": true,
+      "proof_verifies": true,
+      "evaluation_hex": "n/a"
+    },
+    "peak_rss_bytes": null,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "579646586",
+    "block_id": "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "orion",
+    "status": "ok",
+    "error": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 24,
+    "seed": 76128,
+    "threads": 8,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 16,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 16777216,
+      "n_rows": 131072,
+      "n_per_row": 128,
+      "n_cols": 256
+    },
+    "recursion_depth": 3,
+    "level_parameters": [],
+    "total_graph_edges": 0,
+    "total_edge_row_macs": 0,
+    "ns_per_mac": null,
+    "cycles_per_mac": null,
+    "setup_ns": null,
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          399495000,
+          422976000,
+          427786000,
+          429634000,
+          430013000
+        ],
+        "summary": {
+          "min_ns": 399495000,
+          "q1_ns": 422976000,
+          "median_ns": 427786000.0,
+          "q3_ns": 429634000,
+          "iqr_ns": 6658000,
+          "max_ns": 430013000,
+          "mean_ns": 421980800.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": true,
+      "proof_verifies": true,
+      "evaluation_hex": "n/a"
+    },
+    "peak_rss_bytes": null,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "579646586",
+    "block_id": "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "orion",
+    "status": "ok",
+    "error": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 26,
+    "seed": 76128,
+    "threads": 8,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 16,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 67108864,
+      "n_rows": 524288,
+      "n_per_row": 128,
+      "n_cols": 256
+    },
+    "recursion_depth": 3,
+    "level_parameters": [],
+    "total_graph_edges": 0,
+    "total_edge_row_macs": 0,
+    "ns_per_mac": null,
+    "cycles_per_mac": null,
+    "setup_ns": null,
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          2402837000,
+          2403438000,
+          2417262000,
+          2420513000,
+          2422124000
+        ],
+        "summary": {
+          "min_ns": 2402837000,
+          "q1_ns": 2403438000,
+          "median_ns": 2417262000.0,
+          "q3_ns": 2420513000,
+          "iqr_ns": 17075000,
+          "max_ns": 2422124000,
+          "mean_ns": 2413234800.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": true,
+      "proof_verifies": true,
+      "evaluation_hex": "n/a"
+    },
+    "peak_rss_bytes": null,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "579646586",
+    "block_id": "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  }
+]

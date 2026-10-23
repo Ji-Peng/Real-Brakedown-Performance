@@ -1,0 +1,13 @@
+# Headline Prover Encoding Comparison (This Work vs. LCPC Baseline vs. PolyCommit)
+"# Provenance: Results: s1; Fork commit: f0e2116001af; Baselines: LCPC f0e2116, SIMD-Spielman 7b399db; Sessions: s1; Hosts: gcp-c3d-highmem-16."
+# Note: Mode (a) SdigCode6 parameter set over Mont127 field.
+# Note: PolyCommit uses the same Mont127 prime with the pinned default graph constants and an explicit square shape; its patched opening sec_param is 80.
+# Note: Reported values are mean of session medians with [min-max] across runs.
+# Note: Significance: 'faster' denotes non-overlapping sample ranges (max(TW) < min(Base)); else 'comparable'.
+log2(N),N,k x n,T,This Work (ms),TW (ns/MAC),LCPC Orig (ms),Speedup over LCPC,Significance,PolyCommit Mont127 (sec=80) (ms),Speedup over PolyCommit
+20,1048576,1024x2048,1,108.25 [95.25-157.17],2.95,561.95 [527.20-596.88],5.19x,faster,-,-
+20,1048576,1024x2048,8,16.59 [14.55-23.14],0.47,70.95 [66.83-75.97],4.28x,faster,-,-
+24,16777216,4096x8192,1,1390.73 [1328.48-1606.92],2.88,7904.54 [7421.79-8387.93],5.68x,faster,-,-
+24,16777216,4096x8192,8,225.87 [195.90-336.67],0.55,995.26 [935.99-1080.35],4.41x,faster,-,-
+26,67108864,8192x16384,1,5290.16 [5147.38-5593.86],2.92,-,-,comparable,-,-
+26,67108864,8192x16384,8,948.59 [759.84-1442.28],0.67,-,-,comparable,-,-

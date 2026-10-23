@@ -1,0 +1,106 @@
+[
+  {
+    "field": "Mont127",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 532505,
+      "ns_per_op": 10.6501
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 153372,
+      "ns_per_op": 3.06744
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 261963,
+      "ns_per_op": 5.23926
+    },
+    "session_id": "s1",
+    "session_seed": "124841406",
+    "block_id": "full_this_work_mode_b_mers127_t1_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  },
+  {
+    "field": "Mers127",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 272502,
+      "ns_per_op": 5.45004
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 154492,
+      "ns_per_op": 3.08984
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 36260,
+      "ns_per_op": 0.7252
+    },
+    "session_id": "s1",
+    "session_seed": "124841406",
+    "block_id": "full_this_work_mode_b_mers127_t1_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  },
+  {
+    "field": "Fp2M61",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 289873,
+      "ns_per_op": 5.79746
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 140981,
+      "ns_per_op": 2.81962
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 29031,
+      "ns_per_op": 0.58062
+    },
+    "session_id": "s1",
+    "session_seed": "124841406",
+    "block_id": "full_this_work_mode_b_mers127_t1_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  },
+  {
+    "field": "Ft127",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 454884,
+      "ns_per_op": 9.09768
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 153452,
+      "ns_per_op": 3.06904
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 304393,
+      "ns_per_op": 6.08786
+    },
+    "session_id": "s1",
+    "session_seed": "124841406",
+    "block_id": "full_this_work_mode_b_mers127_t1_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  }
+]

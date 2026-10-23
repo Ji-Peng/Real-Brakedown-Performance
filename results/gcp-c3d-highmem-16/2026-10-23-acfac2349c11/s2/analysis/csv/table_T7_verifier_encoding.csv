@@ -1,0 +1,5 @@
+# Verifier-Side Small-Batch Encoding Latency Comparison
+"# Provenance: Results: s2; Fork commit: HEAD; Baselines: LCPC f0e2116, SIMD-Spielman 7b399db; Sessions: s2; Hosts: gcp-c3d-highmem-16."
+# Note: Verifier-side encoding latency in microseconds for 1 vector (v=1) and 2 vectors (v=2) of length k.
+# Note: [KDHR26] values quoted verbatim from Table 6 (page 14) for Montgomery verifier encoding.
+Mode,Field,log2(N),k,This Work v=1 (us),This Work v=2 (us),SIMD-Spielman v=2 (us),[KDHR26] Table 6 (us),Speedup over KDHR26

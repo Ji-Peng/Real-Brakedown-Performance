@@ -1,0 +1,12 @@
+# Orion Matrix Shape Encoding Comparison (128 Rows)
+"# Provenance: Results: s1; Fork commit: f0e2116001af; Baselines: LCPC f0e2116, SIMD-Spielman 7b399db; Sessions: 2026-10-22T213843Z-8dec85493004, 2026-10-22T222434Z-8dec85493004, s1; Hosts: gcp-c3d-highmem-16."
+"# Note: Orion matrix shape uses fixed 128 rows (k = 128, n_per_row = N / 128)."
+# Note: [KDHR26] Table 3 reports Orion results for Fp2M61; Mont127 and Mers127 are not reported there.
+Field,T,log2(N),This Work Orion (ms),SIMD-Spielman Orion (ms),[KDHR26] Orion Table 3 (ms),Orion / Brakedown Ratio
+Fp2M61,1,28,34731.15,-,N/A (KDHR26 Table 3 reports Fp2M61 only),2.10x
+Fp2M61,8,28,7007.09,-,N/A (KDHR26 Table 3 reports Fp2M61 only),2.87x
+Mers127,1,28,36484.02,-,N/A (KDHR26 Table 3 reports Fp2M61 only),1.95x
+Mers127,8,28,7099.71,-,N/A (KDHR26 Table 3 reports Fp2M61 only),2.81x
+Mont127,1,28,40406.25,-,N/A (KDHR26 Table 3 reports Fp2M61 only),1.99x
+Mont127,7,28,-,-,N/A (KDHR26 Table 3 reports Fp2M61 only),-
+Mont127,8,28,7981.04,-,N/A (KDHR26 Table 3 reports Fp2M61 only),2.67x

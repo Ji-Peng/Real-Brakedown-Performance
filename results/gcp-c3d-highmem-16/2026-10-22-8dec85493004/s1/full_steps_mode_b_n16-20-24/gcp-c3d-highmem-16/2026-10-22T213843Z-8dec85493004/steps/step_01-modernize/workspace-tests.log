@@ -1,0 +1,171 @@
+   Compiling autocfg v1.5.1
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling version_check v0.9.5
+   Compiling libm v0.2.16
+   Compiling libc v0.2.191
+   Compiling num-traits v0.2.19
+   Compiling cfg-if v1.0.5
+   Compiling crossbeam-utils v0.8.23
+   Compiling serde_core v1.0.229
+   Compiling crossbeam-epoch v0.9.21
+   Compiling generic-array v0.14.7
+   Compiling syn v2.0.119
+   Compiling rand_core v0.10.1
+   Compiling rustversion v1.0.23
+   Compiling syn v1.0.109
+   Compiling crossbeam-deque v0.8.8
+   Compiling num-integer v0.1.47
+   Compiling proc-macro-error-attr v1.0.4
+   Compiling radium v0.7.0
+   Compiling zerocopy v0.8.63
+   Compiling typenum v1.20.1
+   Compiling rayon-core v1.13.0
+   Compiling num-bigint v0.4.8
+   Compiling proc-macro-error v1.0.4
+   Compiling syn v3.0.9
+   Compiling getrandom v0.4.3
+   Compiling serde v1.0.229
+   Compiling tap v1.0.1
+   Compiling either v1.19.0
+   Compiling cpufeatures v0.3.1
+   Compiling wyz v0.5.1
+   Compiling serde_derive v1.0.229
+   Compiling err-derive v0.3.1
+   Compiling addchain v0.3.0
+   Compiling shlex v2.0.1
+   Compiling unicode-xid v0.2.6
+   Compiling byteorder v1.5.0
+   Compiling find-msvc-tools v0.1.15
+   Compiling funty v2.0.0
+   Compiling bitvec v1.1.1
+   Compiling cc v1.9.0
+   Compiling synstructure v0.12.6
+   Compiling ppv-lite86 v0.2.21
+   Compiling ff_derive v0.14.0
+   Compiling rayon v1.12.0
+   Compiling chacha20 v0.10.2
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling subtle v2.6.1
+   Compiling ff v0.14.0
+   Compiling digest v0.10.7
+   Compiling rand v0.10.3
+   Compiling blake3 v1.8.7
+   Compiling itertools v0.14.0
+   Compiling zeroize_derive v1.5.0
+   Compiling getrandom v0.2.17
+   Compiling arrayvec v0.7.8
+   Compiling constant_time_eq v0.4.2
+   Compiling rand_core v0.6.4
+   Compiling zeroize v1.9.1
+   Compiling keccak v0.1.6
+   Compiling merlin v3.0.0
+   Compiling rand_chacha v0.10.0
+   Compiling serde_bytes v0.11.19
+   Compiling lcpc-test-fields v0.1.0 (/home/jipeng/RealBrakedownPerf/code/target-harness/worktrees/wt-step_01-modernize-xPdN1h/lcpc-test-fields)
+   Compiling lcpc-2d v0.1.1 (/home/jipeng/RealBrakedownPerf/code/target-harness/worktrees/wt-step_01-modernize-xPdN1h/lcpc-2d)
+   Compiling num-complex v0.2.4
+   Compiling matrixmultiply v0.3.11
+   Compiling bincode v1.3.3
+   Compiling rawpointer v0.2.1
+   Compiling approx v0.3.2
+   Compiling num-complex v0.4.6
+   Compiling ndarray v0.17.2
+   Compiling alga v0.9.3
+   Compiling num_cpus v1.17.0
+   Compiling smallvec v1.16.3
+   Compiling zmij v1.0.23
+   Compiling sprs v0.11.6
+   Compiling serde_json v1.0.154
+   Compiling itoa v1.0.18
+   Compiling memchr v2.8.3
+   Compiling lcpc-brakedown-pc v0.1.1 (/home/jipeng/RealBrakedownPerf/code/target-harness/worktrees/wt-step_01-modernize-xPdN1h/lcpc-brakedown-pc)
+   Compiling lcpc-ligero-pc v0.1.1 (/home/jipeng/RealBrakedownPerf/code/target-harness/worktrees/wt-step_01-modernize-xPdN1h/lcpc-ligero-pc)
+   Compiling lcpc-bench v0.1.0 (/home/jipeng/RealBrakedownPerf/code/target-harness/worktrees/wt-step_01-modernize-xPdN1h/bench)
+    Finished `release` profile [optimized] target(s) in 1m 22s
+     Running unittests src/lib.rs (/home/jipeng/RealBrakedownPerf/code/target-harness/cargo/workspace-step_01-modernize/release/deps/lcpc_2d-2b3f7ced8d72dfc0)
+
+running 7 tests
+test tests::commit ... ok
+test tests::end_to_end ... ok
+test tests::end_to_end_two_proofs ... ok
+test tests::eval_outer ... ok
+test tests::log2 ... ok
+test tests::merkleize ... ok
+test tests::open_column ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/main.rs (/home/jipeng/RealBrakedownPerf/code/target-harness/cargo/workspace-step_01-modernize/release/deps/lcpc_bench-f2b78d75c3ff52a9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/home/jipeng/RealBrakedownPerf/code/target-harness/cargo/workspace-step_01-modernize/release/deps/lcpc_brakedown_pc-3495522ff3febd8e)
+
+running 9 tests
+test tests::col_opens ... ok
+test tests::end_to_end_one_proof ... ok
+test tests::end_to_end_one_proof_ml ... ................................................................
+ok
+test tests::end_to_end_two_proofs ... ok
+test tests::golden_vectors_bit_exact_with_lcpc_orig ... ok
+test tests::prove_verify_size_bench ... ignored
+test tests::rough_bench ... ignored
+test tests::sprs_playground ... ok
+test tests::test_matgen_encode ... ok
+
+test result: ok. 7 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.61s
+
+     Running unittests src/lib.rs (/home/jipeng/RealBrakedownPerf/code/target-harness/cargo/workspace-step_01-modernize/release/deps/lcpc_ligero_pc-11247dbfc936bfcd)
+
+running 9 tests
+test tests::col_opens ... ok
+test tests::end_to_end ... ok
+test tests::end_to_end_one_proof_ml ... ................................................................
+ok
+test tests::end_to_end_two_proofs ... ok
+test tests::get_dims ... ok
+test tests::proof_sizes ... ignored
+test tests::prove_verify_size_bench ... ignored
+test tests::rate ... ok
+test tests::rough_bench ... ignored
+
+test result: ok. 6 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running unittests src/lib.rs (/home/jipeng/RealBrakedownPerf/code/target-harness/cargo/workspace-step_01-modernize/release/deps/lcpc_test_fields-48b5746fb8d1b24f)
+
+running 2 tests
+test fft::tests::roots_of_unity ... ok
+test fft::tests::roundtrip ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+   Doc-tests lcpc_2d
+
+running 1 test
+test lcpc-2d/src/macros.rs - macros::def_labels (line 15) ... ignored
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lcpc_brakedown_pc
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lcpc_ligero_pc
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lcpc_test_fields
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

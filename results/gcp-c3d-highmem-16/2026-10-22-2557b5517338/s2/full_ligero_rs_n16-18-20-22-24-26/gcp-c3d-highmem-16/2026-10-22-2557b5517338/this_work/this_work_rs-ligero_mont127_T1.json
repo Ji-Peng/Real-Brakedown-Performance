@@ -1,0 +1,416 @@
+[
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "lcpc-ligero-rs",
+    "upstream_commit": "f0e2116001af5a1bbf39481535f837d6a25772e8",
+    "driver_version": "0.1.0",
+    "hash_algorithm": "BLAKE3-256",
+    "hash_crate_version": "1.8.7",
+    "hash_mode": "portable-only",
+    "field": "Ft127",
+    "params": "rs-ligero",
+    "shape": "brakedown",
+    "log_n": 20,
+    "seed": 5495324220345948928,
+    "threads": 1,
+    "cores": "",
+    "slices": 1,
+    "slice_mode": "none",
+    "adaptive_slices": 1,
+    "warmup": 1,
+    "runs": 5,
+    "dimensions": {
+      "coefficient_count": 1048576,
+      "n_rows": 128,
+      "n_per_row": 8192,
+      "n_cols": 16384
+    },
+    "recursion_depth": 0,
+    "level_parameters": [],
+    "total_graph_edges": 0,
+    "total_edge_row_macs": 0,
+    "ns_per_mac": 0.0,
+    "cycles_per_mac": null,
+    "cpu_mhz_before": 2599.998,
+    "cpu_mhz_after": 2599.998,
+    "proof_size_bytes": 0,
+    "setup_ns": {
+      "graph_sampling_and_encoding_init_ns": 0,
+      "input_generation_and_row_buffer_init_ns": 58372208,
+      "verifier_encoding_init_ns": 0
+    },
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          271845195,
+          272114404,
+          272556303,
+          271977224,
+          272052724
+        ],
+        "summary": {
+          "min_ns": 271845195,
+          "q1_ns": 271977224,
+          "median_ns": 272052724.0,
+          "q3_ns": 272114404,
+          "iqr_ns": 137180,
+          "max_ns": 272556303,
+          "mean_ns": 272109170.0
+        }
+      },
+      "verifier_encode": {
+        "samples_ns": [],
+        "summary": {
+          "min_ns": 0,
+          "q1_ns": 0,
+          "median_ns": 0.0,
+          "q3_ns": 0,
+          "iqr_ns": 0,
+          "max_ns": 0,
+          "mean_ns": 0.0
+        }
+      },
+      "verifier_encode_1": null,
+      "verifier_encode_2": null,
+      "hash_matrix_decomposition": {
+        "samples_ns": [],
+        "summary": {
+          "min_ns": 0,
+          "q1_ns": 0,
+          "median_ns": 0.0,
+          "q3_ns": 0,
+          "iqr_ns": 0,
+          "max_ns": 0,
+          "mean_ns": 0.0
+        }
+      },
+      "commit_total": {
+        "samples_ns": [],
+        "summary": {
+          "min_ns": 0,
+          "q1_ns": 0,
+          "median_ns": 0.0,
+          "q3_ns": 0,
+          "iqr_ns": 0,
+          "max_ns": 0,
+          "mean_ns": 0.0
+        }
+      },
+      "prove": {
+        "samples_ns": [],
+        "summary": {
+          "min_ns": 0,
+          "q1_ns": 0,
+          "median_ns": 0.0,
+          "q3_ns": 0,
+          "iqr_ns": 0,
+          "max_ns": 0,
+          "mean_ns": 0.0
+        }
+      },
+      "verify": {
+        "samples_ns": [],
+        "summary": {
+          "min_ns": 0,
+          "q1_ns": 0,
+          "median_ns": 0.0,
+          "q3_ns": 0,
+          "iqr_ns": 0,
+          "max_ns": 0,
+          "mean_ns": 0.0
+        }
+      }
+    },
+    "correctness": {
+      "direct_encoder_root_matches_commit": true,
+      "proof_verification_passed": true,
+      "verified_evaluation_hex": ""
+    },
+    "peak_rss_bytes": 54468608,
+    "hash_decomposition_includes_scratch_allocation": false,
+    "status": "complete",
+    "error": null,
+    "perf_stat": null,
+    "session_id": "s2",
+    "session_seed": "634954910",
+    "block_id": "full_ligero_rs_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.998",
+    "freq_after_mhz": "2599.998"
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "lcpc-ligero-rs",
+    "upstream_commit": "f0e2116001af5a1bbf39481535f837d6a25772e8",
+    "driver_version": "0.1.0",
+    "hash_algorithm": "BLAKE3-256",
+    "hash_crate_version": "1.8.7",
+    "hash_mode": "portable-only",
+    "field": "Ft127",
+    "params": "rs-ligero",
+    "shape": "brakedown",
+    "log_n": 22,
+    "seed": 5495324220345948930,
+    "threads": 1,
+    "cores": "",
+    "slices": 1,
+    "slice_mode": "none",
+    "adaptive_slices": 1,
+    "warmup": 1,
+    "runs": 5,
+    "dimensions": {
+      "coefficient_count": 4194304,
+      "n_rows": 256,
+      "n_per_row": 16384,
+      "n_cols": 32768
+    },
+    "recursion_depth": 0,
+    "level_parameters": [],
+    "total_graph_edges": 0,
+    "total_edge_row_macs": 0,
+    "ns_per_mac": 0.0,
+    "cycles_per_mac": null,
+    "cpu_mhz_before": 2599.998,
+    "cpu_mhz_after": 2599.998,
+    "proof_size_bytes": 0,
+    "setup_ns": {
+      "graph_sampling_and_encoding_init_ns": 0,
+      "input_generation_and_row_buffer_init_ns": 230199304,
+      "verifier_encoding_init_ns": 0
+    },
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          1155679234,
+          1156079424,
+          1155950595,
+          1155533244,
+          1156923645
+        ],
+        "summary": {
+          "min_ns": 1155533244,
+          "q1_ns": 1155679234,
+          "median_ns": 1155950595.0,
+          "q3_ns": 1156079424,
+          "iqr_ns": 400190,
+          "max_ns": 1156923645,
+          "mean_ns": 1156033228.4
+        }
+      },
+      "verifier_encode": {
+        "samples_ns": [],
+        "summary": {
+          "min_ns": 0,
+          "q1_ns": 0,
+          "median_ns": 0.0,
+          "q3_ns": 0,
+          "iqr_ns": 0,
+          "max_ns": 0,
+          "mean_ns": 0.0
+        }
+      },
+      "verifier_encode_1": null,
+      "verifier_encode_2": null,
+      "hash_matrix_decomposition": {
+        "samples_ns": [],
+        "summary": {
+          "min_ns": 0,
+          "q1_ns": 0,
+          "median_ns": 0.0,
+          "q3_ns": 0,
+          "iqr_ns": 0,
+          "max_ns": 0,
+          "mean_ns": 0.0
+        }
+      },
+      "commit_total": {
+        "samples_ns": [],
+        "summary": {
+          "min_ns": 0,
+          "q1_ns": 0,
+          "median_ns": 0.0,
+          "q3_ns": 0,
+          "iqr_ns": 0,
+          "max_ns": 0,
+          "mean_ns": 0.0
+        }
+      },
+      "prove": {
+        "samples_ns": [],
+        "summary": {
+          "min_ns": 0,
+          "q1_ns": 0,
+          "median_ns": 0.0,
+          "q3_ns": 0,
+          "iqr_ns": 0,
+          "max_ns": 0,
+          "mean_ns": 0.0
+        }
+      },
+      "verify": {
+        "samples_ns": [],
+        "summary": {
+          "min_ns": 0,
+          "q1_ns": 0,
+          "median_ns": 0.0,
+          "q3_ns": 0,
+          "iqr_ns": 0,
+          "max_ns": 0,
+          "mean_ns": 0.0
+        }
+      }
+    },
+    "correctness": {
+      "direct_encoder_root_matches_commit": true,
+      "proof_verification_passed": true,
+      "verified_evaluation_hex": ""
+    },
+    "peak_rss_bytes": 205983744,
+    "hash_decomposition_includes_scratch_allocation": false,
+    "status": "complete",
+    "error": null,
+    "perf_stat": null,
+    "session_id": "s2",
+    "session_seed": "634954910",
+    "block_id": "full_ligero_rs_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.998",
+    "freq_after_mhz": "2599.998"
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "lcpc-ligero-rs",
+    "upstream_commit": "f0e2116001af5a1bbf39481535f837d6a25772e8",
+    "driver_version": "0.1.0",
+    "hash_algorithm": "BLAKE3-256",
+    "hash_crate_version": "1.8.7",
+    "hash_mode": "portable-only",
+    "field": "Ft127",
+    "params": "rs-ligero",
+    "shape": "brakedown",
+    "log_n": 24,
+    "seed": 5495324220345948940,
+    "threads": 1,
+    "cores": "",
+    "slices": 1,
+    "slice_mode": "none",
+    "adaptive_slices": 1,
+    "warmup": 1,
+    "runs": 5,
+    "dimensions": {
+      "coefficient_count": 16777216,
+      "n_rows": 512,
+      "n_per_row": 32768,
+      "n_cols": 65536
+    },
+    "recursion_depth": 0,
+    "level_parameters": [],
+    "total_graph_edges": 0,
+    "total_edge_row_macs": 0,
+    "ns_per_mac": 0.0,
+    "cycles_per_mac": null,
+    "cpu_mhz_before": 2599.998,
+    "cpu_mhz_after": 2599.998,
+    "proof_size_bytes": 0,
+    "setup_ns": {
+      "graph_sampling_and_encoding_init_ns": 0,
+      "input_generation_and_row_buffer_init_ns": 924232729,
+      "verifier_encoding_init_ns": 0
+    },
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          4924233362,
+          4929171522,
+          4928038223,
+          4927701314,
+          4927914044
+        ],
+        "summary": {
+          "min_ns": 4924233362,
+          "q1_ns": 4927701314,
+          "median_ns": 4927914044.0,
+          "q3_ns": 4928038223,
+          "iqr_ns": 336909,
+          "max_ns": 4929171522,
+          "mean_ns": 4927411693.0
+        }
+      },
+      "verifier_encode": {
+        "samples_ns": [],
+        "summary": {
+          "min_ns": 0,
+          "q1_ns": 0,
+          "median_ns": 0.0,
+          "q3_ns": 0,
+          "iqr_ns": 0,
+          "max_ns": 0,
+          "mean_ns": 0.0
+        }
+      },
+      "verifier_encode_1": null,
+      "verifier_encode_2": null,
+      "hash_matrix_decomposition": {
+        "samples_ns": [],
+        "summary": {
+          "min_ns": 0,
+          "q1_ns": 0,
+          "median_ns": 0.0,
+          "q3_ns": 0,
+          "iqr_ns": 0,
+          "max_ns": 0,
+          "mean_ns": 0.0
+        }
+      },
+      "commit_total": {
+        "samples_ns": [],
+        "summary": {
+          "min_ns": 0,
+          "q1_ns": 0,
+          "median_ns": 0.0,
+          "q3_ns": 0,
+          "iqr_ns": 0,
+          "max_ns": 0,
+          "mean_ns": 0.0
+        }
+      },
+      "prove": {
+        "samples_ns": [],
+        "summary": {
+          "min_ns": 0,
+          "q1_ns": 0,
+          "median_ns": 0.0,
+          "q3_ns": 0,
+          "iqr_ns": 0,
+          "max_ns": 0,
+          "mean_ns": 0.0
+        }
+      },
+      "verify": {
+        "samples_ns": [],
+        "summary": {
+          "min_ns": 0,
+          "q1_ns": 0,
+          "median_ns": 0.0,
+          "q3_ns": 0,
+          "iqr_ns": 0,
+          "max_ns": 0,
+          "mean_ns": 0.0
+        }
+      }
+    },
+    "correctness": {
+      "direct_encoder_root_matches_commit": true,
+      "proof_verification_passed": true,
+      "verified_evaluation_hex": ""
+    },
+    "peak_rss_bytes": 812138496,
+    "hash_decomposition_includes_scratch_allocation": false,
+    "status": "complete",
+    "error": null,
+    "perf_stat": null,
+    "session_id": "s2",
+    "session_seed": "634954910",
+    "block_id": "full_ligero_rs_n16-18-20-22-24-26",
+    "freq_before_mhz": "2599.998",
+    "freq_after_mhz": "2599.998"
+  }
+]

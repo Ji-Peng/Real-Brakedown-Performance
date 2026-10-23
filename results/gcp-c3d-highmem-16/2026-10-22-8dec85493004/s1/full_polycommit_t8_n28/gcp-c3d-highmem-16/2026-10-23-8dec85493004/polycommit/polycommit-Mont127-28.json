@@ -1,0 +1,92 @@
+[
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "arkworks-poly-commit-brakedown",
+    "upstream_commit": "1eaec5090ba5bc87d75a69570ed38f6fcf8b9417",
+    "driver_version": "0.1.0",
+    "hash_algorithm": "not invoked (encoding-only)",
+    "hash_crate_version": null,
+    "hash_mode": "not-invoked",
+    "field": "Mont127",
+    "field_modulus": "146823888364060453008360742206866194433",
+    "patched": true,
+    "patch_sha256": "15ba42ea9ab990a707e4efb2e983420f1e810b9a587618cec5595f04b01a75d1",
+    "sec_param": 80,
+    "params": "arkworks-brakedown-explicit-square",
+    "shape": "brakedown",
+    "log_n": 28,
+    "seed": 5786927992459447629,
+    "threads": 8,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": null,
+    "slice_mode": "not-applicable",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "dimensions": {
+      "coefficient_count": 268435456,
+      "n_rows": 16384,
+      "n_per_row": 16384,
+      "n_cols": 24921
+    },
+    "recursion_depth": null,
+    "level_parameters": [],
+    "total_graph_edges": null,
+    "total_edge_row_macs": null,
+    "ns_per_mac": null,
+    "cycles_per_mac": null,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "proof_size_bytes": null,
+    "setup_ns": {
+      "graph_sampling_and_encoding_init_ns": 16012807,
+      "input_generation_and_row_buffer_init_ns": 4455059989,
+      "verifier_encoding_init_ns": null
+    },
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          9975115775,
+          10014280502,
+          9952111929,
+          9947098985,
+          9938691047
+        ],
+        "summary": {
+          "min_ns": 9938691047,
+          "q1_ns": 9947098985,
+          "median_ns": 9952111929.0,
+          "q3_ns": 9975115775,
+          "iqr_ns": 28016790,
+          "max_ns": 10014280502,
+          "mean_ns": 9965459647.6
+        }
+      },
+      "verifier_encode": null,
+      "verifier_encode_1": null,
+      "verifier_encode_2": null,
+      "hash_matrix_decomposition": null,
+      "commit_total": null,
+      "prove": null,
+      "verify": null
+    },
+    "correctness": {
+      "direct_encoder_root_matches_commit": null,
+      "proof_verification_passed": null,
+      "verified_evaluation_hex": null,
+      "encoder_linearity_passed": true
+    },
+    "peak_rss_bytes": 10850496512,
+    "hash_decomposition_includes_scratch_allocation": null,
+    "status": "complete",
+    "error": null,
+    "perf_stat": null,
+    "measurement_scope": "all matrix rows encoded; graph setup and input generation excluded",
+    "hash_functions_invoked": false,
+    "session_id": "s1",
+    "session_seed": "7543847",
+    "block_id": "full_polycommit_t8_n28",
+    "freq_before_mhz": "2599.996",
+    "freq_after_mhz": "2599.996"
+  }
+]

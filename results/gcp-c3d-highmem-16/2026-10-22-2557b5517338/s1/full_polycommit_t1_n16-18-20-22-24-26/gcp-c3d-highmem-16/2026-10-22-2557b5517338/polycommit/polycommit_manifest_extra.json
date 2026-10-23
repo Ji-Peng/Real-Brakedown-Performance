@@ -1,0 +1,37 @@
+{
+  "baseline": {
+    "implementation": "arkworks-poly-commit-brakedown-encoding-only",
+    "repository": "https://github.com/arkworks-rs/poly-commit",
+    "upstream_commit": "1eaec5090ba5bc87d75a69570ed38f6fcf8b9417",
+    "patched": true,
+    "patch_sha256": "15ba42ea9ab990a707e4efb2e983420f1e810b9a587618cec5595f04b01a75d1",
+    "sec_param": 80,
+    "driver_version": "0.1.0",
+    "driver_cargo_manifest_sha256": "64a10d78e0e6d00b1894eac48bbe15af81756bbcc104ee910534afe31c3c04e9",
+    "driver_cargo_lock_sha256": "3151a7c6fb71410be23943b77615a5219370609f008d8455433ae88ac5b6b9eb",
+    "raw_json_sha256": "61d8ba5daab0cffd551c5f4869d9d798f50aad841ed3c92a2cde4fed1b5482e1",
+    "field": {
+      "name": "Mont127",
+      "modulus_hex": "0x6e754097ba20e0bf7f2bd90000000001",
+      "modulus_decimal": "146823888364060453008360742206866194433",
+      "generator": "3",
+      "requested_reference_field": "mont127",
+      "comparison_note": "Matches LCPC Mont127; arkworks sec_param=80 is used for column openings because the 127-bit field cannot satisfy default 128-bit soundness."
+    },
+    "parameters": "patched BrakedownPCParams::with_dims; default code constants; explicit square matrix",
+    "measurement_scope": "linear-code encoding of all coefficient-matrix rows; setup and input generation separate",
+    "hashing": "not invoked; private marker hash types only instantiate arkworks generics",
+    "logN": [
+      16,
+      18,
+      20,
+      22,
+      24,
+      26
+    ],
+    "threads": 1,
+    "cores": "1",
+    "runs": 5,
+    "warmup": 1
+  }
+}

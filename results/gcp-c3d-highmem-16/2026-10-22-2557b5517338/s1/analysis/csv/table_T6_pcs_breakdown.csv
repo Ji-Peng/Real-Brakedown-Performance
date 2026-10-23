@@ -1,0 +1,17 @@
+"# End-to-End PCS Breakdown: Commitment, Proving, Verification, and Proof Size"
+"# Provenance: Results: s1; Fork commit: f0e2116001af; Baselines: LCPC f0e2116, SIMD-Spielman 7b399db; Sessions: s1; Hosts: gcp-c3d-highmem-16."
+# Note: End-to-end PCS commitment times evaluated with portable BLAKE3 hashing.
+# Note: Encode and Hash matrix decomposition fractions illustrate shift of bottleneck to hashing.
+Implementation,T,log2(N),Commit (ms),Encode (ms),Hash (ms),Enc/Hash (%),Prove (ms),Verify (ms),Proof Size (B)
+This Work,1,20,164.57,96.68,59.10,62.1% / 37.9%,72.69,316.77,63283400
+This Work,1,24,2407.39,1334.05,931.80,58.9% / 41.1%,1028.28,1250.88,248297016
+This Work,8,20,32.61,16.49,7.65,68.3% / 31.7%,13.16,41.77,63283400
+This Work,8,24,444.53,197.53,116.87,62.8% / 37.2%,179.85,163.20,248297016
+Original LCPC,1,20,641.02,589.44,48.72,92.4% / 7.6%,54.92,233.13,63283400
+Original LCPC,1,20,589.76,524.23,57.22,90.2% / 9.8%,63.38,278.09,63283400
+Original LCPC,1,24,9139.31,8290.06,766.34,91.5% / 8.5%,725.94,915.73,248297016
+Original LCPC,1,24,8411.86,7374.29,906.72,89.1% / 10.9%,889.00,1096.81,248297016
+Original LCPC,8,20,97.11,604.08,6.37,99.0% / 1.0%,10.89,31.70,63283400
+Original LCPC,8,20,78.40,523.74,7.41,98.6% / 1.4%,11.80,36.84,63283400
+Original LCPC,8,24,1234.46,8308.72,97.91,98.8% / 1.2%,147.73,123.68,248297016
+Original LCPC,8,24,1147.53,7365.61,113.83,98.5% / 1.5%,171.09,143.85,248297016

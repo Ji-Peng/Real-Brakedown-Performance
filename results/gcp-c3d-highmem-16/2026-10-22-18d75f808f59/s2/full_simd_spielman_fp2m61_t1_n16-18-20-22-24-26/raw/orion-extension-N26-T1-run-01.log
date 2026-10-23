@@ -1,0 +1,21 @@
+GraphGen Done lgN=26 k=524288 slices=16
+
+Encode sample 0 :   11959391 us
+Encode sample 1 :   11882916 us
+Encode sample 2 :   11936995 us
+Encode sample 3 :   11951496 us
+Encode sample 4 :   11890928 us
+Encode sample 5 :   11950377 us
+Encode time for logN = 26, repetitions 6 :   11928683 us
+
+Checksum:
+[0] 00055329a49690ee
+[1] 00016ba4a9865183
+[2] 0001238621096df6
+[3] 000ba017158965b7
+[4] 000642242acd53c3
+[5] 000a3928fde3cbf6
+[6] 0004aaf0a79d65fe
+[7] 000f3cc3a9445d1c
+
+Done!

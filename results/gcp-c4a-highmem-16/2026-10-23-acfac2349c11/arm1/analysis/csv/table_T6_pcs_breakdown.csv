@@ -1,0 +1,5 @@
+"# End-to-End PCS Breakdown: Commitment, Proving, Verification, and Proof Size"
+"# Provenance: Results: arm1; Fork commit: HEAD; Baselines: LCPC f0e2116, SIMD-Spielman 7b399db; Sessions: arm1; Hosts: gcp-c4a-highmem-16."
+# Note: End-to-end PCS commitment times evaluated with portable BLAKE3 hashing.
+# Note: Encode and Hash matrix decomposition fractions illustrate shift of bottleneck to hashing.
+Implementation,T,log2(N),Commit (ms),Encode (ms),Hash (ms),Enc/Hash (%),Prove (ms),Verify (ms),Proof Size (B)

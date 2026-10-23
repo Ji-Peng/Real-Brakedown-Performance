@@ -1,0 +1,67 @@
+{
+  "status": "failed",
+  "failure_reason": "Benchmark failed (143): orion-montgomery-N28-T1",
+  "skip_reason": null,
+  "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+  "params_patch_sha256": "d9cf97f0347fbb6b41d96397f6be9e3d7b604381471ef901e5ba61e9d7806fb6",
+  "selected_cpu": "EPYC",
+  "threads": 1,
+  "logN": [
+    28
+  ],
+  "runs": 5,
+  "warmup": 1,
+  "measurement_method": "one process per case (graph generated once); warm-up + timed encodings in-process, each on fresh random input, timed individually; warm-up encodings excluded",
+  "benchmark_cores": "1",
+  "coordinator_shares_worker_core": false,
+  "correctness_test_cores": "0,1,2,3,4,5,6,7",
+  "fields": [
+    "montgomery"
+  ],
+  "shapes": [
+    "brakedown",
+    "orion"
+  ],
+  "verifier_benchmark": "Montgomery, single thread",
+  "slice_mode": "table",
+  "single_slice_override": null,
+  "custom_slice_table": null,
+  "effective_slice_counts_by_benchmark": {
+    "brakedown-montgomery-N28-T1-run-01": 8,
+    "verifier-brakedown-montgomery-N28-T1-run-01": 1
+  },
+  "cxx": "g++",
+  "cxx_wrapper_override": null,
+  "extra_include_override": null,
+  "cxx_include_env": null,
+  "upstream_compile_flags": "-march=native -O3 -funroll-loops -Wno-uninitialized -mavx512f -mavx512vl -mavx512dq; -Wall -faligned-new -g; -lstdc++; SELECTED_CPU compile definition",
+  "cmake_configuration": {
+    "test_poly_sizes": [
+      12,
+      14,
+      16
+    ],
+    "test_thread_variants": [
+      2,
+      4,
+      8,
+      16
+    ],
+    "benchmark_poly_sizes": [
+      28
+    ],
+    "benchmark_thread_variant": 1,
+    "target_definitions": [
+      "SELECTED_CPU=EPYC",
+      "BRAKEDOWN=0 or BRAKEDOWN=1 per matrix shape",
+      "POLY_SIZE=per executable logN",
+      "THREADS=per executable thread variant"
+    ]
+  },
+  "output_dir": "/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-8dec85493004/s2/full_simd_spielman_mont127_t1_n28",
+  "session_id": "s2",
+  "session_seed": "190146827",
+  "block_id": "full_lcpc_orig_mode_a_t1_n28",
+  "freq_before_mhz": "2599.998",
+  "freq_after_mhz": "2599.998"
+}

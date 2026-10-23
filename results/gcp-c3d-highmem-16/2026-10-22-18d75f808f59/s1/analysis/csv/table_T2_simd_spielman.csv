@@ -1,0 +1,6 @@
+# Comparison with SIMD-Spielman (AVX-512 IFMA) and Prior Reported Results
+"# Provenance: Results: s1; Fork commit: f0e2116001af; Baselines: LCPC f0e2116, SIMD-Spielman 7b399db; Sessions: s1; Hosts: gcp-c3d-highmem-16."
+# Note: Mode (b) parameters matching [KDHR26]. All runtimes in milliseconds.
+# Note: SIMD Gap Recovered = T_SIMD / T_ThisWork. Values >= 1.0x indicate This Work matches or exceeds AVX-512.
+# Note: [KDHR26] reported numbers quoted verbatim from SIMD-Spielman paper Table 2 (page 11) on AMD EPYC 9754.
+Field,T,log2(N),This Work (ms),SIMD-Spielman (ms),SIMD Gap Recovered,[KDHR26] Reported (ms),[KDHR26] LCPC Speedup,E15 Cross-Check

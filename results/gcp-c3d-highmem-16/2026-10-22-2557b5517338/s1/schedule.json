@@ -1,0 +1,73 @@
+{
+  "profile": "full",
+  "session_id": "s1",
+  "seed": 124841406,
+  "total_blocks": 13,
+  "blocks": [
+    {
+      "id": "full_this_work_mode_b_mers127_t1_n16-18-20-22-24-26",
+      "description": "E2: This Work mode (b) mers127 T=1 (logN 16..28)",
+      "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/this_work.sh' --params simd-spielman --field mers127 --logN 16,18,20,22,24,26 --threads 1 --runs 5 --warmup 1 --slices adaptive --shape both --cores '1' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-2557b5517338/s1/full_this_work_mode_b_mers127_t1_n16-18-20-22-24-26'"
+    },
+    {
+      "id": "full_polycommit_baseline_n16-18-20-22-24-26",
+      "description": "E1: PolyCommit baseline comparison",
+      "cmd": "sh '/home/jipeng/RealBrakedownPerf/code/reproduce/polycommit.sh' --field mont127 --logN 16,18,20,22,24,26 --threads 1 --warmup 1 --runs 5 --cores '1' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-2557b5517338/s1/full_polycommit_t1_n16-18-20-22-24-26'"
+    },
+    {
+      "id": "full_this_work_mode_b_mont127_t8_n16-18-20-22-24-26",
+      "description": "E2: This Work mode (b) mont127 T=8 (logN 16..28)",
+      "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/this_work.sh' --params simd-spielman --field mont127 --logN 16,18,20,22,24,26 --threads 8 --runs 5 --warmup 1 --slices adaptive --shape both --cores '0,1,2,3,4,5,6,7' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-2557b5517338/s1/full_this_work_mode_b_mont127_t8_n16-18-20-22-24-26'"
+    },
+    {
+      "id": "full_this_work_mode_a_t1_n16-18-20-22-24-26",
+      "description": "E1: This Work mode (a) Mont127 T=1 (logN 16..28)",
+      "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26 --threads 1 --runs 5 --warmup 1 --slices adaptive --cores '1' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-2557b5517338/s1/full_this_work_mode_a_t1_n16-18-20-22-24-26'"
+    },
+    {
+      "id": "full_polycommit_t8_n16-18-20-22-24-26",
+      "description": "E1: PolyCommit baseline comparison T=8",
+      "cmd": "sh '/home/jipeng/RealBrakedownPerf/code/reproduce/polycommit.sh' --field mont127 --logN 16,18,20,22,24,26 --threads 8 --warmup 1 --runs 5 --cores '0,1,2,3,4,5,6,7' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-2557b5517338/s1/full_polycommit_t8_n16-18-20-22-24-26'"
+    },
+    {
+      "id": "full_this_work_mode_b_fp2m61_t8_n16-18-20-22-24-26",
+      "description": "E2: This Work mode (b) fp2m61 T=8 (logN 16..28)",
+      "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/this_work.sh' --params simd-spielman --field fp2m61 --logN 16,18,20,22,24,26 --threads 8 --runs 5 --warmup 1 --slices adaptive --shape both --cores '0,1,2,3,4,5,6,7' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-2557b5517338/s1/full_this_work_mode_b_fp2m61_t8_n16-18-20-22-24-26'"
+    },
+    {
+      "id": "full_this_work_mode_b_mers127_t8_n16-18-20-22-24-26",
+      "description": "E2: This Work mode (b) mers127 T=8 (logN 16..28)",
+      "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/this_work.sh' --params simd-spielman --field mers127 --logN 16,18,20,22,24,26 --threads 8 --runs 5 --warmup 1 --slices adaptive --shape both --cores '0,1,2,3,4,5,6,7' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-2557b5517338/s1/full_this_work_mode_b_mers127_t8_n16-18-20-22-24-26'"
+    },
+    {
+      "id": "full_lcpc_orig_mode_a_t1_n16-18-20-22-24-26",
+      "description": "E1: Original LCPC mode (a) Ft127 T=1 (logN 16..28)",
+      "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26 --threads 1 --runs 5 --warmup 1 --cores '1' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-2557b5517338/s1/full_lcpc_orig_mode_a_t1_n16-18-20-22-24-26'"
+    },
+    {
+      "id": "full_this_work_mode_b_mont127_t1_n16-18-20-22-24-26",
+      "description": "E2: This Work mode (b) mont127 T=1 (logN 16..28)",
+      "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/this_work.sh' --params simd-spielman --field mont127 --logN 16,18,20,22,24,26 --threads 1 --runs 5 --warmup 1 --slices adaptive --shape both --cores '1' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-2557b5517338/s1/full_this_work_mode_b_mont127_t1_n16-18-20-22-24-26'"
+    },
+    {
+      "id": "full_ligero_rs_n16-18-20-22-24-26",
+      "description": "E12: Same-library Ligero Reed-Solomon encoding",
+      "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/this_work.sh' --params rs-ligero --field mont127 --logN 20,22,24 --threads 1 --runs 5 --warmup 1 --cores '1' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-2557b5517338/s1/full_ligero_rs_n16-18-20-22-24-26'"
+    },
+    {
+      "id": "full_this_work_mode_a_t8_n16-18-20-22-24-26",
+      "description": "E1: This Work mode (a) Mont127 T=8 (logN 16..28)",
+      "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26 --threads 8 --runs 5 --warmup 1 --slices adaptive --cores '0,1,2,3,4,5,6,7' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-2557b5517338/s1/full_this_work_mode_a_t8_n16-18-20-22-24-26'"
+    },
+    {
+      "id": "full_this_work_mode_b_fp2m61_t1_n16-18-20-22-24-26",
+      "description": "E2: This Work mode (b) fp2m61 T=1 (logN 16..28)",
+      "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/this_work.sh' --params simd-spielman --field fp2m61 --logN 16,18,20,22,24,26 --threads 1 --runs 5 --warmup 1 --slices adaptive --shape both --cores '1' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-2557b5517338/s1/full_this_work_mode_b_fp2m61_t1_n16-18-20-22-24-26'"
+    },
+    {
+      "id": "full_lcpc_orig_mode_a_t8_n16-18-20-22-24-26",
+      "description": "E1: Original LCPC mode (a) Ft127 T=8 (logN 16..28)",
+      "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26 --threads 8 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'gcp-c3d-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-2557b5517338/s1/full_lcpc_orig_mode_a_t8_n16-18-20-22-24-26'"
+    }
+  ]
+}

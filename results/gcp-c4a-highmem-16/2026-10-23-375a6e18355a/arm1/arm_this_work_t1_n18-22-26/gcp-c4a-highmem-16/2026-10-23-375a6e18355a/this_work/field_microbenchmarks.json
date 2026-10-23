@@ -1,0 +1,114 @@
+[
+  {
+    "field": "Mont127",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 600623,
+      "ns_per_op": 12.01246
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 111638,
+      "ns_per_op": 2.23276
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 265855,
+      "ns_per_op": 5.3171
+    },
+    "session_id": "arm1",
+    "session_seed": "619340897",
+    "stage": "20261023T151823Z_ARM",
+    "block_id": "arm_this_work_t1_n18-22-26",
+    "block_status": "ok",
+    "freq_source": "nominal: /proc/cpuinfo cpu MHz of CPU 1 (no cpufreq; not an observed clock)",
+    "freq_is_nominal": true
+  },
+  {
+    "field": "Mers127",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 397786,
+      "ns_per_op": 7.95572
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 112223,
+      "ns_per_op": 2.24446
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 86227,
+      "ns_per_op": 1.72454
+    },
+    "session_id": "arm1",
+    "session_seed": "619340897",
+    "stage": "20261023T151823Z_ARM",
+    "block_id": "arm_this_work_t1_n18-22-26",
+    "block_status": "ok",
+    "freq_source": "nominal: /proc/cpuinfo cpu MHz of CPU 1 (no cpufreq; not an observed clock)",
+    "freq_is_nominal": true
+  },
+  {
+    "field": "Fp2M61",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 375130,
+      "ns_per_op": 7.5026
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 98388,
+      "ns_per_op": 1.96776
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 77809,
+      "ns_per_op": 1.55618
+    },
+    "session_id": "arm1",
+    "session_seed": "619340897",
+    "stage": "20261023T151823Z_ARM",
+    "block_id": "arm_this_work_t1_n18-22-26",
+    "block_status": "ok",
+    "freq_source": "nominal: /proc/cpuinfo cpu MHz of CPU 1 (no cpufreq; not an observed clock)",
+    "freq_is_nominal": true
+  },
+  {
+    "field": "Ft127",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 510039,
+      "ns_per_op": 10.20078
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 118332,
+      "ns_per_op": 2.36664
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 267204,
+      "ns_per_op": 5.34408
+    },
+    "session_id": "arm1",
+    "session_seed": "619340897",
+    "stage": "20261023T151823Z_ARM",
+    "block_id": "arm_this_work_t1_n18-22-26",
+    "block_status": "ok",
+    "freq_source": "nominal: /proc/cpuinfo cpu MHz of CPU 1 (no cpufreq; not an observed clock)",
+    "freq_is_nominal": true
+  }
+]

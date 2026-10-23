@@ -1,0 +1,15 @@
+   Compiling syn v1.0.109
+   Compiling byteorder v1.5.0
+   Compiling synstructure v0.12.6
+   Compiling bitvec v1.1.1
+   Compiling proc-macro-error v1.0.4
+   Compiling num-traits v0.2.19
+   Compiling ff v0.14.0
+   Compiling merlin v3.0.0
+   Compiling err-derive v0.3.1
+   Compiling lcpc-2d v0.1.1 (/home/jipeng/RealBrakedownPerf/code/target-harness/worktrees/wt-step_06-blocking-yiMi8V/lcpc-2d)
+   Compiling lcpc-fields v0.1.1 (/home/jipeng/RealBrakedownPerf/code/target-harness/worktrees/wt-step_06-blocking-yiMi8V/lcpc-fields)
+   Compiling lcpc-test-fields v0.1.0 (/home/jipeng/RealBrakedownPerf/code/target-harness/worktrees/wt-step_06-blocking-yiMi8V/lcpc-test-fields)
+   Compiling lcpc-brakedown-pc v0.1.1 (/home/jipeng/RealBrakedownPerf/code/target-harness/worktrees/wt-step_06-blocking-yiMi8V/lcpc-brakedown-pc)
+   Compiling lcpc-bench v0.1.0 (/home/jipeng/RealBrakedownPerf/code/target-harness/worktrees/wt-step_06-blocking-yiMi8V/bench)
+    Finished `release` profile [optimized] target(s) in 25.35s

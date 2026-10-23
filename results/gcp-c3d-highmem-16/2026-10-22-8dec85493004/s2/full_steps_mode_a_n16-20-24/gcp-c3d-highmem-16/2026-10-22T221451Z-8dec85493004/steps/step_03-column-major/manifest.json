@@ -1,0 +1,14 @@
+{
+  "schema_version": "steps-tag-manifest-v1",
+  "harness_version": "steps-driver-v1",
+  "tag": "step/03-column-major",
+  "commit": "eae56d1ec681c4eb08c38133e87d96ace9721de3",
+  "commit_subject": "Column-major batched encoding",
+  "step_index": 3,
+  "session_id": "2026-10-22T221451Z-8dec85493004",
+  "detected_api_stage": "batched",
+  "run_class": "campaign",
+  "watermark": null,
+  "workspace_tests": "/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-8dec85493004/s2/full_steps_mode_a_n16-20-24/gcp-c3d-highmem-16/2026-10-22T221451Z-8dec85493004/steps/step_03-column-major/workspace-tests.log",
+  "codegen_report": "/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-8dec85493004/s2/full_steps_mode_a_n16-20-24/gcp-c3d-highmem-16/2026-10-22T221451Z-8dec85493004/steps/step_03-column-major/codegen_report.json"
+}

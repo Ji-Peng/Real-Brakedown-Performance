@@ -1,0 +1,12 @@
+# One-Time Setup Cost and Peak Memory Overhead
+"# Provenance: Results: s2; Fork commit: f0e2116001af; Baselines: LCPC f0e2116, SIMD-Spielman 7b399db; Sessions: s2; Hosts: gcp-c3d-highmem-16."
+"# Note: Setup includes bipartite expander graph sampling, transposition, prepare_weight, and allocation."
+# Note: Peak RSS recorded via VmHWM from /proc/self/status.
+# Note: The SIMD-Spielman wrapper reports encoding only; setup and RSS are not exposed by its upstream benchmark interface.
+Implementation,log2(N),Setup (ms),Encode (ms),Setup / Encode,Peak RSS (MB)
+This Work,20,66.29,96.52,0.69x,335.0
+This Work,24,950.27,1339.95,0.71x,2350.5
+Original LCPC,20,23.89,593.67,0.04x,334.4
+Original LCPC,20,22.51,529.16,0.04x,333.8
+Original LCPC,24,344.87,8358.23,0.04x,2350.4
+Original LCPC,24,344.88,7442.09,0.05x,2349.5

@@ -1,0 +1,14 @@
+{
+  "schema_version": "steps-tag-manifest-v1",
+  "harness_version": "steps-driver-v1",
+  "tag": "step/09-codegen",
+  "commit": "9f15bc23a1ec903488554e12b5f53be66460c547",
+  "commit_subject": "Codegen tuning of hot kernels (portable Rust only)",
+  "step_index": 9,
+  "session_id": "2026-10-22T213843Z-8dec85493004",
+  "detected_api_stage": "runtime-adaptive",
+  "run_class": "campaign",
+  "watermark": null,
+  "workspace_tests": "/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-8dec85493004/s1/full_steps_mode_b_n16-20-24/gcp-c3d-highmem-16/2026-10-22T213843Z-8dec85493004/steps/step_09-codegen/workspace-tests.log",
+  "codegen_report": "/home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-8dec85493004/s1/full_steps_mode_b_n16-20-24/gcp-c3d-highmem-16/2026-10-22T213843Z-8dec85493004/steps/step_09-codegen/codegen_report.json"
+}

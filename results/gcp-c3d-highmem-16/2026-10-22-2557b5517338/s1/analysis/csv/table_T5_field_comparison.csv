@@ -1,0 +1,10 @@
+# Field Arithmetic Microbenchmarks and Encoding Comparison
+"# Provenance: Results: s1; Fork commit: f0e2116001af; Baselines: LCPC f0e2116, SIMD-Spielman 7b399db; Sessions: s1; Hosts: gcp-c3d-highmem-16."
+# Note: Field microbenchmarks report isolated arithmetic operation latencies in nanoseconds.
+"# Note: Security caveat: Fp2M61 operates over F_{(2^61-1)^2}, providing 122 bits of security rather than 127 bits."
+"# Note: Ft127 is retained as a test-only oracle field, not a production fork field."
+Field,Security (bits),Mul (ns),MAC (ns),Reduce (ns),Encode N=2^20 (ms),Encode N=2^24 (ms),Cost (ns/MAC)
+Mont127,127,10.64,3.15,5.14,96.68,1334.05,2.75
+Mers127,127,5.22,3.06,0.73,72.12,1150.65,2.79
+Fp2M61,122,5.84,2.73,0.58,62.82,1015.91,2.46
+Ft127,127,9.09,3.07,6.18,N/A (test-only oracle field),N/A (test-only oracle field),N/A (no production encode)

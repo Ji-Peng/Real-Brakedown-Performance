@@ -1,0 +1,410 @@
+{
+  "schema_version": "1.0.0",
+  "created_at_utc": "2026-10-23T10:33:23.705890+00:00",
+  "instance": "rbd-bench-c3d-2",
+  "zone": "us-east1-d",
+  "machine_family": "c3d",
+  "host_profile": "gcp-c3d-highmem-16",
+  "gcp_metadata": {
+    "instance_name": "rbd-bench-c3d-2",
+    "machine_type": "c3d-highmem-16",
+    "machine_type_resource": "projects/1037236179973/machineTypes/c3d-highmem-16",
+    "zone": "us-east1-d",
+    "zone_resource": "projects/1037236179973/zones/us-east1-d"
+  },
+  "expected_machine_type": "c3d-highmem-16",
+  "expected_provisioning_model": "STANDARD",
+  "expected_on_host_maintenance": "TERMINATE",
+  "expected_threads_per_core": 1,
+  "expected_boot_disk": {
+    "size": "100GB",
+    "type": "pd-balanced"
+  },
+  "lscpu": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           52 bits physical, 57 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  8\nOn-line CPU(s) list:                     0-7\nVendor ID:                               AuthenticAMD\nModel name:                              AMD EPYC 9B14\nCPU family:                              25\nModel:                                   17\nThread(s) per core:                      1\nCore(s) per socket:                      8\nSocket(s):                               1\nStepping:                                1\nBogoMIPS:                                5199.99\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl nonstop_tsc cpuid extd_apicid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext invpcid_single ssbd ibrs ibpb stibp vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx512_bf16 clzero xsaveerptr wbnoinvd arat avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm\nHypervisor vendor:                       KVM\nVirtualization type:                     full\nL1d cache:                               256 KiB (8 instances)\nL1i cache:                               256 KiB (8 instances)\nL2 cache:                                8 MiB (8 instances)\nL3 cache:                                32 MiB (1 instance)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-7\nVulnerability Gather data sampling:      Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Mitigation; safe RET\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; IBRS_FW; STIBP disabled; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Mitigation; Clear CPU buffers\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Not affected\n",
+  "cpu": {
+    "model_name": "AMD EPYC 9B14",
+    "logical_cpu_count_lscpu": 8,
+    "online_cpus": "0-7",
+    "physical_core_count_sysfs": 8,
+    "physical_core_count_lscpu": 8,
+    "sockets": 1,
+    "threads_per_core": 1,
+    "topology": [
+      {
+        "cpu": 0,
+        "physical_package_id": "0",
+        "core_id": "0",
+        "thread_siblings_list": "0"
+      },
+      {
+        "cpu": 1,
+        "physical_package_id": "0",
+        "core_id": "1",
+        "thread_siblings_list": "1"
+      },
+      {
+        "cpu": 2,
+        "physical_package_id": "0",
+        "core_id": "2",
+        "thread_siblings_list": "2"
+      },
+      {
+        "cpu": 3,
+        "physical_package_id": "0",
+        "core_id": "3",
+        "thread_siblings_list": "3"
+      },
+      {
+        "cpu": 4,
+        "physical_package_id": "0",
+        "core_id": "4",
+        "thread_siblings_list": "4"
+      },
+      {
+        "cpu": 5,
+        "physical_package_id": "0",
+        "core_id": "5",
+        "thread_siblings_list": "5"
+      },
+      {
+        "cpu": 6,
+        "physical_package_id": "0",
+        "core_id": "6",
+        "thread_siblings_list": "6"
+      },
+      {
+        "cpu": 7,
+        "physical_package_id": "0",
+        "core_id": "7",
+        "thread_siblings_list": "7"
+      }
+    ]
+  },
+  "avx512ifma": {
+    "present": true,
+    "cpu_count_with_flag": 8,
+    "grep_o_output": "avx512ifma\navx512ifma\navx512ifma\navx512ifma\navx512ifma\navx512ifma\navx512ifma\navx512ifma"
+  },
+  "cache_topology": [
+    {
+      "cpu": 0,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "32K",
+      "shared_cpu_list": "0",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 0,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "32K",
+      "shared_cpu_list": "0",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 0,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "0",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 0,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "32768K",
+      "shared_cpu_list": "0-7",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 1,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "32K",
+      "shared_cpu_list": "1",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 1,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "32K",
+      "shared_cpu_list": "1",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 1,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "1",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 1,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "32768K",
+      "shared_cpu_list": "0-7",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 2,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "32K",
+      "shared_cpu_list": "2",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 2,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "32K",
+      "shared_cpu_list": "2",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 2,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "2",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 2,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "32768K",
+      "shared_cpu_list": "0-7",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 3,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "32K",
+      "shared_cpu_list": "3",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 3,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "32K",
+      "shared_cpu_list": "3",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 3,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "3",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 3,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "32768K",
+      "shared_cpu_list": "0-7",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 4,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "32K",
+      "shared_cpu_list": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 4,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "32K",
+      "shared_cpu_list": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 4,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 4,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "32768K",
+      "shared_cpu_list": "0-7",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 5,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "32K",
+      "shared_cpu_list": "5",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 5,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "32K",
+      "shared_cpu_list": "5",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 5,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "5",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 5,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "32768K",
+      "shared_cpu_list": "0-7",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 6,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "32K",
+      "shared_cpu_list": "6",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 6,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "32K",
+      "shared_cpu_list": "6",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 6,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "6",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 6,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "32768K",
+      "shared_cpu_list": "0-7",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 7,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "32K",
+      "shared_cpu_list": "7",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 7,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "32K",
+      "shared_cpu_list": "7",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 7,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "7",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 7,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "32768K",
+      "shared_cpu_list": "0-7",
+      "coherency_line_size": "64"
+    }
+  ],
+  "l3_domains": [
+    {
+      "shared_cpu_list": "0-7",
+      "size": "32768K",
+      "online_cpus": "0,1,2,3,4,5,6,7",
+      "physical_core_count": 8
+    }
+  ],
+  "rust_toolchain": {
+    "pinned_channel": "1.99.1",
+    "rustc_version_verbose": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1",
+    "cargo_version_verbose": "cargo 1.99.1 (5f94df478 2026-08-27)\nrelease: 1.99.1\ncommit-hash: 5f94df4789f005f9a352888e8355ffc645b7ed0e\ncommit-date: 2026-08-27\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.6 (sys:0.21.0 vendored)\nlibcurl: 8.21.0-DEV (sys:0.4.90+curl-8.21.0 vendored ssl:OpenSSL/3.6.3)\nssl: OpenSSL 3.6.3 9 Jun 2026\nos: Debian 12.0.0 (bookworm) [64-bit]"
+  },
+  "os": {
+    "platform": "Linux-6.1.0-54-cloud-amd64-x86_64-with-glibc2.36",
+    "release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian GNU/Linux\"\nVERSION_ID=\"12\"\nVERSION=\"12 (bookworm)\"\nVERSION_CODENAME=bookworm\nID=debian\nHOME_URL=\"https://www.debian.org/\"\nSUPPORT_URL=\"https://www.debian.org/support\"\nBUG_REPORT_URL=\"https://bugs.debian.org/\"",
+    "machine": "x86_64",
+    "kernel": "6.1.0-54-cloud-amd64"
+  },
+  "checks": {
+    "gcp_machine_type_c3d_highmem_16": true,
+    "gcp_zone_matches_selection": true,
+    "gcp_instance_name_matches_selection": true,
+    "debian_12": true,
+    "amd_epyc_9xx4_model": true,
+    "eight_physical_cores": true,
+    "one_thread_per_core": true,
+    "avx512ifma_present": true,
+    "l3_cache_topology_available": true,
+    "eight_distinct_cores_in_one_l3_domain": true
+  },
+  "status": "passed"
+}

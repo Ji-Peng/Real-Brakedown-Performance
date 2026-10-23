@@ -1,0 +1,116 @@
+{
+  "schema_version": "1.0.0",
+  "created_at_utc": "2026-10-23T15:00:07.744120+00:00",
+  "host_profile": "gcp-c3d-highmem-16",
+  "instance": "rbd-bench-c3d-3",
+  "zone": "us-east4-c",
+  "source": "Linux sysfs at profile load time",
+  "online_cpus": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "all_l3_domains": [
+    {
+      "shared_cpu_list": "0-7",
+      "size": "32768K",
+      "online_cpus": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "physical_core_count": 8
+    }
+  ],
+  "selected_l3_domain": {
+    "shared_cpu_list": "0-7",
+    "size": "32768K",
+    "selected_benchmark_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "selected_physical_cores": [
+      {
+        "cpu": 0,
+        "physical_package_id": "0",
+        "core_id": "0",
+        "thread_siblings": [
+          0
+        ]
+      },
+      {
+        "cpu": 1,
+        "physical_package_id": "0",
+        "core_id": "1",
+        "thread_siblings": [
+          1
+        ]
+      },
+      {
+        "cpu": 2,
+        "physical_package_id": "0",
+        "core_id": "2",
+        "thread_siblings": [
+          2
+        ]
+      },
+      {
+        "cpu": 3,
+        "physical_package_id": "0",
+        "core_id": "3",
+        "thread_siblings": [
+          3
+        ]
+      },
+      {
+        "cpu": 4,
+        "physical_package_id": "0",
+        "core_id": "4",
+        "thread_siblings": [
+          4
+        ]
+      },
+      {
+        "cpu": 5,
+        "physical_package_id": "0",
+        "core_id": "5",
+        "thread_siblings": [
+          5
+        ]
+      },
+      {
+        "cpu": 6,
+        "physical_package_id": "0",
+        "core_id": "6",
+        "thread_siblings": [
+          6
+        ]
+      },
+      {
+        "cpu": 7,
+        "physical_package_id": "0",
+        "core_id": "7",
+        "thread_siblings": [
+          7
+        ]
+      }
+    ],
+    "single_thread_core": 1
+  }
+}
