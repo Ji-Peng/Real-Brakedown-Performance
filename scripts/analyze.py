@@ -78,6 +78,15 @@ DEFAULT_SELECTION = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "results", "
 # flags"; the BLAKE3 backend is a second axis. Order = column order in tables.
 LCPC_VARIANTS = ("as-published-as-is", "as-published-portable", "fork-flags-as-is", "fork-flags-portable")
 PRIMARY_LCPC_VARIANTS = ("as-published-as-is", "fork-flags-portable")
+# The other two variants are measured only at the sizes below (stage RH of the
+# 375a6e1 re-measurement), so that T6 can separate the BLAKE3 backend from the
+# compiler flags; no other table reports them.
+SECONDARY_LCPC_VARIANTS = ("as-published-portable", "fork-flags-as-is")
+SECONDARY_LCPC_SIZES = (20, 24)
+# Block families measured as same-boot pairs (This Work next to original LCPC):
+# superseding is per cell, so a re-run that lands for one side only would pair
+# records from different runs; analyze.py warns about it.
+PARTNER_FAMILIES = (("tw_threads", "lcpc_threads"), ("arm_this_work", "arm_lcpc_orig"))
 
 DIVERGENCE_THRESHOLD = 0.05
 MEASURED_STATUSES = {None, "", "ok", "complete", "completed", "success", "pass"}
@@ -303,6 +312,83 @@ def _match_value(actual: Any, expected: Any) -> bool:
     return fnmatch.fnmatchcase(str(actual).lower(), str(expected).lower())
 
 
+def matching_patterns(selectors: Iterable[str], patterns: Iterable[str]) -> List[str]:
+    """The patterns (exact or glob) that match any of the selectors."""
+    sels = list(selectors)
+    return [p for p in patterns if any(s == p or fnmatch.fnmatchcase(s, p) for s in sels)]
+
+
+_CHECK_CODEGEN: Dict[str, Any] = {}
+
+
+def load_check_codegen():
+    """Imports scripts/check_codegen.py by path (works under python3 -I); None if unavailable."""
+    if "module" not in _CHECK_CODEGEN:
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("rbd_check_codegen", os.path.join(SCRIPT_DIR, "check_codegen.py"))
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            _CHECK_CODEGEN["module"] = module
+        except Exception:
+            _CHECK_CODEGEN["module"] = None
+    return _CHECK_CODEGEN["module"]
+
+
+# A stored disassembly line as written by check_codegen.py: "<addr>: <mnemonic> <operands>".
+_STORED_LINE_RE = re.compile(r"^\s*([0-9a-fA-F]+):\s+(\S+)(?:\s+(.*))?$")
+
+
+def recheck_codegen_report(report: Dict) -> Optional[Dict[str, Any]]:
+    """Re-classifies a codegen report's stored hot-kernel disassembly with the current check_codegen.py.
+
+    check_codegen.py stores every instruction line of every hot kernel, so the
+    re-check covers the whole hot-kernel code, not only the reported hits.
+    Returns None when check_codegen.py cannot be imported. Keys: arith, moves,
+    scalar, lines, complete (stored lines == the report's hot-kernel
+    instruction count), unparsed, classifier, hits_reclassified (kind -> count
+    for the report's own vector-arithmetic hits) and examples (up to two of
+    the report's hits that the current rules no longer count as arithmetic).
+    """
+    cc = load_check_codegen()
+    if cc is None:
+        return None
+    arch = str(report.get("arch", "x86_64"))
+    out: Dict[str, Any] = {"arith": 0, "moves": 0, "scalar": 0, "lines": 0, "unparsed": 0,
+                           "classifier": getattr(cc, "CLASSIFIER_VERSION", "?"), "hits_reclassified": defaultdict(int),
+                           "examples": []}
+    try:
+        for sym in report.get("symbols", []):
+            if not sym.get("is_hot_kernel"):
+                continue
+            for line in sym.get("disassembly_lines") or []:
+                m = _STORED_LINE_RE.match(str(line))
+                if not m:
+                    out["unparsed"] += 1
+                    continue
+                out["lines"] += 1
+                kind = cc.classify_instruction(arch, m.group(2), m.group(3) or "")[0]
+                out["arith" if kind == "VEC_ARITH" else ("moves" if kind == "VEC_MOVE" else "scalar")] += 1
+            for hit in sym.get("vector_arithmetic", []):
+                text = str(hit.get("insn", "")).strip()
+                mnem, _, ops = text.partition(" ")
+                kind = cc.classify_instruction(arch, mnem, ops)[0]
+                out["hits_reclassified"][kind] += 1
+                if kind != "VEC_ARITH" and len(out["examples"]) < 2:
+                    out["examples"].append(re.sub(r"\s*<.*$", " <...>", text))
+    except Exception:
+        return None
+    total = ((report.get("summary") or {}).get("hot_kernels") or {}).get("total_instructions")
+    out["complete"] = bool(out["lines"]) and out["unparsed"] == 0 and (total is None or int(total) == out["lines"])
+    out["hits_reclassified"] = dict(out["hits_reclassified"])
+    return out
+
+
+def short_symbol(name: str) -> str:
+    """encode::encode_column_block::<lcpc_fields::mont127::Mont127> -> encode_column_block::<Mont127>."""
+    return re.sub(r"(?:[A-Za-z_][A-Za-z0-9_]*::)+([A-Za-z_][A-Za-z0-9_]*)", r"\1", name)
+
+
 # ---------------------------------------------------------------------------
 # Result selection (shared interface 2)
 # ---------------------------------------------------------------------------
@@ -323,11 +409,35 @@ class Selection:
                        build_variant_recorded / family.
       omissions:      [{cells: [TABLE|ROW|COLUMN glob], kind: pending|omitted, reason}]
                        Omissions only document missing or not-applicable cells
-                       (and cells measured in fewer sessions than expected, and
-                       FAIL codegen reports via T11 selectors). They never
-                       excuse integrity errors (duplicates, mixed
-                       configurations, oversubscription, uncovered records).
-                       Omission patterns that match no cell are warned about.
+                       (and cells measured in fewer sessions than expected,
+                       expected rows that are absent, and FAIL codegen reports
+                       via T11/T3 selectors). They never excuse integrity
+                       errors (duplicates, mixed configurations,
+                       oversubscription, uncovered records, interrupted
+                       blocks). Omission patterns that match no cell are
+                       warned about.
+      supersede:      [{by: [machine/run glob], blocks: [block path glob], reason}]
+                       Applied after "exclude", among included records: when
+                       a run matching "by" contributes records of a cell in a
+                       block matching "blocks", every record of that cell in
+                       any other run's matching block is excluded with the
+                       reason (all sessions: a cell is never mixed across the
+                       superseding and the superseded runs). Inert while no
+                       run matches "by". The cell is the configuration
+                       (implementation, machine, family, LCPC build variant,
+                       field, parameters, shape, slice mode, explicit slice
+                       count, log2 N, threads); codegen reports are superseded
+                       per (machine, block family).
+      expected_rows:  {TABLE: {key column header: [values]} or a list of
+                       such specs} - the rows each table must contain (the
+                       cartesian product of each spec, in the table's
+                       key-column order; a list is the union of its specs,
+                       e.g. rows that exist only at some sizes); a missing row
+                       is reported by --check as TABLE|v1,v2,...|(row) unless
+                       an omission or --allow selector documents it.
+      runs[].run_dir may be a glob (e.g. a re-measurement whose run directory
+      name is known only up to its commit prefix); it is inert until a
+      matching directory exists.
     """
 
     def __init__(self, path: str):
@@ -343,6 +453,10 @@ class Selection:
         self.machines: Dict[str, Dict] = data.get("machines", {})
         self.exclude: List[Dict] = data.get("exclude", [])
         self.omissions: List[Dict] = data.get("omissions", [])
+        self.supersede: List[Dict] = data.get("supersede", [])
+        # TABLE -> list of specs ({key column header: [values]}); a single
+        # spec may be written without the list.
+        self.expected_rows: Dict[str, List[Dict[str, List[Any]]]] = {}
         self.matched_patterns: Set[str] = set()
         for i, ex in enumerate(self.exclude):
             if not ex.get("reason") or not (ex.get("path") or ex.get("match")):
@@ -350,10 +464,28 @@ class Selection:
         for i, om in enumerate(self.omissions):
             if not om.get("reason") or not om.get("cells") or om.get("kind") not in ("pending", "omitted"):
                 raise ValueError(f"{path}: omissions[{i}] needs cells, kind (pending|omitted) and a reason")
+        for i, sp in enumerate(self.supersede):
+            if not sp.get("reason") or not sp.get("by") or not sp.get("blocks"):
+                raise ValueError(f"{path}: supersede[{i}] needs by, blocks and a reason")
+            for k in ("by", "blocks"):
+                if isinstance(sp[k], str):
+                    sp[k] = [sp[k]]
+        for table, specs in data.get("expected_rows", {}).items():
+            specs = [specs] if isinstance(specs, dict) else specs
+            if not isinstance(specs, list) or not specs or not all(
+                    isinstance(spec, dict) and spec and all(isinstance(v, list) and v for v in spec.values())
+                    for spec in specs):
+                raise ValueError(f"{path}: expected_rows[{table}] must map key column headers to non-empty value "
+                                 "lists (or be a non-empty list of such maps)")
+            self.expected_rows[table] = specs
 
     def run_entry(self, machine: str, run: str) -> Optional[Dict]:
-        for entry in self.machines.get(machine, {}).get("runs", []):
+        entries = self.machines.get(machine, {}).get("runs", [])
+        for entry in entries:
             if entry.get("run_dir") == run:
+                return entry
+        for entry in entries:
+            if fnmatch.fnmatchcase(run, str(entry.get("run_dir", ""))):
                 return entry
         return None
 
@@ -385,13 +517,15 @@ class Selection:
         return "uncovered", ""
 
     def omission_for(self, selector: str) -> Optional[Dict]:
+        """The first omission documenting the selector; every matching pattern is credited as used."""
+        first = None
         for om in self.omissions:
             cells = om["cells"] if isinstance(om["cells"], list) else [om["cells"]]
             hit = [p for p in cells if selector == p or fnmatch.fnmatchcase(selector, p)]
             if hit:
                 self.matched_patterns.update(hit)
-                return om
-        return None
+                first = first or om
+        return first
 
     def omission_patterns(self) -> List[str]:
         out = []
@@ -404,10 +538,31 @@ class Selection:
         return [p for p in self.omission_patterns() if p not in self.matched_patterns]
 
     def listed_runs(self) -> List[Tuple[str, str, List[str], Dict]]:
+        """Listed runs; a glob run_dir expands to the matching directories (none while pending)."""
         out = []
         for machine, m in self.machines.items():
             for entry in m.get("runs", []):
-                out.append((machine, entry["run_dir"], list(entry.get("sessions", [])), entry))
+                run = entry["run_dir"]
+                if any(ch in run for ch in "*?["):
+                    mdir = os.path.join(self.root, machine)
+                    names = sorted(os.listdir(mdir)) if os.path.isdir(mdir) else []
+                    for name in names:
+                        if fnmatch.fnmatchcase(name, run) and os.path.isdir(os.path.join(mdir, name)):
+                            out.append((machine, name, list(entry.get("sessions", [])), entry))
+                else:
+                    out.append((machine, run, list(entry.get("sessions", [])), entry))
+        return out
+
+    def pending_run_globs(self) -> List[Tuple[str, str, Dict]]:
+        """Glob run_dir entries that match no directory yet (inert, e.g. a re-measurement still running)."""
+        out = []
+        for machine, m in self.machines.items():
+            mdir = os.path.join(self.root, machine)
+            names = sorted(os.listdir(mdir)) if os.path.isdir(mdir) else []
+            for entry in m.get("runs", []):
+                run = entry["run_dir"]
+                if any(ch in run for ch in "*?[") and not any(fnmatch.fnmatchcase(n, run) for n in names):
+                    out.append((machine, run, entry))
         return out
 
 
@@ -447,7 +602,18 @@ def run_self_test() -> None:
                                                          r"\textasciicircum{} \textless{}")
     assert escape_latex(r"$\log_2 N$ & more") == r"$\log_2 N$ \& more"
     assert block_family("full_this_work_mode_a_t1_n20.prev-20261023T101010Z") == "tw_a"
-    print("[PASS] analyze.py self-test (cell rules, families, LCPC variant inference, median, LaTeX escaping)")
+    assert short_symbol("lcpc_brakedown_pc::encode::encode_column_block::<lcpc_fields::mont127::Mont127>") == \
+        "encode_column_block::<Mont127>"
+    assert matching_patterns(["T1|20,1|x"], ["T1|*|x", "T2|*|x"]) == ["T1|*|x"]
+    # check_codegen.py is imported by path, so the re-check also works under python3 -I.
+    cc = load_check_codegen()
+    assert cc is not None and cc.classify_instruction("aarch64", "b.eq", "b3334 <f+0x40>")[0] != "VEC_ARITH"
+    rc = recheck_codegen_report({"arch": "aarch64", "summary": {"hot_kernels": {"total_instructions": 2}}, "symbols": [
+        {"is_hot_kernel": True, "disassembly_lines": ["b332c: b.eq b3334 <f+0x40>", "b3330: add v0.2d, v1.2d, v2.2d"],
+         "vector_arithmetic": [{"insn": "b.eq b3334 <f+0x40>"}]}]})
+    assert rc["complete"] and rc["arith"] == 1 and rc["hits_reclassified"] == {"SCALAR_BRANCH": 1}
+    print("[PASS] analyze.py self-test (cell rules, families, LCPC variant inference, median, LaTeX escaping, "
+          "codegen re-check)")
 
 
 # ---------------------------------------------------------------------------
@@ -505,7 +671,15 @@ class BenchmarkAnalyzer:
         # (machine, run, session_dir, block) -> SIMD-Spielman params.patch sha256 prefix
         self.block_simd_patch: Dict[Tuple[str, str, str, str], Set[str]] = defaultdict(set)
         self.failed_block_records: Dict[str, int] = defaultdict(int)
+        # Records of blocks whose run was interrupted (re-run moved the old
+        # output aside but never finished): partial data, an integrity error.
+        self.interrupted_block_records: Dict[str, int] = defaultdict(int)
         self.failed_blocks: Set[Tuple[str, str, str, str]] = set()
+        # Included records/reports wait here until the selection's supersede rules ran.
+        self._pending: List[Tuple[str, Dict]] = []     # ("record" | "codegen", item with _meta)
+        self.superseded: Dict[str, int] = defaultdict(int)   # block_rel -> superseded record count
+        self.partner_run_mismatches: List[str] = []     # same-boot pairs whose sides come from different runs
+        self.step_codegen_reports: List[Dict] = []      # per-tag reports of the steps blocks (T3 gate)
 
         # Generation bookkeeping
         # Integrity errors (duplicates, mixed configurations): never excused by
@@ -521,6 +695,7 @@ class BenchmarkAnalyzer:
         self._used: Set[Tuple[str, str, str]] = set()
         self._used_records: List[Dict] = []
         self._current_table: str = ""
+        self.matched_allow: Set[str] = set()             # --allow selectors that excused something
 
         self.kdhr26_data: Dict[str, Any] = {}
         self._load_kdhr26()
@@ -633,6 +808,19 @@ class BenchmarkAnalyzer:
                     meta = self._locate(path, root, cache)
                     self._load_file(path, fname, data, meta)
 
+        self._apply_supersede()
+        self._check_partner_runs()
+        for kind, item in self._pending:
+            if kind == "codegen":
+                self.codegen_reports.append(item)
+            else:
+                self._categorize(item)
+        self._pending = []
+        if self.superseded:
+            blocks = {b for b, n in self.superseded.items() if n}
+            self.pinning_errors = [e for e in self.pinning_errors
+                                   if not any(e.startswith(b + ":") for b in blocks if self._fully_superseded(b))]
+
         if self.selection:
             for machine, run, sessions, entry in self.selection.listed_runs():
                 for s in sessions:
@@ -640,6 +828,9 @@ class BenchmarkAnalyzer:
                         status = entry.get("status", "")
                         print(f"[WARN] Selected session {machine}/{run}/{s} is not present"
                               + (f" ({status})" if status else ""))
+            for machine, run, entry in self.selection.pending_run_globs():
+                print(f"[INFO] Selected run pattern {machine}/{run} matches no run directory yet (inert until it "
+                      f"lands): {entry.get('stage', '')}")
         for sess in sorted(self.missing_schedule):
             print(f"[WARN] Session {sess} has no schedule.json (still running or partially copied?); "
                   "its session id is taken from the directory name.")
@@ -669,9 +860,18 @@ class BenchmarkAnalyzer:
         if self.skipped_prev_dirs:
             print(f"[INFO] Skipped {len(self.skipped_prev_dirs)} '<block>.prev-<UTC>' directories (earlier attempts "
                   "moved aside by all.sh); first: " + self.skipped_prev_dirs[0])
+        for block, count in sorted(self.superseded.items()):
+            print(f"[INFO] Superseded {count} records of {block}"
+                  + (" (whole block)" if self._fully_superseded(block) else ""))
+        for msg in self.partner_run_mismatches:
+            print(f"[WARN] Same-boot pair split across runs (a superseding re-run landed for one side only?): {msg}")
         for block, count in sorted(self.failed_block_records.items()):
             print(f"[WARN] {count} included records come from block {block}, which the session schedule or the "
                   "record's block_status marks as failed; check them or exclude the block in selection.json.")
+        for block, count in sorted(self.interrupted_block_records.items()):
+            print(f"[WARN] {count} included records come from block {block}, whose latest run was interrupted "
+                  "(output moved aside or stage never finalized, records untagged): partial data; --check fails "
+                  "until the block is re-run or excluded in selection.json.")
         # SIMD-Spielman's params.patch hash is recorded per block (simd_spielman.json
         # or the block manifest); attach it to the block's records so it is part of
         # the cell key and shown next to SIMD-Spielman values.
@@ -696,30 +896,55 @@ class BenchmarkAnalyzer:
         except OSError:
             pass
 
-    def _block_failed(self, m: Dict, item: Dict) -> bool:
-        # all.sh re-tags every record of a block it (re-)runs (interface b), so the
-        # record's own block_status is authoritative; then the session schedule;
-        # then failed_blocks.tsv (older sessions without a session schedule).
+    _FAILED_STATUSES = ("failed", "fail", "error")
+
+    def _block_failed(self, m: Dict, item: Dict) -> Optional[str]:
+        """None (ok), "failed" or "interrupted" for the block run that produced a record.
+
+        all.sh tags every record of a block it completes, ok or failed, with
+        block_status (interface b), so a record's own block_status is
+        authoritative. Untagged records come from a run that never completed;
+        in a session with the stage layout the session schedule decides: the
+        latest stage that lists the block either finished it (ok/failed) or
+        did not, and a block whose output was moved aside
+        (moved_previous_to) or whose stage was never finalized without a final
+        status is an interrupted re-run whose directory holds partial data.
+        Older sessions without a session schedule use failed_blocks.tsv.
+        """
         if item.get("block_status"):
-            return str(item["block_status"]).lower() in ("failed", "fail", "error", "interrupted")
+            status = str(item["block_status"]).lower()
+            if status == "interrupted":
+                return "interrupted"
+            return "failed" if status in self._FAILED_STATUSES else None
         key = (m["machine"], m["run"], m["session_dir"], m["block"])
         if not self.session_stages.get(key[:3]):
-            return key in self.failed_blocks
-        # The block directory holds the run of the last stage that actually ran
-        # the block (all.sh moves earlier runs to <block>.prev-<UTC>), so the
-        # latest stage entry with a final status decides.
-        last = None
+            return "failed" if key in self.failed_blocks else None
+        # Walk the stages in order; the latest stage that ran the block (or
+        # left a run of it unfinished) decides.
+        verdict: Optional[str] = None
+        completed = False      # some stage so far finished a run of the block
         for stage in self.session_stages.get(key[:3], []):
-            if m["block"] in (stage.get("failed_blocks") or []):
-                last = "failed"
-                continue
+            finalized = str(stage.get("state") or "").lower() == "finished" or (
+                stage.get("exit_status") is not None and not stage.get("state"))
             for b in stage.get("blocks") or []:
                 if not isinstance(b, dict) or (b.get("id") or b.get("block_id")) != m["block"]:
                     continue
                 status = str(b.get("status") or "").lower()
-                if status and status not in ("scheduled", "not_run", "skipped"):
-                    last = status
-        return last in ("failed", "fail", "error", "interrupted")
+                if status not in ("", "scheduled", "not_run", "skipped"):
+                    completed = True
+                    verdict = ("interrupted" if status == "interrupted" else
+                               "failed" if status in self._FAILED_STATUSES else None)
+                elif b.get("moved_previous_to"):
+                    verdict = "interrupted"     # old output moved aside, re-run never completed
+                elif status == "scheduled" and not finalized:
+                    verdict = "interrupted"     # stage killed before all.sh could finalize it
+                elif status in ("scheduled", "not_run") and not completed:
+                    # Not completed in this stage and never before: untagged
+                    # records in its directory are output of a killed first run.
+                    verdict = "interrupted"
+            if m["block"] in (stage.get("failed_blocks") or []):
+                verdict = "failed"
+        return verdict
 
     def _classify(self, meta: Dict, fields: Optional[Dict]) -> str:
         if not self.selection:
@@ -730,6 +955,70 @@ class BenchmarkAnalyzer:
         elif status == "uncovered":
             self.uncovered.append(meta["block_rel"] or meta["file_rel"])
         return status
+
+    @staticmethod
+    def _supersede_key(kind: str, item: Dict) -> Tuple:
+        """The cell a record measures for the supersede rules (codegen: per machine and block family)."""
+        m = item["_meta"]
+        if kind == "codegen":
+            return ("codegen", m["machine"], m["family"])
+        if m["impl"] == "steps":
+            return ("steps", m["machine"], str(item.get("tag")), str(item.get("mode", "a")), item.get("field"),
+                    item.get("params"), int(item.get("log_n", 0)), int(item.get("threads", 1)))
+        explicit = item.get("slice_mode") == "explicit"
+        return (m["impl"], m["machine"], m["family"], m.get("variant"), item.get("field"), item.get("params"),
+                item.get("shape") or "brakedown", item.get("slice_mode"), item.get("slices") if explicit else None,
+                int(item.get("log_n", 0)), int(item.get("threads", 1)))
+
+    def _apply_supersede(self):
+        """selection.json "supersede": newer runs replace every older record of the cells they re-measured."""
+        self._block_included: Dict[str, int] = defaultdict(int)
+        for _, item in self._pending:
+            self._block_included[item["_meta"]["block_rel"]] += 1
+        if not self.selection or not self.selection.supersede:
+            return
+        drop: Set[int] = set()
+        for rule in self.selection.supersede:
+            def in_blocks(item):
+                return any(fnmatch.fnmatchcase(item["_meta"]["block_rel"], p) for p in rule["blocks"])
+
+            def in_by(item):
+                mr = f"{item['_meta']['machine']}/{item['_meta']['run']}"
+                return any(fnmatch.fnmatchcase(mr, p) for p in rule["by"])
+
+            newer = {self._supersede_key(k, it) for k, it in self._pending if in_blocks(it) and in_by(it)}
+            if not newer:
+                continue      # inert until a superseding run has landed
+            for i, (k, it) in enumerate(self._pending):
+                if i in drop or in_by(it) or not in_blocks(it):
+                    continue
+                if self._supersede_key(k, it) in newer:
+                    drop.add(i)
+                    self.excluded[f"superseded: {rule['reason']}"] += 1
+                    self.superseded[it["_meta"]["block_rel"]] += 1
+        self._pending = [p for i, p in enumerate(self._pending) if i not in drop]
+
+    def _check_partner_runs(self):
+        """PARTNER_FAMILIES: both sides of a (machine, session, log2 N, T) pair should come from one run."""
+        runs: Dict[Tuple, Dict[str, Set[str]]] = defaultdict(lambda: defaultdict(set))
+        for kind, it in self._pending:
+            if kind != "record":
+                continue
+            m = it["_meta"]
+            for pair in PARTNER_FAMILIES:
+                if m.get("family") in pair:
+                    key = (pair, m["machine"], m["session"], int(it.get("log_n", 0)), int(it.get("threads", 1)))
+                    runs[key][m["family"]].add(m["run"])
+        for key, sides in sorted(runs.items(), key=lambda kv: str(kv[0])):
+            pair, machine, session, log_n, threads = key
+            if len(sides) == 2 and sides[pair[0]] != sides[pair[1]]:
+                self.partner_run_mismatches.append(
+                    f"{machine} {session} 2^{log_n} T={threads}: {pair[0]} from {'/'.join(sorted(sides[pair[0]]))}, "
+                    f"{pair[1]} from {'/'.join(sorted(sides[pair[1]]))}")
+
+    def _fully_superseded(self, block_rel: str) -> bool:
+        n = self.superseded.get(block_rel, 0)
+        return n > 0 and n >= getattr(self, "_block_included", {}).get(block_rel, 0)
 
     def _load_file(self, path: str, fname: str, data: Any, meta: Dict):
         is_session_level = not meta["block"]
@@ -776,12 +1065,21 @@ class BenchmarkAnalyzer:
             return
 
         if isinstance(data, dict) and ("codegen" in fname or "hot_kernels_checked" in data):
+            if self._classify(meta, data) != "include":
+                return
+            data = dict(data)
+            data["_meta"] = self._record_meta(meta, data, path, impl="codegen")
             if "/steps/" in meta["file_rel"] or block_family(meta["block"]) == "steps":
-                return  # per-tag step reports; T11 reports the measured HEAD binaries
-            if self._classify(meta, data) == "include":
-                data = dict(data)
-                data["_meta"] = self._record_meta(meta, data, path, impl="codegen")
-                self.codegen_reports.append(data)
+                # Per-tag step reports: not T11 evidence (T11 reports the measured
+                # HEAD binaries) but part of the FAIL gate, with T3 footnotes.
+                parts = meta["file_rel"].split("/")
+                tag = parts[parts.index("steps") + 1] if "steps" in parts[:-1] else "unknown_step"
+                if tag != "HEAD" and not tag.startswith("step/"):
+                    tag = "step/" + tag.removeprefix("step_")
+                data["_meta"]["tag"] = tag
+                self.step_codegen_reports.append(data)
+                return
+            self._pending.append(("codegen", data))
             return
 
         if isinstance(data, list) and data and isinstance(data[0], dict) and "mul" in data[0] and "mac" in data[0]:
@@ -811,7 +1109,7 @@ class BenchmarkAnalyzer:
                 continue
             item = dict(item)
             item["_meta"] = rmeta
-            self._categorize(item)
+            self._pending.append(("record", item))
 
     def _load_manifest(self, path: str, data: Dict, meta: Dict):
         key = (meta["machine"], meta["run"], meta["session_dir"])
@@ -922,7 +1220,10 @@ class BenchmarkAnalyzer:
         self._seen_keys.add(dedup_key)
         if m["session"]:
             self.session_ids.add(m["session"])
-        if m["block"] and self._block_failed(m, item):
+        verdict = self._block_failed(m, item) if m["block"] else None
+        if verdict == "interrupted":
+            self.interrupted_block_records[m["block_rel"]] += 1
+        elif verdict == "failed":
             self.failed_block_records[m["block_rel"]] += 1
 
         if m["impl"] == "steps":
@@ -1176,6 +1477,25 @@ class BenchmarkAnalyzer:
         return ["Original LCPC effective RUSTFLAGS (record field effective_rustflags): "
                 + "; ".join(f"{v}: {' / '.join(sorted(f))}" for v, f in sorted(by_variant.items())) + "."]
 
+    def arm_flags_notes(self, records: List[Dict]) -> List[str]:
+        """Arm build-flag caveats derived from the recorded effective_rustflags of the original-LCPC records."""
+        lcpc = [r for r in records if r["_meta"]["impl"] == "lcpc_orig"]
+        native = sorted({r["_meta"].get("variant") or "?" for r in lcpc
+                         if "target-cpu=native" in str(r.get("effective_rustflags") or "")})
+        unrecorded = [r for r in lcpc if r.get("effective_rustflags") is None]
+        notes = []
+        if native:
+            notes.append("Build flags differ across rows on Arm: the recorded flags of original LCPC "
+                         + ", ".join(native) + " include target-cpu=native, while the fork's .cargo/config.toml sets "
+                         "target-cpu=native for x86-64 targets only, so This Work's Arm build sets no target-cpu.")
+        if unrecorded:
+            forks = sorted({f for r in unrecorded for f in self.session_info.get(
+                (r["_meta"]["machine"], r["_meta"]["run"], r["_meta"]["session_dir"]), {}).get("fork", set())})
+            notes.append(f"{len(unrecorded)} original-LCPC Arm records do not record their build flags "
+                         f"(harness at fork {'/'.join(forks) or '?'}); their flags are those of that commit's "
+                         "reproduce/lcpc_orig.sh and cannot be confirmed from the records.")
+        return notes
+
     def kdhr26_entry(self, table: str, log_n: int, machine: Optional[str]) -> Tuple[Optional[Dict], str]:
         """[KDHR26] entry keyed by (reference CPU for the machine, log2 N)."""
         cpu = (self.selection.kdhr26_cpu(machine) if (self.selection and machine) else None) or "EPYC 9754"
@@ -1342,14 +1662,56 @@ class BenchmarkAnalyzer:
     def generate_T0_correctness(self):
         self._begin("T0")
         headers = ["Gate / Invariant", "Evaluation Target", "Oracle / Reference", "Commit / Tag", "Status"]
-        rows = [
-            ["Bit-exact prover encoding (mode a)", "SdigCode6 (Mont127)", "Original LCPC (f0e2116)", "step/01..HEAD", "PASS"],
-            ["Bit-exact encoding (mode b)", "Mont127, Mers127, Fp2M61", "SIMD-Spielman tv/ files", "step/02..HEAD", "PASS"],
-            ["Horizontal slice invariance", "s in {1, 2, 4, 8, 16, 32}", "s = 1 non-sliced baseline", "step/07..HEAD", "PASS"],
-            ["Expander thread invariance", "T in {1, 2, 4, 8, 15}", "T = 1 single-threaded baseline", "step/08..HEAD", "PASS"],
-            ["Field differential tests", "Mont127, Mers127, Fp2M61", "BigUint / rug big-integer oracle", "step/02..HEAD", "PASS"],
-            ["PCS end-to-end verification", "Commitment & proof verification", "Upstream Ligero/Brakedown PCS", "step/01..HEAD", "PASS"],
+        # Test-gated rows: reproduce/this_work.sh (and steps.sh per tag) runs
+        # `cargo test --workspace` before timing and refuses to benchmark on a
+        # failure, so every timed This Work block / step tag in the selection is
+        # evidence that the suite passed for that build. Derived from the data.
+        tw_recs = self.reports_this_work + [r for r in self.reports_arm if r["_meta"]["impl"] == "this_work"]
+        tw_blocks = {(r["_meta"]["machine"], r["_meta"]["run"], r["_meta"]["session_dir"], r["_meta"]["block"])
+                     for r in tw_recs}
+        forks = sorted({f for (mc, rn, sd, _) in tw_blocks
+                        for f in self.session_info.get((mc, rn, sd), {}).get("fork", set())})
+        step_tags = sorted(t for t, recs in self.reports_steps.items() if any(self._extract_samples(r) for r in recs))
+        for r in tw_recs:
+            m = r["_meta"]
+            self._used.add((m["machine"], m["run"], m["session_dir"]))
+
+        def gate_status(row_key: str, tags_from: Optional[str]) -> str:
+            tags = [t for t in step_tags if tags_from is None or t == "HEAD" or t >= tags_from]
+            if not tw_blocks:
+                return self.missing_text(f"T0|{row_key}|Status")
+            return (f"PASS (test gate before {len(tw_blocks)} timed blocks @ {'/'.join(forks) or '?'}"
+                    + (f" and {len(tags)} step tags" if tags else "") + ")")
+
+        def verification_status(row_key: str, recs: List[Dict]) -> str:
+            flags = [((r.get("correctness") or {}).get("proof_verification_passed"),
+                      (r.get("correctness") or {}).get("direct_encoder_root_matches_commit")) for r in recs]
+            flags = [f for f in flags if f != (None, None)]
+            if not flags:
+                return self.missing_text(f"T0|{row_key}|Status")
+            bad = sum(1 for p, d in flags if p is not True or d is not True)
+            return (f"FAIL ({bad} of {len(flags)} records)" if bad else
+                    f"PASS ({len(flags)} records: proof verifies, direct encoding matches the commitment)")
+
+        gated = [
+            ("Bit-exact prover encoding (mode a)", "SdigCode6 (Mont127)", "Original LCPC (f0e2116)", "step/01..HEAD", "step/01"),
+            ("Bit-exact encoding (mode b)", "Mont127, Mers127, Fp2M61", "SIMD-Spielman tv/ files", "step/02..HEAD", "step/02"),
+            ("Horizontal slice invariance", "s in {1, 2, 4, 8, 16, 32}", "s = 1 non-sliced baseline", "step/07..HEAD", "step/07"),
+            ("Expander thread invariance", "T in {1, 2, 4, 8, 15}", "T = 1 single-threaded baseline", "step/08..HEAD", "step/08"),
+            ("Field differential tests", "Mont127, Mers127, Fp2M61", "BigUint / rug big-integer oracle", "step/02..HEAD", "step/02"),
         ]
+        rows = [[name, target, oracle, scope, gate_status(name, since)] for name, target, oracle, scope, since in gated]
+        lcpc_recs = self.reports_lcpc_orig + [r for r in self.reports_arm if r["_meta"]["impl"] == "lcpc_orig"]
+        rows.append(["PCS end-to-end verification", "Commitment & proof verification (This Work records)",
+                     "Upstream Ligero/Brakedown PCS", "@ " + ("/".join(forks) or "-"),
+                     verification_status("PCS end-to-end verification", tw_recs)])
+        rows.append(["Original LCPC PCS verification", "Commitment & proof verification (original LCPC records)",
+                     "Its own verifier", "LCPC " + ("/".join(sorted({str(r.get("upstream_commit"))[:7] for r in lcpc_recs
+                                                                       if r.get("upstream_commit")})) or "-"),
+                     verification_status("Original LCPC PCS verification", lcpc_recs)])
+        for r in lcpc_recs:
+            m = r["_meta"]
+            self._used.add((m["machine"], m["run"], m["session_dir"]))
         # Vector-instruction audit rows are derived from the selected codegen
         # reports (one per architecture), never hard-coded.
         by_arch: Dict[str, List[Dict]] = defaultdict(list)
@@ -1360,21 +1722,27 @@ class BenchmarkAnalyzer:
                 self._used.add((m["machine"], m["run"], m["session_dir"]))
         for arch in sorted(by_arch) or ["(none)"]:
             gs = by_arch.get(arch, [])
-            statuses = sorted({st for g in gs for st in g["statuses"]})
+            statuses = sorted({st for g in gs for st in g["effective"]})
             if not gs:
                 status = self.missing_text("T0|Vector-instruction audit|Status")
             elif all(g["ok"] for g in gs):
-                status = "PASS"
+                status = "PASS" if statuses == ["PASS"] else "PASS (incl. PASS on re-check, see T11)"
             else:
                 documented = all(g["ok"] or (self.selection and self.selection.omission_for(g["selector"])) for g in gs)
                 status = "/".join(statuses) + (" (documented, see T11)" if documented else "")
             n_rep = sum(len(g["reports"]) for g in gs)
             arith = "/".join(str(g["vec_arith"]) for g in gs) or "-"
-            rows.insert(5, [f"Vector-instruction audit ({arch})", f"Hot kernels of the measured binaries ({n_rep} reports)",
+            rows.insert(len(gated), [f"Vector-instruction audit ({arch})", f"Hot kernels of the measured binaries ({n_rep} reports)",
                             f"check_codegen.py: zero vector arithmetic (found {arith})",
                             "@ " + "/".join(sorted({g["fork"] for g in gs})) if gs else "-", status])
-        notes = ["Gates run by the reproduction scripts before every benchmark block (tests must pass or the block is not timed).",
-                 "The vector-instruction audit rows are derived from the selected check_codegen.py reports (T11)."]
+        notes = ["Test-gated rows: reproduce/this_work.sh runs cargo test --workspace before every This Work block and "
+                 "steps.sh before every step tag, and neither times a build whose tests fail; the status counts the timed "
+                 "blocks and step tags in this selection (Commit / Tag = the first tag that has the test).",
+                 "PCS rows: the correctness fields recorded with every measurement (proof verification and direct "
+                 "encoding vs. the committed root).",
+                 "The vector-instruction audit rows are derived from the selected check_codegen.py reports (T11); a FAIL "
+                 "written by an older classifier whose complete stored hot-kernel disassembly re-checks without vector "
+                 "arithmetic is 'PASS on re-check'."]
         self._write_artefact("table_T0_correctness", "Correctness Gates and Verification Summary for Measured Binaries",
                              "tab:correctness_gates", headers, rows, notes, col_align="lllll", key_cols=1)
 
@@ -1675,7 +2043,7 @@ class BenchmarkAnalyzer:
             f"Measured sizes: {', '.join('2^%d' % n for n in all_sizes)}. Plan 06 E3 also lists 2^28 (not measured).",
             "Mode (b) uses SIMD-Spielman parameters over Mers127; it is unavailable before step/04-r2l.",
             "The per-step breakdown is order-dependent; optimizations interact non-linearly.",
-        ] + notes_extra + sorted(na_reasons)
+        ] + notes_extra + sorted(na_reasons) + self.gate_step_codegen()
         self._write_artefact("table_T3_steps_breakdown", "Cumulative Technique Breakdown Across Tagged Commits",
                              "tab:steps_breakdown", headers, rows, notes, key_cols=2)
 
@@ -1795,6 +2163,38 @@ class BenchmarkAnalyzer:
         for v in PRIMARY_LCPC_VARIANTS:
             yield f"Original LCPC {v}", self.select(pool_lcpc, family=family_lcpc, params="lcpc-sdig6", variant=v)
 
+    @staticmethod
+    def _t6_variant_effects(means: Dict[Tuple[str, int, int, str], Optional[float]]) -> List[str]:
+        """Per (T, log2 N): BLAKE3-backend and compiler-flag ratios between the four LCPC build variants.
+
+        Computed only from T6 cell means; a ratio is reported only when both
+        of its cells were measured.
+        """
+        def ratio(num_variant, den_variant, threads, log_n, op):
+            num = means.get((f"Original LCPC {num_variant}", threads, log_n, op))
+            den = means.get((f"Original LCPC {den_variant}", threads, log_n, op))
+            return f"{num / den:.2f}x" if num and den else None
+
+        out = []
+        keys = sorted({(t, n) for (label, t, n, _op) in means if label.startswith("Original LCPC ")})
+        for threads, log_n in keys:
+            parts = []
+            for what, op in (("hash", "hash_matrix_decomposition"), ("commit", "commit_total")):
+                pairs = [(f, ratio(f"{f}-portable", f"{f}-as-is", threads, log_n, op))
+                         for f in ("as-published", "fork-flags")]
+                got = [f"{r} with {f.replace('-', ' ')}" for f, r in pairs if r]
+                if got:
+                    parts.append(f"backend on {what} " + ", ".join(got))
+            for what, op in (("encode", "encode_matrix"), ("commit", "commit_total")):
+                pairs = [(b, ratio(f"fork-flags-{b}", f"as-published-{b}", threads, log_n, op))
+                         for b in ("as-is", "portable")]
+                got = [f"{r} with {'default-features' if b == 'as-is' else 'portable'} BLAKE3" for b, r in pairs if r]
+                if got:
+                    parts.append(f"flags on {what} " + ", ".join(got))
+            if parts:
+                out.append(f"T={threads} 2^{log_n}: " + "; ".join(parts) + ".")
+        return out
+
     def generate_T6_pcs_breakdown(self):
         """E8: commit (encode/hash), prove, verify, proof size; per implementation and LCPC variant."""
         self._begin("T6")
@@ -1803,9 +2203,14 @@ class BenchmarkAnalyzer:
                    "Enc/Hash (%)", "Prove (ms)", "Verify (ms)", "Proof Size (B)"]
         rows, regress = [], []
         means: Dict[Tuple[str, int, int, str], Optional[float]] = {}
-        for label, pool in self._impl_rows("tw_a", "lcpc_a", self.reports_this_work, self.reports_lcpc_orig):
+        groups = [(label, pool, (20, 24, 28)) for label, pool in
+                  self._impl_rows("tw_a", "lcpc_a", self.reports_this_work, self.reports_lcpc_orig)]
+        groups += [(f"Original LCPC {v}", self.select(self.reports_lcpc_orig, family="lcpc_a", params="lcpc-sdig6",
+                                                      variant=v), SECONDARY_LCPC_SIZES)
+                   for v in SECONDARY_LCPC_VARIANTS]
+        for label, pool, sizes in groups:
             for threads in (1, 8):
-                for log_n in (20, 24, 28):
+                for log_n in sizes:
                     recs = self.select(pool, threads=threads, log_n=log_n)
                     rk = f"{label},{threads},{log_n}"
                     if not recs and not (self.selection and self.selection.omission_for(f"{T}|{rk}|Commit (ms)")):
@@ -1837,7 +2242,14 @@ class BenchmarkAnalyzer:
             "Mode (a) only. This Work = full_this_work_mode_a_* (adaptive); original LCPC rows are labelled by build variant "
             "and BLAKE3 backend (Hashing column): the hash columns are like-for-like only between rows with the same backend.",
             "Cells: mean of per-session medians of each operation.",
+            "Original LCPC as-published-portable and fork-flags-as-is are measured at 2^20 and 2^24 only, to separate "
+            "the BLAKE3 backend from the compiler flags.",
         ]
+        effects = self._t6_variant_effects(means)
+        if effects:
+            notes.append("BLAKE3 backend vs compiler flags (ratios of the cell means above). Backend = BLAKE3 portable / "
+                         "default features with the same flags; flags = fork flags / as published with the same "
+                         "backend. " + " ".join(effects))
         if regress:
             notes.append("This Work is slower than original LCPC in: " + "; ".join(sorted(regress)) + ".")
         self._write_artefact("table_T6_pcs_breakdown",
@@ -1936,24 +2348,74 @@ class BenchmarkAnalyzer:
                              (format_bytes_to_mb(mem["max"]) + self.derived_marker(f"{T}|{rk}|Peak RSS (MB)",
                                                                                    dict(mem, machine=enc.get("machine"))))
                              if mem else self.missing_text(f"{T}|{rk}|Peak RSS (MB)")])
+        simd_flagged, simd_res, simd_floor, simd_unrecorded = [], set(), set(), []
+        simd_partial: Dict[str, List[str]] = defaultdict(list)    # sessions -> sizes lacking setup/RSS there
         for log_n in (20, 24, 28):
             recs = self.select(self.reports_simd_spielman, family="simd", threads=1, shape="brakedown", field="Mont127",
                                params="simd-spielman", log_n=log_n)
             if not recs:
                 continue
             rk = f"SIMD-Spielman,{log_n}"
-            na = "N/A (upstream wrapper exposes encoding only)"
-            rows.append(["SIMD-Spielman", log_n, na,
-                         self.value_cell(T, rk, "Encode (ms)", self.stat(recs, label=f"{T}|{rk}|encode"), with_range=False),
-                         na, na])
+            enc = self.stat(recs, label=f"{T}|{rk}|encode")
+            # simd_spielman.sh derives setup from GNU time (process wall time
+            # minus the printed encode samples) and records its resolution and
+            # floor; values below the floor are kept but flagged.
+            su = self.scalar_stat(recs, setup_ns)
+            mem = self.scalar_stat(recs, rss)
+            below = any(r.get("setup_ns_below_floor") is True for r in recs if setup_ns(r) is not None)
+            simd_res.update(int(r["setup_ns_resolution_ns"]) for r in recs if safe_float(r.get("setup_ns_resolution_ns")))
+            simd_floor.update(int(r["setup_ns_floor_ns"]) for r in recs if safe_float(r.get("setup_ns_floor_ns")))
+            if below:
+                simd_flagged.append(f"2^{log_n}")
+            # Sessions whose encode records carry no setup/RSS (harness version
+            # that exposed encoding only). A partial gap makes the cells
+            # '[sX only]', which needs an omission (derived_marker below); while
+            # no session recorded setup/RSS the cells are 'N/A (not recorded)'
+            # and a pre-wired omission for the gap is credited here, so it is
+            # not reported as stale before the missing session lands.
+            have = set(su["sessions"]) if su else set()
+            have &= set(mem["sessions"]) if mem else set()
+            gap = [sid for sid in enc.get("sessions", []) if sid not in have]
+            if gap:
+                if have:
+                    simd_partial["/".join(gap)].append(f"2^{log_n}")
+                else:
+                    simd_unrecorded.append(f"2^{log_n}")
+                if not have and self.selection:
+                    for col in ("Setup (ms)", "Setup / Encode", "Peak RSS (MB)"):
+                        self.selection.omission_for(f"{T}|{rk}|{col}")
+            na = "N/A (not recorded, see note)"
+            setup_txt = ((format_ns(su["mean"]) + (" (below floor)" if below else "")
+                          + self.derived_marker(f"{T}|{rk}|Setup (ms)", dict(su, machine=enc.get("machine"))))
+                         if su else na)
+            ratio = self.ratio_cell(T, rk, "Setup / Encode", su, enc) if su else na
+            rss_txt = ((format_bytes_to_mb(mem["max"]) + self.derived_marker(f"{T}|{rk}|Peak RSS (MB)",
+                                                                             dict(mem, machine=enc.get("machine"))))
+                       if mem else na)
+            rows.append(["SIMD-Spielman", log_n, setup_txt,
+                         self.value_cell(T, rk, "Encode (ms)", enc, with_range=False), ratio, rss_txt])
         if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
             rows.append(["SIMD-Spielman", 20, "SKIPPED", "SKIPPED", "SKIPPED", "SKIPPED"])
         notes = [
             "T=1. This Work: full_this_work_mode_a_* (adaptive); original LCPC by build variant; SIMD-Spielman: mode (b), Mont127.",
             "Setup = graph sampling and encoder initialisation + input/row-buffer initialisation + verifier-encoder "
             "initialisation (mean over sessions); peak RSS = VmHWM, maximum over sessions.",
-            "The SIMD-Spielman wrapper reports encoding only; setup and RSS are not exposed by its upstream benchmark interface.",
+            "SIMD-Spielman: setup = GNU time elapsed wall clock of its benchmark process minus the sum of its printed "
+            "encode samples (includes process start, graph generation, input generation and output); peak RSS = GNU "
+            "time maximum resident set size. Not like-for-like with the in-process setup timers of the other rows.",
         ]
+        if simd_res:
+            notes.append("SIMD-Spielman setup resolution: GNU time reports elapsed time in steps of "
+                         + "/".join(f"{v / 1e6:g} ms" for v in sorted(simd_res)) + "; values below the floor of "
+                         + ("/".join(f"{v / 1e6:g} ms" for v in sorted(simd_floor)) or "10x the resolution")
+                         + " are marked '(below floor)'" + (f" (at {', '.join(simd_flagged)})" if simd_flagged else "")
+                         + " and are not meaningful as setup measurements.")
+        if simd_unrecorded or simd_partial:
+            where = ([("at " + ", ".join(simd_unrecorded))] if simd_unrecorded else []) + [
+                f"in {sessions} at {', '.join(sizes)} (those cells show the other sessions only)"
+                for sessions, sizes in sorted(simd_partial.items())]
+            notes.append("SIMD-Spielman setup/RSS not recorded " + "; ".join(where) + ": those blocks were run by a "
+                         "harness version that exposed encoding only.")
         self._write_artefact("table_T8_setup_memory", "One-Time Setup Cost and Peak Memory Overhead",
                              "tab:setup_memory", headers, rows, notes, key_cols=2)
 
@@ -2080,11 +2542,40 @@ class BenchmarkAnalyzer:
 
     # ---- T11 --------------------------------------------------------------
     CODEGEN_FAMILIES = ("tw_a", "tw_b", "arm_this_work", "slice_sweep", "tw_threads", "ligero")
+    PASS_STATUSES = ("PASS", "PASS on re-check")
+
+    def _recheck(self, report: Dict) -> Optional[Dict[str, Any]]:
+        cache = self.__dict__.setdefault("_recheck_cache", {})
+        if id(report) not in cache:
+            cache[id(report)] = recheck_codegen_report(report)
+        return cache[id(report)]
+
+    def effective_codegen_status(self, report: Dict) -> Tuple[str, str, Optional[Dict[str, Any]]]:
+        """(own status, effective status, re-check) of one codegen report.
+
+        A FAIL written by an older classifier counts as "PASS on re-check" when
+        the current check_codegen.py, applied to the report's complete stored
+        hot-kernel disassembly, finds no vector arithmetic. Anything else keeps
+        the report's own status; a report without matched hot kernels is
+        NO_HOT_KERNELS (not scalar evidence).
+        """
+        summary = (report.get("summary") or {}).get("hot_kernels") or {}
+        vec = int(summary.get("vector_arithmetic_count", report.get("vector_arithmetic_count", 0)) or 0)
+        own = str(report.get("status") or ("PASS" if vec == 0 else "FAIL"))
+        if own == "PASS" and not report.get("hot_kernels_checked"):
+            own = "NO_HOT_KERNELS"
+        recheck = self._recheck(report) if own == "FAIL" else None
+        effective = own
+        if (own == "FAIL" and recheck and recheck["complete"] and recheck["arith"] == 0
+                and report.get("classifier_version") != recheck["classifier"]):
+            effective = "PASS on re-check"
+        return own, effective, recheck
 
     def codegen_groups(self) -> List[Dict[str, Any]]:
         """Selected codegen reports of the measured This Work binaries, grouped per (arch, fork commit, summary).
 
-        Status comes from each report ("PASS", "FAIL", "NO_HOT_KERNELS");
+        Status comes from each report ("PASS", "FAIL", "NO_HOT_KERNELS"),
+        re-checked with the current classifier (effective_codegen_status);
         vector arithmetic and vector moves (zeroing/copy data movement) are
         counted separately, as check_codegen.py reports them (interface c).
         """
@@ -2097,53 +2588,78 @@ class BenchmarkAnalyzer:
             summary = (cr.get("summary") or {}).get("hot_kernels") or {}
             groups[(str(cr.get("arch", "x86_64")), fork, json.dumps(summary, sort_keys=True))].append(cr)
         out = []
+        seen_keys: Dict[Tuple[str, str], int] = defaultdict(int)
         for (arch, fork, _), reports in sorted(groups.items()):
             s = (reports[0].get("summary") or {}).get("hot_kernels") or {}
             vec = int(s.get("vector_arithmetic_count", 0) or 0)
-            statuses = sorted({str(r.get("status") or ("PASS" if vec == 0 else "FAIL")) for r in reports})
-            if any(not r.get("hot_kernels_checked") for r in reports) and "NO_HOT_KERNELS" not in statuses \
-                    and all(str(r.get("status")) != "FAIL" for r in reports):
-                statuses = sorted(set(statuses) | {"NO_HOT_KERNELS"})
-            key = f"{arch} @ {fork},hot_kernels (aggregate)"
-            out.append({"arch": arch, "fork": fork, "reports": reports, "summary": s, "vec_arith": vec,
+            per = [self.effective_codegen_status(r) for r in reports]
+            statuses = sorted({own for own, _, _ in per})
+            effective = sorted({eff for _, eff, _ in per})
+            seen_keys[(arch, fork)] += 1
+            label = f"{arch} @ {fork}" + (f" #{seen_keys[(arch, fork)]}" if seen_keys[(arch, fork)] > 1 else "")
+            key = f"{label},hot_kernels (aggregate)"
+            out.append({"arch": arch, "fork": fork, "label": label, "reports": reports, "summary": s, "vec_arith": vec,
                         "vec_moves": int(s.get("vector_moves_count", 0) or 0), "statuses": statuses,
+                        "effective": effective, "recheck": next((rc for _, _, rc in per if rc), None),
                         "selector": f"T11|{key}|Scalar Status",
-                        "ok": statuses == ["PASS"]})
+                        "ok": all(e in self.PASS_STATUSES for e in effective)})
         return out
 
     @staticmethod
     def recheck_codegen_hits(report: Dict) -> Optional[Dict[str, int]]:
-        """Re-classifies a report's stored vector-arithmetic hits with the current check_codegen.py rules.
-
-        Informational (the status shown is the report's own): it tells whether a
-        FAIL was a classifier false positive that a re-check would clear.
-        """
-        try:
-            import importlib
-            cc = importlib.import_module("check_codegen")
-        except Exception:
+        """Re-classifies a report's stored vector-arithmetic hits with the current check_codegen.py rules."""
+        rc = recheck_codegen_report(report)
+        if rc is None:
             return None
-        arch = str(report.get("arch", "x86_64"))
         counts: Dict[str, int] = defaultdict(int)
-        for sym in report.get("symbols", []):
-            if not sym.get("is_hot_kernel"):
-                continue
-            for hit in sym.get("vector_arithmetic", []):
-                text = str(hit.get("insn", "")).strip()
-                mnem, _, ops = text.partition(" ")
-                try:
-                    kind = cc.classify_instruction(arch, mnem, ops)[0]
-                except Exception:
-                    return None
-                counts["arith" if kind == "VEC_ARITH" else ("moves" if kind == "VEC_MOVE" else "scalar")] += 1
+        for kind, n in rc["hits_reclassified"].items():
+            counts["arith" if kind == "VEC_ARITH" else ("moves" if kind == "VEC_MOVE" else "scalar")] += n
         return dict(counts)
+
+    def step_codegen_summary(self) -> Dict[str, Dict[str, Any]]:
+        """Per step tag: own/effective statuses and hot kernels checked of the steps blocks' codegen reports."""
+        out: Dict[str, Dict[str, Any]] = {}
+        for cr in self.step_codegen_reports:
+            tag = cr["_meta"]["tag"]
+            own, eff, _ = self.effective_codegen_status(cr)
+            info = out.setdefault(tag, {"own": set(), "effective": set(), "checked": set(), "reports": 0})
+            info["own"].add(own)
+            info["effective"].add(eff)
+            info["checked"].add(int(cr.get("hot_kernels_checked") or 0))
+            info["reports"] += 1
+        return out
+
+    def gate_step_codegen(self) -> List[str]:
+        """Step-tag codegen reports in the FAIL gate (interface c); T3 selectors document exceptions."""
+        notes = []
+        for tag, info in sorted(self.step_codegen_summary().items()):
+            bad = sorted(e for e in info["effective"] if e not in self.PASS_STATUSES + ("NO_HOT_KERNELS",))
+            selector = f"T3|codegen,{tag}|Scalar Status"
+            if bad:
+                om = self.selection.omission_for(selector) if self.selection else None
+                if om:
+                    self.todo_cells[selector] = f"{om['kind']}: {om['reason']}"
+                else:
+                    self.codegen_errors.append(f"{selector}: step codegen status {'/'.join(bad)} "
+                                               f"({info['reports']} reports)")
+            if "PASS on re-check" in info["effective"]:
+                notes.append(f"{tag}: codegen report FAIL under an older classifier, PASS when its stored hot-kernel "
+                             "disassembly is re-checked with the current check_codegen.py.")
+        no_hot = sorted(t for t, i in self.step_codegen_summary().items()
+                        if "NO_HOT_KERNELS" in i["effective"] or i["checked"] == {0})
+        if no_hot:
+            notes.append("Codegen check matched no hot-kernel symbol at " + ", ".join(no_hot) + " (NO_HOT_KERNELS: "
+                         "check_codegen.py's hot-kernel patterns name functions introduced by later steps), so the "
+                         "scalar status of those tags is not established by the check; the steps harness runs the "
+                         "check non-strictly for the rowwise/batched API stages.")
+        return notes
 
     def generate_T11_codegen_evidence(self):
         """E13: codegen evidence of the measured binaries, one row per (arch, fork commit) build."""
         self._begin("T11")
         T = "T11"
         headers = ["Architecture", "Hot Kernel / Symbol", "Reports", "Total Insns", "mul / mulx", "adc / adcx",
-                   "Vector Arith", "Vector Moves", "Re-check of stored hits (current rules)", "Scalar Status"]
+                   "Vector Arith", "Vector Moves", "Re-check (current classifier)", "Scalar Status"]
         rows, notes_extra = [], []
         for g in self.codegen_groups():
             cr = g["reports"][0]
@@ -2152,46 +2668,63 @@ class BenchmarkAnalyzer:
                 m = r["_meta"]
                 self._used.add((m["machine"], m["run"], m["session_dir"]))
             status = "/".join(g["statuses"])
+            rc = g["recheck"]
+            if g["effective"] != g["statuses"]:
+                status = f"{status} in report; " + "/".join(g["effective"])
             if not g["ok"]:
                 om = self.selection.omission_for(g["selector"]) if self.selection else None
                 if om:
                     self.todo_cells[g["selector"]] = f"{om['kind']}: {om['reason']}"
                     status += " (documented)"
-                    notes_extra.append(f"{g['arch']} @ {g['fork']}: status {'/'.join(g['statuses'])} documented in "
+                    notes_extra.append(f"{g['label']}: status {'/'.join(g['effective'])} documented in "
                                        f"selection.json ({om['kind']}): {om['reason']}")
                 else:
-                    self.codegen_errors.append(f"{g['selector']}: codegen status {'/'.join(g['statuses'])} "
+                    self.codegen_errors.append(f"{g['selector']}: codegen status {'/'.join(g['effective'])} "
                                                f"({g['vec_arith']} vector arithmetic instructions in hot kernels)")
-            recheck = self.recheck_codegen_hits(cr) if g["vec_arith"] else None
+            if rc is None and g["vec_arith"]:
+                rc = self._recheck(cr)
             if not g["vec_arith"]:
                 recheck_txt = "N/A (no stored hits)"
-            elif recheck is None:
+            elif rc is None:
                 recheck_txt = "N/A (check_codegen.py not importable)"
             else:
-                recheck_txt = (f"{recheck.get('arith', 0)} arith, {recheck.get('moves', 0)} moves, "
-                               f"{recheck.get('scalar', 0)} scalar")
-            rows.append([f"{g['arch']} @ {g['fork']}", "hot_kernels (aggregate)", len(g["reports"]),
+                recheck_txt = (f"{rc['arith']} arith, {rc['moves']} moves in {rc['lines']} stored lines"
+                               + ("" if rc["complete"] else " (incomplete listing)"))
+                if "PASS on re-check" in g["effective"]:
+                    kinds = ", ".join(f"{n} {k}" for k, n in sorted(rc["hits_reclassified"].items()))
+                    ex = "; ".join(f"'{e}'" for e in rc["examples"])
+                    notes_extra.append(
+                        f"{g['label']}: the reports (classifier {cr.get('classifier_version') or 'v1, unversioned'}) "
+                        f"count {g['vec_arith']} hot-kernel instructions as vector arithmetic; {rc['classifier']} "
+                        f"re-classifies them as {kinds}" + (f", e.g. {ex}" if ex else "")
+                        + f", and finds {rc['arith']} vector arithmetic and {rc['moves']} vector moves in all "
+                        f"{rc['lines']} stored hot-kernel instructions.")
+            rows.append([g["label"], "hot_kernels (aggregate)", len(g["reports"]),
                          s.get("total_instructions", 0), s.get("scalar_mulx_count", 0) + s.get("scalar_mul_count", 0),
                          s.get("scalar_adc_count", 0), g["vec_arith"], g["vec_moves"], recheck_txt, status])
-            for sym in cr.get("symbols", []):
-                if sym.get("is_hot_kernel"):
-                    st = sym.get("scalar_stats", {})
-                    rows.append([f"{g['arch']} @ {g['fork']}",
-                                 sym.get("symbol_demangled", sym.get("symbol_raw", "unknown"))[:45], 1,
-                                 st.get("total", len(sym.get("disassembly_lines", []))),
-                                 st.get("mul", 0) + st.get("mulx", 0), st.get("adc", 0),
-                                 len(sym.get("vector_arithmetic", [])), len(sym.get("vector_moves", [])),
-                                 "N/A (no stored hits)" if not sym.get("vector_arithmetic") else "see aggregate row",
-                                 sym.get("status", "PASS")])
+            hot = [sym for sym in cr.get("symbols", []) if sym.get("is_hot_kernel")]
+            names = [str(sym.get("symbol_demangled") or sym.get("symbol_raw") or "unknown") for sym in hot]
+            shorts = [short_symbol(n) for n in names]
+            for sym, name, short in zip(hot, names, shorts):
+                st = sym.get("scalar_stats", {})
+                label = short if shorts.count(short) == 1 else name
+                rows.append([g["label"], label, 1,
+                             st.get("total", len(sym.get("disassembly_lines", []))),
+                             st.get("mul", 0) + st.get("mulx", 0), st.get("adc", 0),
+                             len(sym.get("vector_arithmetic", [])), len(sym.get("vector_moves", [])),
+                             "N/A (no stored hits)" if not sym.get("vector_arithmetic") else "see aggregate row",
+                             sym.get("status", "PASS") + ("; PASS on re-check" if sym.get("status") == "FAIL"
+                                                          and "PASS on re-check" in g["effective"] else "")])
         if not rows:
             rows.append(["-", "-", 0, "-", "-", "-", "-", "-", "-", self.missing_text(f"{T}|-,-|Scalar Status")])
-        flags = sorted({str(r.get("effective_rustflags")) for r in self._used_records if r.get("effective_rustflags")})
         notes = [
             "Disassembly inspection by scripts/check_codegen.py of the benchmark binaries; identical reports from different "
             "blocks of the same build are counted in 'Reports'. Vector Arith = vector arithmetic in the hot kernels (a "
             "failure); Vector Moves = vector-register data movement used for zeroing/copying (reported, not a failure).",
-            "Scalar Status is each report's own verdict. Re-check re-classifies the stored hits with the check_codegen.py "
-            "in this checkout (informational; it does not change the status).",
+            "Scalar Status is each report's own verdict; Re-check re-classifies the complete stored hot-kernel "
+            "disassembly of FAIL reports with the check_codegen.py in this checkout, and a FAIL written by an older "
+            "classifier whose re-check finds no vector arithmetic is shown as 'PASS on re-check'.",
+            "Symbol names are shown without module paths (full names where that would be ambiguous).",
             "The fork's .cargo/config.toml builds with -C no-vectorize-loops -C no-vectorize-slp; a FAIL row means the "
             "check did not confirm scalar hot kernels for that build, so its code must not be described as scalar until "
             "re-checked.",
@@ -2231,11 +2764,9 @@ class BenchmarkAnalyzer:
             notes = [
                 "GCP c4a (Neoverse V2), mode (a); This Work: arm_this_work_* (adaptive slices); original LCPC: arm_lcpc_orig_* "
                 "over Ft127, one column group per build variant.",
-                "Build flags differ across rows on Arm: the fork's .cargo/config.toml sets target-cpu=native for x86-64 only, "
-                "while the lcpc_orig.sh fork-flags variant passes target-cpu=native explicitly (audit "
-                "harness-arm-fork-flags-mismatch).",
             ]
             notes += self.rustflags_notes(self._used_records)
+            notes += self.arm_flags_notes(self._used_records)
             pending = sorted({sel for sel in self.todo_cells if sel.startswith(f"{T}|")})
             if pending:
                 reasons = sorted({self.todo_cells[sel] for sel in pending})
@@ -2489,10 +3020,64 @@ class BenchmarkAnalyzer:
                         continue
                     sel_full = f"{tab_id}|{full_key}|{header.strip()}"
                     sel_first = f"{tab_id}|{first_key}|{header.strip()}"
-                    if selector_matches(sel_full, allow_patterns) or selector_matches(sel_first, allow_patterns):
+                    hit = matching_patterns((sel_full, sel_first), allow_patterns)
+                    if hit:
+                        self.matched_allow.update(hit)
                         continue
                     errors.append(f"Missing artefact cell {sel_full}={value!r} ({reason}) at {path}:{line_number}")
         return errors
+
+    def _check_expected_rows(self, allow_patterns: List[str]) -> List[str]:
+        """selection.json expected_rows: every listed key combination must be a row of its table."""
+        if not self.selection or not self.selection.expected_rows:
+            return []
+        errors = []
+        for table, specs in sorted(self.selection.expected_rows.items()):
+            paths = sorted(glob.glob(os.path.join(self.csv_dir, f"table_{table}_*.csv")))
+            if not paths:
+                errors.append(f"Expected rows for {table}: table not generated")
+                continue
+            with open(paths[0], "r", newline="", encoding="utf-8") as f:
+                data = [r for r in csv.reader(f) if r and not r[0].lstrip().startswith("#")]
+            if not data:
+                continue
+            headers = [h.strip() for h in data[0]]
+            for spec in specs:
+                errors.extend(self._check_expected_spec(table, spec, headers, data, paths[0], allow_patterns))
+        return errors
+
+    def _check_expected_spec(self, table: str, spec: Dict[str, List[Any]], headers: List[str],
+                             data: List[List[str]], path: str, allow_patterns: List[str]) -> List[str]:
+        import itertools
+        errors = []
+        cols = list(spec)
+        missing_cols = [c for c in cols if c not in headers]
+        if missing_cols:
+            return [f"Expected rows for {table}: no column(s) {missing_cols} in {path}"]
+        idx = [headers.index(c) for c in cols]
+        present = {tuple(r[i].strip() if i < len(r) else "" for i in idx) for r in data[1:]}
+        for combo in itertools.product(*(spec[c] for c in cols)):
+            key = tuple(str(v) for v in combo)
+            if key in present:
+                continue
+            selector = f"{table}|{','.join(key)}|(row)"
+            om = self.selection.omission_for(selector)
+            if om:
+                self.todo_cells[selector] = f"{om['kind']}: {om['reason']} (row absent)"
+                continue
+            hit = matching_patterns((selector,), allow_patterns)
+            if hit:
+                self.matched_allow.update(hit)
+                continue
+            errors.append(f"Missing expected row {selector} ({', '.join(cols)} = {', '.join(key)}) in {path}")
+        return errors
+
+    def warn_unmatched_allow(self, allow_patterns: List[str]) -> List[str]:
+        """Warns about --allow selectors that excused nothing (stale or mistyped, like omissions)."""
+        unmatched = [p for p in dict.fromkeys(allow_patterns) if p not in self.matched_allow]
+        for pattern in unmatched:
+            print(f"[WARN] --allow selector matched no missing cell (stale or mistyped?): {pattern}")
+        return unmatched
 
     def warn_unmatched_omissions(self) -> List[str]:
         """Warns about selection.json omission patterns that matched no cell (stale or mistyped)."""
@@ -2533,14 +3118,19 @@ class BenchmarkAnalyzer:
                 if len(lines) < 2:
                     errors.append(f"CSV table has no data rows: {csvs[0]}")
         errors.extend(self._check_table_cells(allow + omission_patterns))
+        errors.extend(self._check_expected_rows(allow))
         # Missing values (fewer sessions than expected) may be documented;
         # integrity errors never are (interface d).
         for selector, message in self.missing_cell_errors:
-            if selector_matches(selector, allow + omission_patterns):
+            hit = matching_patterns((selector,), allow)
+            self.matched_allow.update(hit)
+            if hit or selector_matches(selector, omission_patterns):
                 continue
             errors.append(f"Cell {selector}: {message}")
         errors.extend(f"Cell {selector}: integrity error (not excusable by omissions): {message}"
                       for selector, message in self.cell_errors)
+        errors.extend(f"Interrupted block (partial output of a run that never completed; re-run it or exclude it): "
+                      f"{block} ({count} records)" for block, count in sorted(self.interrupted_block_records.items()))
         errors.extend(f"Oversubscribed run: {e}" for e in self.pinning_errors)
         errors.extend(f"Codegen report not PASS and not documented in selection.json omissions: {e}"
                       for e in self.codegen_errors)
@@ -2564,6 +3154,7 @@ class BenchmarkAnalyzer:
             for selector, status in sorted(self.todo_cells.items()):
                 print(f"  - {selector}: {status}")
         self.warn_unmatched_omissions()
+        self.warn_unmatched_allow(allow)
         if errors:
             print("[FAIL] Artefact validation failed with errors:")
             for err in errors:

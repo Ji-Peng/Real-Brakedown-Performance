@@ -603,5 +603,517 @@ class LatexTests(unittest.TestCase):
         self.assertEqual(len(errors), 1)
 
 
+
+def stage_schedule(path, stages):
+    with open(os.path.join(path, "schedule.json"), "w") as f:
+        json.dump({"format": "rbd-session-schedule-v1", "profile": "full", "session_id": os.path.basename(path),
+                   "stages": stages}, f)
+
+
+class InterruptedRerunTests(unittest.TestCase):
+    """Review 2 item 1: an interrupted re-run leaves untagged partial records in the block directory."""
+
+    def setUp(self):
+        self.fx = Fixture()
+
+    def tearDown(self):
+        self.fx.cleanup()
+
+    def _check(self, a):
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            a.generate_all()
+            ok = a.check_all_artefacts([])
+        return ok, out.getvalue()
+
+    def test_moved_previous_without_final_status_is_interrupted(self):
+        blk = "full_this_work_mode_a_t1_n20"
+        self.fx.write("s1", blk, "tw/a.json", [tw_record("s1")])           # partial, untagged
+        self.fx.write("s1", blk + ".prev-20261023T000000Z", "tw/a.json", [dict(tw_record("s1"), block_status="ok")])
+        stage_schedule(os.path.join(self.fx.root, MACHINE, RUN, "s1"), [
+            {"stage": "A", "state": "finished", "exit_status": 0, "blocks": [{"id": blk, "status": "ok"}]},
+            {"stage": "B", "state": "interrupted", "exit_status": 143, "failed_blocks": [],
+             "blocks": [{"id": blk, "status": "not_run", "moved_previous_to": blk + ".prev-20261023T000000Z"}]}])
+        sel = self.fx.selection(sessions=("s1",), expected=("s1",),
+                                exclude=[{"path": "*.prev-*", "reason": "earlier attempt"}])
+        a = self.fx.analyzer(sel)
+        self.assertEqual(dict(a.interrupted_block_records), {f"{MACHINE}/{RUN}/s1/{blk}": 1})
+        self.assertEqual(dict(a.failed_block_records), {})
+        ok, out = self._check(a)
+        self.assertFalse(ok)
+        self.assertIn("Interrupted block", out)
+
+    def test_killed_first_run_and_unfinalized_stage_are_interrupted(self):
+        self.fx.write("s1", "blk_new_this_work_mode_a_t1", "tw/a.json", [tw_record("s1")])
+        self.fx.write("s1", "full_this_work_mode_a_t8_n20", "tw/a.json", [tw_record("s1", threads=8)])
+        stage_schedule(os.path.join(self.fx.root, MACHINE, RUN, "s1"), [
+            {"stage": "A", "state": "interrupted", "exit_status": 143,
+             "blocks": [{"id": "blk_new_this_work_mode_a_t1", "status": "not_run"}]},
+            {"stage": "B", "state": "running", "exit_status": None,
+             "blocks": [{"id": "full_this_work_mode_a_t8_n20", "status": "scheduled"}]}])
+        a = self.fx.analyzer(self.fx.selection(sessions=("s1",), expected=("s1",)))
+        self.assertEqual(sorted(b.rsplit("/", 1)[1] for b in a.interrupted_block_records),
+                         ["blk_new_this_work_mode_a_t1", "full_this_work_mode_a_t8_n20"])
+
+    def test_completed_and_tagged_blocks_are_not_interrupted(self):
+        self.fx.write("s1", "full_this_work_mode_a_t1_n20", "tw/a.json", [dict(tw_record("s1"), block_status="ok")])
+        self.fx.write("s1", "full_this_work_mode_a_t8_n20", "tw/a.json", [tw_record("s1", threads=8)])
+        stage_schedule(os.path.join(self.fx.root, MACHINE, RUN, "s1"), [
+            {"stage": "A", "state": "finished", "exit_status": 0,
+             "blocks": [{"id": "full_this_work_mode_a_t1_n20", "status": "ok"},
+                        {"id": "full_this_work_mode_a_t8_n20", "status": "ok"}]},
+            # A later stage that did not touch the blocks (not_run, nothing moved).
+            {"stage": "B", "state": "interrupted", "exit_status": 143,
+             "blocks": [{"id": "full_this_work_mode_a_t1_n20", "status": "not_run"},
+                        {"id": "full_this_work_mode_a_t8_n20", "status": "not_run"}]}])
+        a = self.fx.analyzer(self.fx.selection(sessions=("s1",), expected=("s1",)))
+        self.assertEqual(dict(a.interrupted_block_records), {})
+        self.assertEqual(dict(a.failed_block_records), {})
+
+
+NEW_RUN = "2026-10-23-375a6e1x"
+
+
+class SupersedeTests(unittest.TestCase):
+    """selection.json 'supersede': a newer run replaces every older record of the cells it re-measured."""
+
+    def setUp(self):
+        self.fx = Fixture()
+
+    def tearDown(self):
+        self.fx.cleanup()
+
+    def _selection(self, supersede=None, runs=None, omissions=()):
+        path = os.path.join(self.fx.root, "selection.json")
+        with open(path, "w") as f:
+            json.dump({"schema_version": "rbd-selection-v1", "machines": {MACHINE: {
+                "expected_sessions": ["s1", "s2"],
+                "runs": runs or [{"run_dir": RUN, "sessions": ["s1", "s2"]},
+                                 {"run_dir": "2026-10-23-375a6e1*", "sessions": ["s1", "s2"]}]}},
+                "supersede": supersede if supersede is not None else [
+                    {"by": [f"{MACHINE}/2026-10-23-375a6e1*"],
+                     "blocks": [f"{MACHINE}/*/*/full_lcpc_orig_mode_a_*", f"{MACHINE}/*/*/full_this_work_threads_*",
+                                f"{MACHINE}/*/*/full_lcpc_orig_threads_*"],
+                     "reason": "re-measured at 375a6e1"}],
+                "omissions": list(omissions)}, f)
+        return analyze.Selection(path)
+
+    def _old_tree(self):
+        lc = "lcpc_orig/lcpc-sdig6-fork-release-blake3-portable-only.json"
+        for sid in ("s1", "s2"):
+            self.fx.write(sid, "full_this_work_mode_a_t1_n20", "tw/a.json", [tw_record(sid, samples=(100,) * 5)])
+            self.fx.write(sid, "full_lcpc_orig_mode_a_t1_n20-24", lc,
+                          [lcpc_record(sid, (700,) * 5), lcpc_record(sid, (900,) * 5, log_n=24)])
+            self.fx.write(sid, "full_this_work_threads_t1_n20", "tw/a.json", [tw_record(sid, samples=(130,) * 5)])
+            self.fx.write(sid, "full_this_work_threads_t1_n20", "this_work/codegen/codegen_report.json",
+                          codegen_report("PASS"))
+
+    def test_inert_until_the_new_run_exists(self):
+        self._old_tree()
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            a = analyze.BenchmarkAnalyzer(self.fx.out, "/nonexistent", selection=self._selection())
+            a.load_results([self.fx.root])
+        self.assertEqual(dict(a.superseded), {})
+        self.assertEqual(len(a.reports_lcpc_orig), 4)
+        self.assertIn("matches no run directory yet", out.getvalue())
+
+    def test_new_run_supersedes_old_cells_in_all_sessions(self):
+        self._old_tree()
+        lc = "lcpc_orig/lcpc-sdig6-fork-release-blake3-portable-only.json"
+        # The re-measurement (same block ids, new run dir); s2 has not landed yet for the threads block.
+        for sid in ("s1", "s2"):
+            self.fx.write(sid, "full_lcpc_orig_mode_a_t1_n20-24", lc,
+                          [lcpc_record(sid, (500,) * 5)], run=NEW_RUN)       # only 2^20 re-measured
+        self.fx.write("s1", "full_this_work_threads_t1_n20", "tw/a.json", [tw_record("s1", samples=(120,) * 5)],
+                      run=NEW_RUN)
+        self.fx.write("s1", "full_this_work_threads_t1_n20", "this_work/codegen/codegen_report.json",
+                      codegen_report("PASS"), run=NEW_RUN)
+        a = self.fx.analyzer(self._selection())
+        # LCPC 2^20: both old sessions superseded; 2^24 (not re-measured) kept.
+        lcpc = sorted((r["_meta"]["run"], r["_meta"]["session"], int(r["log_n"])) for r in a.reports_lcpc_orig)
+        self.assertEqual(lcpc, sorted([(NEW_RUN, "s1", 20), (NEW_RUN, "s2", 20), (RUN, "s1", 24), (RUN, "s2", 24)]))
+        st = a.stat(a.select(a.reports_lcpc_orig, log_n=20), label="T1|20,1|LCPC")
+        self.assertAlmostEqual(st["mean"], 500e6)
+        self.assertEqual(a.cell_errors, [])
+        # Threads: the cell is superseded in every session, so s2 is missing (never mixed across runs).
+        thr = a.select(a.reports_this_work, family="tw_threads")
+        self.assertEqual([(r["_meta"]["run"], r["_meta"]["session"]) for r in thr], [(NEW_RUN, "s1")])
+        # The headline block is not covered by the rule and stays.
+        self.assertEqual(len(a.select(a.reports_this_work, family="tw_a")), 2)
+        # Codegen reports of the superseded blocks go too.
+        self.assertEqual({r["_meta"]["run"] for r in a.codegen_reports}, {NEW_RUN})
+        self.assertTrue(any(k.startswith("superseded: re-measured at 375a6e1") for k in a.excluded))
+        self.assertTrue(a._fully_superseded(f"{MACHINE}/{RUN}/s1/full_this_work_threads_t1_n20"))
+        self.assertFalse(a._fully_superseded(f"{MACHINE}/{RUN}/s1/full_lcpc_orig_mode_a_t1_n20-24"))
+
+    def test_without_supersede_the_rerun_is_a_duplicate(self):
+        self._old_tree()
+        self.fx.write("s1", "full_lcpc_orig_mode_a_t1_n20-24", "lcpc_orig/lcpc-sdig6-fork-release-blake3-portable-only.json",
+                      [lcpc_record("s1", (500,) * 5)], run=NEW_RUN)
+        a = self.fx.analyzer(self._selection(supersede=[]))
+        a.stat(a.select(a.reports_lcpc_orig, log_n=20), label="T1|20,1|LCPC")
+        self.assertTrue(any("duplicate" in m for _, m in a.cell_errors))
+
+    def test_real_selection_prewires_the_remeasure(self):
+        real = analyze.Selection(analyze.DEFAULT_SELECTION)
+        self.assertIsNotNone(real.run_entry("gcp-c3d-highmem-16", "2026-10-23-375a6e18355a"))
+        self.assertIsNotNone(real.run_entry("gcp-c4a-highmem-16", "2026-10-23-375a6e18355a"))
+        by = [p for rule in real.supersede for p in rule["by"]]
+        self.assertIn("gcp-c3d-highmem-16/2026-10-23-375a6e1*", by)
+        self.assertIn("gcp-c4a-highmem-16/2026-10-23-375a6e1*", by)
+        blocks = [p for rule in real.supersede for p in rule["blocks"]]
+        for blk in ("gcp-c3d-highmem-16/2026-10-23-8dec85493004/s1/full_lcpc_orig_mode_a_t1_n16-18-20-22-24-26",
+                    "gcp-c3d-highmem-16/2026-10-22-8dec85493004/s2/full_lcpc_orig_mode_a_t8_n28",
+                    "gcp-c3d-highmem-16/2026-10-22-18d75f808f59/s1/full_this_work_threads_t4_n20-24-26",
+                    "gcp-c3d-highmem-16/2026-10-22-18d75f808f59/s2/full_lcpc_orig_threads_t2_n20-24-26",
+                    "gcp-c4a-highmem-16/2026-10-23-acfac2349c11/arm1/arm_this_work_t1_n18-22-26",
+                    "gcp-c4a-highmem-16/2026-10-23-acfac2349c11/arm1/arm_lcpc_orig_t8_n18-22-26"):
+            self.assertTrue(any(analyze.fnmatch.fnmatchcase(blk, p) for p in blocks), blk)
+        for blk in ("gcp-c3d-highmem-16/2026-10-22-2557b5517338/s1/full_this_work_mode_a_t1_n16-18-20-22-24-26",
+                    "gcp-c3d-highmem-16/2026-10-22-8dec85493004/s1/full_simd_spielman_mont127_t1_n28"):
+            self.assertFalse(any(analyze.fnmatch.fnmatchcase(blk, p) for p in blocks), blk)
+        # As-published LCPC from every older run stays excluded, recorded build_variant or not.
+        fields = {"implementation": "lcpc-original-upstream", "build_variant": "as-published-as-is",
+                  "build_variant_recorded": "true"}
+        for run in ("2026-10-22-8dec85493004", "2026-10-23-8dec85493004", "2026-10-23-acfac2349c11"):
+            status, _ = real.classify(f"gcp-c3d-highmem-16/{run}/s1/full_lcpc_orig_mode_a_t1_n28", "x.json", fields)
+            self.assertEqual(status, "exclude", run)
+        status, _ = real.classify("gcp-c3d-highmem-16/2026-10-23-375a6e18355a/s1/full_lcpc_orig_mode_a_t1_n28",
+                                  "x.json", fields)
+        self.assertEqual(status, "include")
+
+
+class CodegenRecheckTests(unittest.TestCase):
+    """Review 2 items 2 and 5: re-classified v1 reports, step reports in the gate."""
+
+    def setUp(self):
+        self.fx = Fixture()
+
+    def tearDown(self):
+        self.fx.cleanup()
+
+    @staticmethod
+    def v1_report(lines, hits):
+        r = codegen_report("FAIL", "aarch64", arith=hits)
+        r["symbols"][0]["disassembly_lines"] = lines
+        r["summary"]["hot_kernels"]["total_instructions"] = len(lines)
+        return r
+
+    def _check(self, a):
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            a.generate_all()
+            ok = a.check_all_artefacts([])
+        return ok, out.getvalue()
+
+    def test_v1_branch_false_positive_passes_on_recheck(self):
+        lines = ["b332c: b.eq b3334 <f::<typenum::B1>+0x40>", "b3330: movi v0.2d, #0x0", "b3334: mul x1, x2, x3"]
+        rep = self.v1_report(lines, ["b.eq b3334 <f::<typenum::B1>+0x40>"])
+        self.fx.write("s1", "full_this_work_mode_a_t1_n20", "tw/a.json", [tw_record("s1")])
+        self.fx.write("s1", "full_this_work_mode_a_t1_n20", "this_work/codegen/codegen_report.json", rep)
+        a = self.fx.analyzer(self.fx.selection(sessions=("s1",), expected=("s1",)))
+        ok, out = self._check(a)
+        self.assertNotIn("Codegen report not PASS", out)
+        headers, rows = TableTests._rows(self, "table_T11_codegen_evidence.csv")
+        agg = dict(zip(headers, rows[0]))
+        self.assertEqual(agg["Scalar Status"], "FAIL in report; PASS on re-check")
+        self.assertEqual(agg["Re-check (current classifier)"], "0 arith, 1 moves in 3 stored lines")
+        _, t0 = TableTests._rows(self, "table_T0_correctness.csv")
+        audit = [r for r in t0 if r[0].startswith("Vector-instruction audit")]
+        self.assertEqual(audit[0][-1], "PASS (incl. PASS on re-check, see T11)")
+        with open(os.path.join(self.fx.out, "csv", "table_T11_codegen_evidence.csv")) as f:
+            self.assertIn("'b.eq b3334 <...>'", f.read())
+
+    def test_real_vector_arithmetic_stays_fail(self):
+        lines = ["b332c: b.eq b3334 <f+0x40>", "b3330: add v0.2d, v1.2d, v2.2d"]
+        rep = self.v1_report(lines, ["b.eq b3334 <f+0x40>", "add v0.2d, v1.2d, v2.2d"])
+        self.fx.write("s1", "full_this_work_mode_a_t1_n20", "tw/a.json", [tw_record("s1")])
+        self.fx.write("s1", "full_this_work_mode_a_t1_n20", "this_work/codegen/codegen_report.json", rep)
+        a = self.fx.analyzer(self.fx.selection(sessions=("s1",), expected=("s1",)))
+        ok, out = self._check(a)
+        self.assertFalse(ok)
+        self.assertIn("Codegen report not PASS", out)
+
+    def test_incomplete_listing_is_not_rechecked_to_pass(self):
+        rep = self.v1_report(["b332c: b.eq b3334 <f+0x40>"], ["b.eq b3334 <f+0x40>"])
+        rep["summary"]["hot_kernels"]["total_instructions"] = 40     # listing does not cover the kernel
+        own, eff, rc = analyze.BenchmarkAnalyzer.effective_codegen_status(
+            self.fx.analyzer(self.fx.selection(sessions=("s1",), expected=("s1",))), rep)
+        self.assertEqual((own, eff, rc["complete"]), ("FAIL", "FAIL", False))
+
+    def test_step_reports_are_gated_and_no_hot_kernels_footnoted(self):
+        def step(mode):
+            return {"schema_version": "steps-bench-v1", "tag": "step_01-modernize", "mode": mode, "field": "Ft127",
+                    "params": "lcpc-sdig6", "log_n": 20, "threads": 1, "session_id": "s1", "samples_ns": [1e8] * 5}
+        blk = "full_steps_mode_a_n20"
+        self.fx.write("s1", blk, "steps/step_01-modernize/a.json", step("a"))
+        none = codegen_report("PASS")
+        none["hot_kernels_checked"] = 0
+        self.fx.write("s1", blk, "steps/step_01-modernize/codegen_report.json", none)
+        self.fx.write("s1", blk, "steps/step_05-lazy/codegen_report.json",
+                      codegen_report("FAIL", "x86_64", arith=["vpaddq %ymm0, %ymm1, %ymm2"]))
+        a = self.fx.analyzer(self.fx.selection(sessions=("s1",), expected=("s1",)))
+        ok, out = self._check(a)
+        self.assertIn("T3|codegen,step/05-lazy|Scalar Status: step codegen status FAIL", out)
+        with open(os.path.join(self.fx.out, "csv", "table_T3_steps_breakdown.csv")) as f:
+            self.assertIn("matched no hot-kernel symbol at step/01-modernize", f.read())
+        b = self.fx.analyzer(self.fx.selection(sessions=("s1",), expected=("s1",), omissions=[
+            {"kind": "pending", "reason": "documented", "cells": ["T3|codegen,step/05-lazy|Scalar Status"]}]))
+        ok, out = self._check(b)
+        self.assertNotIn("step codegen status FAIL", out)
+
+    def test_t11_symbol_names_are_unique(self):
+        rep = codegen_report("PASS")
+        sym = rep["symbols"][0]
+        rep["symbols"] = [dict(sym, symbol_demangled="a::encode::encode_column_block::<x::mont127::Mont127>"),
+                          dict(sym, symbol_demangled="a::encode::encode_column_block::<x::mers127::Mers127>"),
+                          dict(sym, symbol_demangled="a::f::<x::A>"), dict(sym, symbol_demangled="b::f::<y::A>")]
+        self.fx.write("s1", "full_this_work_mode_a_t1_n20", "this_work/codegen/codegen_report.json", rep)
+        a = self.fx.analyzer(self.fx.selection(sessions=("s1",), expected=("s1",)))
+        with contextlib.redirect_stdout(io.StringIO()):
+            a.generate_T11_codegen_evidence()
+        _, rows = TableTests._rows(self, "table_T11_codegen_evidence.csv")
+        names = [r[1] for r in rows[1:]]
+        self.assertEqual(names, ["encode_column_block::<Mont127>", "encode_column_block::<Mers127>",
+                                 "a::f::<x::A>", "b::f::<y::A>"])
+        self.assertEqual(len({(r[0], r[1]) for r in rows}), len(rows))
+
+
+class CheckCoverageTests(unittest.TestCase):
+    """Expected rows (item 6), --allow / omission bookkeeping (item 7, cross-group)."""
+
+    def setUp(self):
+        self.fx = Fixture()
+
+    def tearDown(self):
+        self.fx.cleanup()
+
+    def _selection(self, expected_rows, omissions=()):
+        path = os.path.join(self.fx.root, "selection.json")
+        with open(path, "w") as f:
+            json.dump({"schema_version": "rbd-selection-v1", "machines": {MACHINE: {
+                "expected_sessions": ["s1"], "runs": [{"run_dir": RUN, "sessions": ["s1"]}]}},
+                "expected_rows": expected_rows, "omissions": list(omissions)}, f)
+        return analyze.Selection(path)
+
+    def test_missing_expected_rows_are_reported_unless_documented(self):
+        self.fx.write("s1", "full_this_work_mode_a_t1_n20", "tw/a.json", [tw_record("s1")])
+        a = self.fx.analyzer(self._selection({"T1": {"log2(N)": [20, 22], "T": [1]}}))
+        with contextlib.redirect_stdout(io.StringIO()):
+            a.generate_T1_headline_encoding()
+        errors = a._check_expected_rows([])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("T1|22,1|(row)", errors[0])
+        self.assertEqual(a._check_expected_rows(["T1|22,*|*"]), [])
+        b = self.fx.analyzer(self._selection({"T1": {"log2(N)": [20, 22], "T": [1]}}, omissions=[
+            {"kind": "pending", "reason": "2^22 pending", "cells": ["T1|22,*|*"]}]))
+        with contextlib.redirect_stdout(io.StringIO()):
+            b.generate_T1_headline_encoding()
+        self.assertEqual(b._check_expected_rows([]), [])
+        self.assertIn("T1|22,1|(row)", b.todo_cells)
+
+    def test_unmatched_allow_patterns_are_warned_about(self):
+        self.fx.write("s1", "full_this_work_mode_a_t1_n20", "tw/a.json", [tw_record("s1")])
+        a = self.fx.analyzer(self._selection({}))
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            a.generate_all()
+            a.check_all_artefacts(["T1|*|LCPC *", "T99|nothing|here"])
+        text = out.getvalue()
+        self.assertIn("--allow selector matched no missing cell (stale or mistyped?): T99|nothing|here", text)
+        self.assertNotIn("(stale or mistyped?): T1|*|LCPC *", text)
+
+    def test_every_matching_omission_pattern_is_credited(self):
+        sel = self._selection({}, omissions=[{"kind": "pending", "reason": "narrow", "cells": ["T1|20,1|x"]},
+                                             {"kind": "omitted", "reason": "broad", "cells": ["T1|*|*"]}])
+        self.assertEqual(sel.omission_for("T1|20,1|x")["reason"], "narrow")
+        self.assertEqual(sel.unmatched_omission_patterns(), [])
+
+
+class TableNoteTests(unittest.TestCase):
+    """Review 2 items 3 and 4: T8 SIMD setup/RSS, T12 flags note from the records."""
+
+    def setUp(self):
+        self.fx = Fixture()
+
+    def tearDown(self):
+        self.fx.cleanup()
+
+    def test_t8_reads_simd_setup_rss_and_flags_below_floor(self):
+        for sid in ("s1", "s2"):
+            for n, setup in ((20, 40_000_000), (24, 2_000_000_000)):
+                self.fx.write(sid, f"full_simd_spielman_mont127_t1_n{n}", "simd_spielman_bench.json", [simd_record(
+                    sid, log_n=n, setup_ns={"graph_generation_and_process_overhead_ns": setup},
+                    peak_rss_bytes=512 * 1024 * 1024, setup_ns_resolution_ns=10_000_000,
+                    setup_ns_floor_ns=100_000_000, setup_ns_below_floor=setup < 100_000_000)])
+        a = self.fx.analyzer(self.fx.selection())
+        with contextlib.redirect_stdout(io.StringIO()):
+            a.generate_T8_setup_memory()
+        headers, rows = TableTests._rows(self, "table_T8_setup_memory.csv")
+        simd = {r[1]: dict(zip(headers, r)) for r in rows if r[0] == "SIMD-Spielman"}
+        self.assertEqual(simd["20"]["Setup (ms)"], "40.00 (below floor)")
+        self.assertEqual(simd["24"]["Setup (ms)"], "2000.00")
+        self.assertEqual(simd["24"]["Peak RSS (MB)"], "512.0")
+        self.assertTrue(simd["24"]["Setup / Encode"].startswith("40.00x"))
+        with open(os.path.join(self.fx.out, "csv", "table_T8_setup_memory.csv")) as f:
+            text = f.read()
+        self.assertIn("steps of 10 ms", text)
+        self.assertIn("(at 2^20)", text)
+
+    def test_t12_flags_note_follows_the_records(self):
+        def tree(flags):
+            fx = Fixture()
+            rec = lcpc_record("arm1", (500,) * 5, log_n=18)
+            rec.update({"build_variant": "fork-flags-portable"})
+            if flags is not None:
+                rec["effective_rustflags"] = flags
+            fx.write("arm1", "arm_lcpc_orig_t1_n18", "lcpc_orig/x.json", [rec], machine="gcp-c4a-test")
+            path = os.path.join(fx.root, "selection.json")
+            with open(path, "w") as f:
+                json.dump({"schema_version": "rbd-selection-v1", "machines": {"gcp-c4a-test": {
+                    "expected_sessions": ["arm1"], "runs": [{"run_dir": RUN, "sessions": ["arm1"]}]}}}, f)
+            a = fx.analyzer(analyze.Selection(path))
+            with contextlib.redirect_stdout(io.StringIO()):
+                a.generate_T12_arm_portability()
+            with open(os.path.join(fx.out, "csv", "table_T12_arm_portability.csv")) as f:
+                text = f.read()
+            fx.cleanup()
+            return text
+        native = tree("-C target-cpu=native -C no-vectorize-loops")
+        self.assertIn("include target-cpu=native", native)
+        generic = tree("-C no-vectorize-loops -C no-vectorize-slp")
+        self.assertNotIn("target-cpu=native", generic)
+        self.assertIn("do not record their build flags", tree(None))
+
+
+class Review3Tests(unittest.TestCase):
+    """Review 3: T6 BLAKE3-backend/flags rows, T8 SIMD session gap, same-boot partner runs, expected_rows lists."""
+
+    def setUp(self):
+        self.fx = Fixture()
+
+    def tearDown(self):
+        self.fx.cleanup()
+
+    @staticmethod
+    def pcs_record(session, encode, hash_, log_n=20, threads=1):
+        r = lcpc_record(session, (encode,) * 5, log_n=log_n, threads=threads)
+        r["measurements"]["hash_matrix_decomposition"] = {"samples_ns": [hash_ * 1_000_000] * 5}
+        r["measurements"]["commit_total"] = {"samples_ns": [(encode + hash_) * 1_000_000] * 5}
+        return r
+
+    def test_t6_reports_all_four_variants_and_separates_backend_from_flags(self):
+        files = {"as-published-as-is": ("plain", "as-is", 600, 30), "as-published-portable": ("plain", "portable-only", 600, 60),
+                 "fork-flags-as-is": ("fork", "as-is", 500, 30), "fork-flags-portable": ("fork", "portable-only", 500, 60)}
+        for sid in ("s1", "s2"):
+            for v, (prof, hm, enc, hsh) in files.items():
+                recs = [self.pcs_record(sid, enc, hsh, log_n=n) for n in (20, 24, 28)]
+                for r in recs:
+                    r["hash_mode"] = hm
+                self.fx.write(sid, "full_lcpc_orig_mode_a_t1_n20-24-28",
+                              f"lcpc_orig/lcpc-sdig6-{prof}-release-blake3-{hm}.json", recs)
+        a = self.fx.analyzer(self.fx.selection())
+        with contextlib.redirect_stdout(io.StringIO()):
+            a.generate_T6_pcs_breakdown()
+        headers, rows = TableTests._rows(self, "table_T6_pcs_breakdown.csv")
+        keys = {(r[0], r[2]) for r in rows}
+        for v in ("as-published-portable", "fork-flags-as-is"):
+            self.assertIn((f"Original LCPC {v}", "20"), keys)
+            self.assertIn((f"Original LCPC {v}", "24"), keys)
+            self.assertNotIn((f"Original LCPC {v}", "28"), keys)     # measured at 2^20/2^24 only (stage RH)
+        self.assertIn(("Original LCPC fork-flags-portable", "28"), keys)
+        with open(os.path.join(self.fx.out, "csv", "table_T6_pcs_breakdown.csv")) as f:
+            note = [l for l in f if "BLAKE3 backend vs compiler flags" in l][0]
+        # backend: hash portable/as-is = 60/30; flags: encode fork/as-published = 500/600
+        self.assertIn("T=1 2^20: backend on hash 2.00x with as published, 2.00x with fork flags", note)
+        self.assertIn("flags on encode 0.83x with default-features BLAKE3, 0.83x with portable BLAKE3", note)
+        self.assertNotIn("2^28:", note)
+        self.assertEqual(a.cell_errors, [])
+
+    def test_t6_effects_need_both_cells(self):
+        means = {("Original LCPC fork-flags-portable", 1, 20, "hash_matrix_decomposition"): 60.0,
+                 ("Original LCPC fork-flags-as-is", 1, 20, "hash_matrix_decomposition"): None}
+        self.assertEqual(analyze.BenchmarkAnalyzer._t6_variant_effects(means), [])
+
+    def test_t8_simd_session_gap_needs_omission_and_is_footnoted(self):
+        for sid in ("s1", "s2"):
+            extra = dict(setup_ns={"graph_generation_and_process_overhead_ns": 4_000_000_000},
+                         peak_rss_bytes=2 ** 30) if sid == "s1" else {}
+            self.fx.write(sid, "full_simd_spielman_mont127_t1_n28", "simd_spielman_bench.json",
+                          [simd_record(sid, log_n=28, **extra)])
+        cells = ["T8|SIMD-Spielman,28|Setup (ms)", "T8|SIMD-Spielman,28|Setup / Encode", "T8|SIMD-Spielman,28|Peak RSS (MB)"]
+        a = self.fx.analyzer(self.fx.selection())
+        with contextlib.redirect_stdout(io.StringIO()):
+            a.generate_T8_setup_memory()
+        self.assertEqual(sorted(s for s, _ in a.missing_cell_errors), sorted(cells))
+        b = self.fx.analyzer(self.fx.selection(omissions=[{"kind": "omitted", "reason": "s2 harness", "cells": cells}]))
+        with contextlib.redirect_stdout(io.StringIO()):
+            b.generate_T8_setup_memory()
+        self.assertEqual(b.missing_cell_errors, [])
+        headers, rows = TableTests._rows(self, "table_T8_setup_memory.csv")
+        row = dict(zip(headers, [r for r in rows if r[0] == "SIMD-Spielman"][0]))
+        self.assertEqual(row["Setup (ms)"], "4000.00 [s1 only]")
+        with open(os.path.join(self.fx.out, "csv", "table_T8_setup_memory.csv")) as f:
+            self.assertIn("not recorded in s2 at 2^28", f.read())
+
+    def test_t8_prewired_gap_omission_is_not_stale_before_the_data_lands(self):
+        self.fx.write("s2", "full_simd_spielman_mont127_t1_n28", "simd_spielman_bench.json", [simd_record("s2", log_n=28)])
+        cells = ["T8|SIMD-Spielman,28|Setup (ms)", "T8|SIMD-Spielman,28|Setup / Encode", "T8|SIMD-Spielman,28|Peak RSS (MB)"]
+        sel = self.fx.selection(omissions=[{"kind": "omitted", "reason": "s2 harness", "cells": cells},
+                                           {"kind": "pending", "reason": "s1", "cells": ["T8|SIMD-Spielman,28|Encode (ms)"]}])
+        a = self.fx.analyzer(sel)
+        with contextlib.redirect_stdout(io.StringIO()):
+            a.generate_T8_setup_memory()
+        self.assertEqual(sel.unmatched_omission_patterns(), [])
+
+    def test_partner_runs_warn_when_one_side_comes_from_another_run(self):
+        sel_path = os.path.join(self.fx.root, "selection.json")
+        with open(sel_path, "w") as f:
+            json.dump({"schema_version": "rbd-selection-v1", "machines": {MACHINE: {
+                "expected_sessions": ["s1"], "runs": [{"run_dir": RUN, "sessions": ["s1"]},
+                                                     {"run_dir": NEW_RUN, "sessions": ["s1"]}]}},
+                "supersede": [{"by": [f"{MACHINE}/{NEW_RUN}"], "blocks": [f"{MACHINE}/*/*/full_this_work_threads_*",
+                                                                          f"{MACHINE}/*/*/full_lcpc_orig_threads_*"],
+                               "reason": "same-boot pairs"}]}, f)
+        lc = "lcpc_orig/lcpc-sdig6-fork-release-blake3-portable-only.json"
+        self.fx.write("s1", "full_this_work_threads_t1_n20", "tw/a.json", [tw_record("s1")])
+        self.fx.write("s1", "full_lcpc_orig_threads_t1_n20", lc, [lcpc_record("s1", (500,) * 5)])
+        same = self.fx.analyzer(analyze.Selection(sel_path))
+        self.assertEqual(same.partner_run_mismatches, [])
+        # The re-run's This Work block landed, its LCPC partner did not (failed block).
+        self.fx.write("s1", "full_this_work_threads_t1_n20", "tw/a.json", [tw_record("s1")], run=NEW_RUN)
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            a = analyze.BenchmarkAnalyzer(self.fx.out, "/nonexistent", selection=analyze.Selection(sel_path))
+            a.load_results([self.fx.root])
+        self.assertEqual(len(a.partner_run_mismatches), 1)
+        self.assertIn(f"tw_threads from {NEW_RUN}, lcpc_threads from {RUN}", a.partner_run_mismatches[0])
+        self.assertIn("Same-boot pair split across runs", out.getvalue())
+
+    def test_expected_rows_accept_a_list_of_specs(self):
+        self.fx.write("s1", "full_this_work_mode_a_t1_n20", "tw/a.json", [tw_record("s1")])
+        path = os.path.join(self.fx.root, "selection.json")
+        with open(path, "w") as f:
+            json.dump({"schema_version": "rbd-selection-v1", "machines": {MACHINE: {
+                "expected_sessions": ["s1"], "runs": [{"run_dir": RUN, "sessions": ["s1"]}]}},
+                "expected_rows": {"T1": [{"log2(N)": [20], "T": [1]}, {"log2(N)": [22], "T": [8]}]}}, f)
+        a = self.fx.analyzer(analyze.Selection(path))
+        with contextlib.redirect_stdout(io.StringIO()):
+            a.generate_T1_headline_encoding()
+        errors = a._check_expected_rows([])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("T1|22,8|(row)", errors[0])
+        with open(path, "w") as f:
+            json.dump({"schema_version": "rbd-selection-v1", "expected_rows": {"T1": [{}]}}, f)
+        with self.assertRaises(ValueError):
+            analyze.Selection(path)
+
+    def test_real_selection_expects_the_rh_rows_in_t6(self):
+        real = analyze.Selection(analyze.DEFAULT_SELECTION)
+        specs = real.expected_rows["T6"]
+        rh = [s for s in specs if "Original LCPC fork-flags-as-is" in s["Implementation"]]
+        self.assertEqual(len(rh), 1)
+        self.assertEqual(sorted(rh[0]["Implementation"]),
+                         ["Original LCPC as-published-portable", "Original LCPC fork-flags-as-is"])
+        self.assertEqual(rh[0]["log2(N)"], list(analyze.SECONDARY_LCPC_SIZES))
+        self.assertIsNotNone(real.omission_for("T8|SIMD-Spielman,28|Peak RSS (MB)"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
