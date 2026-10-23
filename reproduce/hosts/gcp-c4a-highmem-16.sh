@@ -24,11 +24,14 @@ HOST_DEFAULT_SINGLE_CORE=
 HOST_ALLOWED_CORES=
 
 _gcp_load_arm_host_profile() {
-    _gcp_arm_profile_manifest="$CODE_DIR/results/gcp-c4a-highmem-16/host-profile.json"
+    # One file per VM instance: two VMs of the same machine type must not
+    # overwrite each other's topology record when results are copied back.
+    _gcp_instance=$(host_instance_name)
+    _gcp_arm_profile_manifest="$CODE_DIR/results/gcp-c4a-highmem-16/host-profile-$_gcp_instance.json"
     mkdir -p "$(dirname -- "$_gcp_arm_profile_manifest")"
 
     _gcp_arm_profile_info=$(
-        PROFILE_MANIFEST="$_gcp_arm_profile_manifest" python3 - <<'PY'
+        PROFILE_MANIFEST="$_gcp_arm_profile_manifest" PROFILE_INSTANCE="$_gcp_instance" python3 - <<'PY'
 import datetime
 import glob
 import json
@@ -149,10 +152,26 @@ domain_record = {
     "single_thread_core": single_core,
 }
 
+def gce_zone():
+    import urllib.request
+    # Link-local metadata IP: no DNS lookup, so the timeout bounds the call.
+    host = os.environ.get("GCE_METADATA_HOST", "169.254.169.254")
+    req = urllib.request.Request(
+        f"http://{host}/computeMetadata/v1/instance/zone",
+        headers={"Metadata-Flavor": "Google"})
+    try:
+        with urllib.request.urlopen(req, timeout=0.3) as response:
+            return response.read().decode("utf-8", errors="replace").strip().rsplit("/", 1)[-1]
+    except Exception:
+        return None
+
+
 manifest = {
     "schema_version": "1.0.0",
     "created_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     "host_profile": "gcp-c4a-highmem-16",
+    "instance": os.environ.get("PROFILE_INSTANCE"),
+    "zone": gce_zone(),
     "cpu_architecture": "aarch64",
     "source": "Linux sysfs at profile load time",
     "online_cpus": sorted(online),

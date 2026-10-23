@@ -175,7 +175,7 @@ esac
 sudo -n apt-get update
 sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y \
     build-essential ca-certificates cmake curl g++ git libboost-all-dev \
-    pkg-config python3 python3-matplotlib python3-numpy || true
+    pkg-config python3 python3-matplotlib python3-numpy time || true
 
 # Attempt to install linux-perf if available
 sudo -n env DEBIAN_FRONTEND=noninteractive apt-get install -y linux-perf || true
@@ -221,7 +221,8 @@ ls "$UPSTREAM_DIR/tv/bd_spielman_extension_N12_in.txt" >/dev/null
 
 FIRST_BOOT_DIR=$REMOTE_CODE_DIR/results/$HOST_PROFILE_NAME
 mkdir -p "$FIRST_BOOT_DIR"
-FIRST_BOOT_MANIFEST=$FIRST_BOOT_DIR/first-boot-manifest.json \
+# One first-boot record per VM instance (several VMs share a machine type).
+FIRST_BOOT_MANIFEST=$FIRST_BOOT_DIR/first-boot-manifest-$INSTANCE.json \
 EXPECTED_ZONE=$ZONE EXPECTED_INSTANCE=$INSTANCE EXPECTED_TOOLCHAIN=$TOOLCHAIN \
 EXPECTED_MACHINE=$MACHINE EXPECTED_HOST_PROFILE=$HOST_PROFILE_NAME \
 REMOTE_CODE_DIR=$REMOTE_CODE_DIR python3 - <<'PY'
@@ -498,7 +499,7 @@ if not all(checks.values()):
     sys.exit(1)
 PY
 
-printf 'First-boot manifest: %s\n' "$FIRST_BOOT_DIR/first-boot-manifest.json"
+printf 'First-boot manifest: %s\n' "$FIRST_BOOT_DIR/first-boot-manifest-$INSTANCE.json"
 printf 'Setup complete for %s (%s) in %s.\n' "$INSTANCE" "$MACHINE" "$ZONE"
 REMOTE_SETUP
 

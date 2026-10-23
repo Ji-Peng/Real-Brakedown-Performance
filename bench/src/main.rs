@@ -296,6 +296,8 @@ fn make_error_report(
         cycles_per_mac: None,
         cpu_mhz_before: None,
         cpu_mhz_after: None,
+        cpu_mhz_source: None,
+        cycles_per_mac_is_nominal: None,
         proof_size_bytes: 0,
         setup_ns: SetupTimes {
             graph_sampling_and_encoding_init_ns: 0,

@@ -31,18 +31,49 @@ for argument in "$@"; do
         --shape) SHAPE_WAS_SET=1 ;;
         -h|--help)
             cat <<'EOF'
-Usage: simd_spielman.sh [common options]
+Usage: simd_spielman.sh [common options] [--max-orion-logn N]
 
 Runs upstream SIMD-Spielman correctness tests and benchmarks from a patched,
 out-of-tree copy. With no --field option, all three fields, both Brakedown and
-Orion shapes, and the Montgomery verifier benchmark are run.
+Orion shapes, and the Montgomery verifier benchmark are run. The upstream test
+suite runs once per host, upstream commit, patch and compiler; later runs reuse
+that recorded pass (recorded in simd_spielman.json as upstream_tests).
 
-Common options: --threads N --logN LIST --runs N --cores LIST --field
+Common options: --threads N --logN LIST --runs N --warmup N --cores LIST --field
 mont127|mers127|fp2m61 --shape brakedown|orion|both --slices table|N --host NAME --out DIR
+
+--threads accepts any T <= 16. Multi-threaded upstream encoders add a
+spin-waiting coordinator thread pinned to the core after the T workers, so
+T=7 on 8 cores is the 8-core point without over-subscription.
+
+--max-orion-logn N  Do not run Orion-shape cases above logN=N; they are written
+                    to simd_spielman_bench.json with status "omitted" and the
+                    reason (upstream Orion graph generation at 2^28 takes more
+                    than 90 min per process, single threaded).
 EOF
             exit 0
             ;;
     esac
+done
+
+# --max-orion-logn is specific to this script; strip it before parse_args.
+MAX_ORION_LOGN=
+_remaining=$#
+while [ "$_remaining" -gt 0 ]; do
+    _argument=$1
+    shift
+    _remaining=$((_remaining - 1))
+    if [ "$_argument" = "--max-orion-logn" ]; then
+        [ "$_remaining" -gt 0 ] || { log_error "Option --max-orion-logn requires an argument"; exit 1; }
+        MAX_ORION_LOGN=$1
+        shift
+        _remaining=$((_remaining - 1))
+        case "$MAX_ORION_LOGN" in
+            ''|*[!0-9]*) log_error "--max-orion-logn must be an integer"; exit 1 ;;
+        esac
+    else
+        set -- "$@" "$_argument"
+    fi
 done
 
 parse_args "$@"
@@ -134,6 +165,14 @@ SKIP_REASON=
 SELECTED_CPU=
 SOURCE_COMMIT=
 PATCH_SHA256=
+UPSTREAM_TESTS_STATUS=not-run
+UPSTREAM_TESTS_MARKER=
+# GNU time gives the peak RSS and wall time of each benchmark process (setup
+# and peak memory); optional, the encode timings do not depend on it.
+TIME_BIN=
+if [ -x /usr/bin/time ] && /usr/bin/time -v true >/dev/null 2>&1; then
+    TIME_BIN=/usr/bin/time
+fi
 TEST_CORES=${HOST_ALLOWED_CORES:-$CORES}
 mkdir -p "$RAW_DIR" "$TARGET_ROOT"
 RUN_ROOT=$(mktemp -d "$TARGET_ROOT/run.XXXXXXXX")
@@ -175,11 +214,17 @@ finalize() {
     SIMD_CXX_FLAGS='-march=native -O3 -funroll-loops -Wno-uninitialized -mavx512f -mavx512vl -mavx512dq; -Wall -faligned-new -g; -lstdc++; SELECTED_CPU compile definition' \
     SIMD_RAW_DIR=$RAW_DIR \
     SIMD_OUTPUT_DIR=$OUT_DIR \
+    SIMD_MAX_ORION_LOGN=$MAX_ORION_LOGN \
+    SIMD_TESTS_STATUS=$UPSTREAM_TESTS_STATUS \
+    SIMD_TESTS_MARKER=$UPSTREAM_TESTS_MARKER \
+    SIMD_TIME_BIN=$TIME_BIN \
     python3 - <<'PY' > "$OUT_DIR/simd_spielman.json"
+import hashlib
 import json
 import os
 import pathlib
 import re
+import sys
 
 raw_dir = pathlib.Path(os.environ.get("SIMD_RAW_DIR", ""))
 output_dir = pathlib.Path(os.environ.get("SIMD_OUTPUT_DIR", ""))
@@ -245,6 +290,17 @@ manifest = {
         ],
     },
     "output_dir": os.environ.get("SIMD_OUTPUT_DIR"),
+    "max_orion_logn": int(os.environ["SIMD_MAX_ORION_LOGN"]) if os.environ.get("SIMD_MAX_ORION_LOGN") else None,
+    "process_resource_tool": os.environ.get("SIMD_TIME_BIN") or None,
+}
+# Correctness evidence for this baseline is the upstream test suite (there is
+# no commit/proof path). Record whether it ran in this invocation or a recorded
+# pass for the same host/commit/patch/compiler was reused.
+tests_log = raw_dir / "upstream-tests.log"
+manifest["upstream_tests"] = {
+    "status": os.environ.get("SIMD_TESTS_STATUS"),
+    "marker": os.path.basename(os.environ.get("SIMD_TESTS_MARKER") or "") or None,
+    "log_sha256": hashlib.sha256(tests_log.read_bytes()).hexdigest() if tests_log.is_file() else None,
 }
 print(json.dumps(manifest, indent=2))
 
@@ -313,8 +369,23 @@ if raw_dir.is_dir():
 
         k = int(m_graph.group(2)) if m_graph else (128 if shape == "orion" else 1 << (log_n // 2))
         slices = int(m_graph.group(3)) if (m_graph and m_graph.group(3)) else 1
-        case = bench_cases.setdefault(case_key, {"field": field, "k": k, "slices": slices, "samples_ns": []})
+        case = bench_cases.setdefault(case_key, {"field": field, "k": k, "slices": slices, "samples_ns": [],
+                                                 "graph_k_printed": m_graph is not None})
         case["samples_ns"].extend(us * 1000 for us in encode_samples_us(content))
+        # Process wall time and peak RSS from GNU time, when it was available.
+        time_path = path.with_suffix(".time")
+        if time_path.is_file():
+            tinfo = time_path.read_text(encoding="utf-8", errors="replace")
+            m_rss = re.search(r"Maximum resident set size \(kbytes\):\s*(\d+)", tinfo)
+            m_wall = re.search(r"Elapsed \(wall clock\) time.*?\):\s*(?:(\d+):)?(\d+):(\d+(?:\.\d+)?)", tinfo)
+            if m_rss:
+                case["peak_rss_bytes"] = int(m_rss.group(1)) * 1024
+            if m_wall:
+                hours = int(m_wall.group(1) or 0)
+                case["process_wall_ns"] = int((hours * 3600 + int(m_wall.group(2)) * 60 + float(m_wall.group(3))) * 1e9)
+            all_samples_us = [int(x) for x in re.findall(r"Encode sample\s+\d+\s*:\s*(\d+)\s*us", content)]
+            if m_wall and all_samples_us:
+                case["setup_ns"] = max(0, case["process_wall_ns"] - sum(all_samples_us) * 1000)
 
     def summarize(samples):
         ordered = sorted(samples)
@@ -333,6 +404,52 @@ if raw_dir.is_dir():
             },
         }
 
+    # Upstream code geometry (SpielmanParams.h / SpielmanCode.h): the matrix
+    # has column_size rows (2^(logN/2) for Brakedown, 128 for Orion); each row
+    # is a message of k = N / column_size elements, encoded recursively by
+    # initExpanders(k) into a codeword of initExpanders(k) elements.
+    SETUP_RESOLUTION_NS = 10_000_000          # GNU time "Elapsed (wall clock)": 0.01 s
+    SETUP_FLOOR_NS = 10 * SETUP_RESOLUTION_NS
+
+    CODE_DISTANCE, ALPHA, R_RATE, CN, DN = 0.07, 0.238, 1.72, 10, 20
+    DISTANCE_THRESHOLD = int(1.0 / CODE_DISTANCE) - 1
+
+    def upstream_levels(n_left, levels):
+        if n_left < DISTANCE_THRESHOLD:
+            return n_left
+        m = int(ALPHA * n_left)
+        level = {"n_i": n_left, "m_i": m, "c_n": CN}
+        levels.append(level)
+        n_prime = upstream_levels(m, levels)
+        m_prime = int(n_left * (R_RATE - 1) - n_prime)
+        level.update({
+            "n_i_prime": n_prime, "m_i_prime": m_prime, "d_n": DN,
+            "precode_edges": n_left * CN, "postcode_edges": n_prime * DN,
+            "total_edges": n_left * CN + n_prime * DN,
+        })
+        return n_left + n_prime + m_prime
+
+    def code_geometry(shape, log_n, k_printed):
+        rows = (1 << (log_n // 2)) if shape == "brakedown" else 128
+        k = (1 << log_n) // rows
+        if k_printed and k_printed != k:
+            # Never expected; keep the printed value so the record stays truthful.
+            print(f"[WARN] upstream printed k={k_printed}, expected {k} for {shape} logN={log_n}", file=sys.stderr)
+            k, rows = k_printed, (1 << log_n) // k_printed
+        levels = []
+        codeword = upstream_levels(k, levels)
+        return rows, k, codeword, levels
+
+    max_orion = os.environ.get("SIMD_MAX_ORION_LOGN")
+    if max_orion and "orion" in os.environ.get("SIMD_REQUESTED_SHAPES", ""):
+        for field_raw in os.environ.get("SIMD_FIELDS", "").replace(",", " ").split():
+            for log_n in [int(x) for x in os.environ.get("SIMD_LOGN", "").split(",") if x]:
+                if log_n > int(max_orion):
+                    bench_cases.setdefault(("orion", field_raw, log_n, int(os.environ.get("SIMD_THREADS", "1"))), {
+                        "field": field_map.get(field_raw, field_raw), "k": 0, "slices": None,
+                        "samples_ns": [], "graph_k_printed": False, "omitted": True})
+
+    tests_status = os.environ.get("SIMD_TESTS_STATUS")
     for (shape, field_raw, log_n, threads), case in sorted(bench_cases.items()):
         field = case["field"]
         k = case["k"]
@@ -340,6 +457,11 @@ if raw_dir.is_dir():
         samples_ns = case["samples_ns"]
         runs = len(samples_ns)
         status = "ok" if runs == int(os.environ.get("SIMD_RUNS", "1")) else "failed"
+        if case.get("omitted"):
+            status = "omitted"
+        rows, k_msg, codeword, levels = code_geometry(shape, log_n, k if case.get("graph_k_printed") else None)
+        total_edges = sum(level["total_edges"] for level in levels)
+        median_ns = summarize(samples_ns)["summary"].get("median_ns") if samples_ns else None
         measurements = {}
         if samples_ns:
             measurements["encode_matrix"] = summarize(samples_ns)
@@ -349,7 +471,6 @@ if raw_dir.is_dir():
             measurements["verifier_encode_2"] = summarize(verifier_samples)
             measurements["verifier_encode"] = summarize(verifier_samples)
 
-        n_per_row = (1 << log_n) // k if k > 0 else 0
         report = {
             "schema_version": "lcpc-bench-v1",
             "implementation": "simd-spielman",
@@ -360,7 +481,10 @@ if raw_dir.is_dir():
             "hash_mode": "none",
             "shape": shape,
             "status": status,
-            "error": None if status == "ok" else f"Expected {os.environ.get('SIMD_RUNS')} timed samples, found {runs}",
+            "error": None if status in ("ok", "omitted") else f"Expected {os.environ.get('SIMD_RUNS')} timed samples, found {runs}",
+            "omission_reason": (f"Orion shape at logN={log_n} not run (--max-orion-logn {max_orion}): upstream "
+                                "Orion graph generation is single-threaded and took more than 90 min per process "
+                                "at logN=28 in the 2026-10 campaign") if status == "omitted" else None,
             "field": field,
             "params": "simd-spielman",
             "log_n": log_n,
@@ -374,27 +498,48 @@ if raw_dir.is_dir():
             "runs": runs,
             "cpu_mhz_before": None,
             "cpu_mhz_after": None,
+            # Derived from upstream's code parameters for this shape and logN
+            # (same layout as This Work's records: n_rows matrix rows, each a
+            # message of n_per_row elements encoded into n_cols elements).
             "dimensions": {
                 "coefficient_count": 1 << log_n,
-                "n_rows": k,
-                "n_per_row": n_per_row,
-                "n_cols": 2 * n_per_row
+                "n_rows": rows,
+                "n_per_row": k_msg,
+                "n_cols": codeword,
             },
-            "recursion_depth": 3,
-            "level_parameters": [],
-            "total_graph_edges": 0,
-            "total_edge_row_macs": 0,
-            "ns_per_mac": None,
+            "recursion_depth": len(levels),
+            "level_parameters": levels,
+            "total_graph_edges": total_edges,
+            "total_edge_row_macs": total_edges * rows,
+            "ns_per_mac": (median_ns / (total_edges * rows)) if (median_ns and total_edges) else None,
             "cycles_per_mac": None,
-            "setup_ns": None,
+            # Wall time of the benchmark process minus all its encode samples
+            # (graph generation, input generation, allocation, output);
+            # GNU time, when available.
+            "setup_ns": {"graph_generation_and_process_overhead_ns": case["setup_ns"]} if "setup_ns" in case else None,
+            "process_wall_ns": case.get("process_wall_ns"),
+            # GNU time prints the elapsed wall clock with 10 ms resolution, so
+            # the derived setup time is only meaningful well above that: values
+            # below the floor (10x the resolution) are kept but flagged, and
+            # they also include process start, input generation and output.
+            "setup_ns_resolution_ns": SETUP_RESOLUTION_NS if "setup_ns" in case else None,
+            "setup_ns_floor_ns": SETUP_FLOOR_NS if "setup_ns" in case else None,
+            "setup_ns_below_floor": (case["setup_ns"] < SETUP_FLOOR_NS) if "setup_ns" in case else None,
+            "setup_ns_method": ("GNU time elapsed wall clock of the benchmark process minus the sum of its "
+                                "printed encode samples (warm-up and timed); includes process start, graph "
+                                "generation, input generation and output") if "setup_ns" in case else None,
             "measurements": measurements,
             "proof_size_bytes": None,
+            # SIMD-Spielman has no commit or proof path; its correctness
+            # evidence is the upstream test suite (see upstream_tests).
             "correctness": {
-                "direct_encode_matches_commit": True,
-                "proof_verifies": True,
-                "evaluation_hex": "n/a"
+                "direct_encode_matches_commit": None,
+                "proof_verifies": None,
+                "evaluation_hex": None,
+                "not_applicable_reason": "encoder-only baseline without commit/proof",
+                "upstream_test_suite": tests_status,
             },
-            "peak_rss_bytes": None,
+            "peak_rss_bytes": case.get("peak_rss_bytes"),
             "perf_stat": None
         }
         bench_reports.append(report)
@@ -527,6 +672,7 @@ TESTS_MARKER="$TARGET_ROOT/upstream-tests-passed-$(hostname)-$UPSTREAM_SHA-$PATC
 if [ -f "$TESTS_MARKER" ]; then
     log_info "Upstream SIMD-Spielman tests already passed on this host with this commit, patch and compiler: $TESTS_MARKER"
     cp "$TESTS_MARKER" "$RAW_DIR/upstream-tests.log"
+    UPSTREAM_TESTS_STATUS=passed-reused-marker
 else
     run_logged test-configure taskset -c "$TEST_CORES" cmake -S "$PATCHED_SOURCE" -B "$TEST_BUILD" \
         "-DPOLY_SIZES=12;14;16" "-DTHREADS=2;4;8;16" "-DCMAKE_CXX_COMPILER=$SIMD_CXX" \
@@ -537,7 +683,9 @@ else
         SIMD_SPIELMAN_SLICE_TABLE="${SIMD_SPIELMAN_SLICE_TABLE:-}" \
         sh -c 'cd "$1" && python3 -u run_tests.py' sh "$PATCHED_SOURCE"
     cp "$RAW_DIR/upstream-tests.log" "$TESTS_MARKER"
+    UPSTREAM_TESTS_STATUS=passed-this-run
 fi
+UPSTREAM_TESTS_MARKER=$TESTS_MARKER
 
 run_logged benchmark-configure taskset -c "$TEST_CORES" cmake -S "$PATCHED_SOURCE" -B "$BENCH_BUILD" \
     "-DPOLY_SIZES=$LOGN_CMAKE" "-DTHREADS=$THREADS" "-DCMAKE_CXX_COMPILER=$SIMD_CXX" \
@@ -559,7 +707,11 @@ run_benchmark() {
     reps=$((WARMUP + RUNS))
     log_file="$RAW_DIR/$name-run-01.log"
     log_info "Running $name: $WARMUP warm-up + $RUNS timed encodings in one process under taskset -c $CORES"
-    if taskset -c "$CORES" env SIMD_SPIELMAN_CORES="$CORES" \
+    set --
+    if [ -n "$TIME_BIN" ]; then
+        set -- "$TIME_BIN" -v -o "$RAW_DIR/$name-run-01.time"
+    fi
+    if "$@" taskset -c "$CORES" env SIMD_SPIELMAN_CORES="$CORES" \
         SIMD_SPIELMAN_SLICES="$SLICE_OVERRIDE" \
         SIMD_SPIELMAN_SLICE_TABLE="${SIMD_SPIELMAN_SLICE_TABLE:-}" \
         "$executable" "$reps" > "$log_file" 2>&1; then
@@ -580,6 +732,10 @@ IFS=' '
 # These lists contain only validated integers or the fixed shape/field tokens.
 for log_n in $LOGN_ITEMS; do
     for shape in $REQUESTED_SHAPES; do
+        if [ "$shape" = orion ] && [ -n "$MAX_ORION_LOGN" ] && [ "$log_n" -gt "$MAX_ORION_LOGN" ]; then
+            log_info "Omitting Orion-shape cases at logN=$log_n (--max-orion-logn $MAX_ORION_LOGN)"
+            continue
+        fi
         for field_name in $FIELD_ITEMS; do
             executable_name="${shape}_spielman_${field_name}_bench_N${log_n}"
             if [ "$THREADS" -gt 1 ]; then

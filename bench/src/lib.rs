@@ -153,6 +153,15 @@ pub struct BenchReport {
     pub cpu_mhz_before: Option<f64>,
     #[serde(default)]
     pub cpu_mhz_after: Option<f64>,
+    /// Where `cpu_mhz_before`/`cpu_mhz_after` (and so `cycles_per_mac`) come
+    /// from; see [`CPU_MHZ_SOURCE`].
+    #[serde(default)]
+    pub cpu_mhz_source: Option<String>,
+    /// Always `true` when `cycles_per_mac` is present: it is derived from the
+    /// `/proc/cpuinfo` MHz snapshot of [`CPU_MHZ_SOURCE`], not from a cycle
+    /// counter or the pinned core's measured clock.
+    #[serde(default)]
+    pub cycles_per_mac_is_nominal: Option<bool>,
     #[serde(default)]
     pub proof_size_bytes: usize,
     pub setup_ns: SetupTimes,
@@ -439,7 +448,15 @@ where
         .collect()
 }
 
-/// Reads current CPU MHz from /proc/cpuinfo if available.
+/// Provenance of [`get_cpu_mhz`], recorded with every report that carries a
+/// frequency. The value is one snapshot of the first `cpu MHz` entry of
+/// `/proc/cpuinfo` (CPU 0, not necessarily the pinned benchmark core); on
+/// guests without cpufreq (e.g. GCP) it is the constant nominal frequency.
+pub const CPU_MHZ_SOURCE: &str =
+    "/proc/cpuinfo first 'cpu MHz' entry (CPU 0), one snapshot before and one after the timed runs; \
+     nominal, not the pinned core's measured clock";
+
+/// Reads current CPU MHz from /proc/cpuinfo if available (see [`CPU_MHZ_SOURCE`]).
 pub fn get_cpu_mhz() -> Option<f64> {
     if let Ok(content) = fs::read_to_string("/proc/cpuinfo") {
         for line in content.lines() {
@@ -872,6 +889,8 @@ where
         total_edge_row_macs,
         ns_per_mac,
         cycles_per_mac,
+        cpu_mhz_source: cpu_mhz_before.or(cpu_mhz_after).map(|_| CPU_MHZ_SOURCE.to_owned()),
+        cycles_per_mac_is_nominal: cycles_per_mac.map(|_| true),
         cpu_mhz_before,
         cpu_mhz_after,
         proof_size_bytes,
@@ -988,6 +1007,8 @@ pub fn run_ligero_rs_benchmark(
         total_edge_row_macs: 0,
         ns_per_mac: 0.0,
         cycles_per_mac: None,
+        cpu_mhz_source: cpu_mhz_before.or(cpu_mhz_after).map(|_| CPU_MHZ_SOURCE.to_owned()),
+        cycles_per_mac_is_nominal: None,
         cpu_mhz_before,
         cpu_mhz_after,
         proof_size_bytes: 0,

@@ -52,7 +52,12 @@ Orchestrates a complete benchmark session on a Google Cloud VM per plan 06 §6 i
   2. Syncs code/ and verifies first-boot checks via setup_vm.sh.
   3. Launches reproduce/all.sh with the chosen profile inside nohup remotely.
   4. Polls log output until completion (safe against dropped SSH connections).
-  5. Copies results/ back to local code/results/.
+  5. Copies back to code/results/ only what this all.sh run wrote: its stage
+     dir, the session-level schedule.json/failed_blocks.tsv and the output
+     dirs of the blocks it ran (from the stage's copyback.tsv; never other run
+     dirs or sessions on the VM), plus this VM's per-instance host-profile and
+     first-boot records. A local copy of a re-run block is moved to the same
+     <block>.prev-<UTC> name the VM used, so local and remote layouts agree.
   6. ALWAYS stops the VM on exit (via trap EXIT INT TERM) to minimize costs,
      and prints a reminder to delete the VM when all sessions finish.
 
@@ -65,10 +70,11 @@ Options:
   --remote-dir PATH        Remote checkout directory (default: ~/RealBrakedownPerf/code)
   --seed INT               Random seed for block interleaving order
   --skip-sync              Skip setup_vm.sh code sync
-  --blocks/--logn/--warmup/--lcpc-variants ARG
+  --blocks/--logn/--warmup/--lcpc-variants/--stage/--run-date ARG
                            Passed to all.sh to run one stage of a staged campaign
-  --keep-running           Leave the VM running after a successful stage (the caller
-                           starts the next stage and stops the VM)
+  --keep-running           Leave the VM running when this script exits, whatever the
+                           outcome (the caller starts the next stage and stops the VM);
+                           the exit status is still that of the stage
   -h, --help               Show this help message
 
 If gcloud is not on PATH, set GCLOUD to
@@ -113,7 +119,7 @@ while [ "$#" -gt 0 ]; do
             SEED=$2
             shift 2
             ;;
-        --blocks|--logn|--warmup|--lcpc-variants)
+        --blocks|--logn|--warmup|--lcpc-variants|--stage|--run-date)
             [ "$#" -ge 2 ] || { log_error "$1 requires an argument"; exit 2; }
             STAGE_ARGS="$STAGE_ARGS $1 '$2'"
             shift 2
@@ -200,7 +206,7 @@ cleanup() {
     printf '\n'
     if [ "$KEEP_RUNNING" -eq 1 ]; then
         log_info "Stage finished (exit $_rc); VM '$INSTANCE' left running for the next stage (--keep-running)."
-        exit 0
+        exit "$_rc"
     fi
     log_info "Cost-minimization rule: stopping VM '$INSTANCE' in zone '$ZONE'..."
     "$GCLOUD" compute instances stop "$INSTANCE" --zone="$ZONE" --quiet >/dev/null 2>&1 || true
@@ -276,10 +282,11 @@ REMOTE_DIR_ACTUAL=${REMOTE_CODE_DIR:-~/RealBrakedownPerf/code}
 REMOTE_LOG="/tmp/rbd-session-${SESSION_ID}.log"
 REMOTE_STATUS="/tmp/rbd-session-${SESSION_ID}.status"
 REMOTE_PID="/tmp/rbd-session-${SESSION_ID}.pid"
+REMOTE_COPYBACK="/tmp/rbd-session-${SESSION_ID}.copyback"
 
 log_info "Clearing remote status markers..."
 "$GCLOUD" compute ssh "$INSTANCE" --zone="$ZONE" \
-    --command "rm -f '$REMOTE_LOG' '$REMOTE_STATUS' '$REMOTE_PID'"
+    --command "rm -f '$REMOTE_LOG' '$REMOTE_STATUS' '$REMOTE_PID' '$REMOTE_COPYBACK'"
 
 if [ "$MACHINE" = c3d ]; then REMOTE_HOST_PROFILE=gcp-c3d-highmem-16; else REMOTE_HOST_PROFILE=gcp-c4a-highmem-16; fi
 REMOTE_ALL_ARGS="--profile $PROFILE --session $SESSION_ID --host $REMOTE_HOST_PROFILE"
@@ -288,7 +295,7 @@ if [ -n "$SEED" ]; then
 fi
 REMOTE_ALL_ARGS="$REMOTE_ALL_ARGS$STAGE_ARGS"
 
-RUN_CMD="cd '$REMOTE_DIR_ACTUAL' && . \"\$HOME/.cargo/env\" && ./reproduce/all.sh $REMOTE_ALL_ARGS > '$REMOTE_LOG' 2>&1; echo \$? > '$REMOTE_STATUS'"
+RUN_CMD="cd '$REMOTE_DIR_ACTUAL' && . \"\$HOME/.cargo/env\" && RBD_COPYBACK_FILE='$REMOTE_COPYBACK' ./reproduce/all.sh $REMOTE_ALL_ARGS > '$REMOTE_LOG' 2>&1; echo \$? > '$REMOTE_STATUS'"
 
 log_info "Launching remote benchmark campaign via nohup..."
 # POSIX sh has no printf %q: ship the command as a remote script over stdin.
@@ -323,13 +330,138 @@ done
 
 log_info "Remote campaign process completed with exit code $SESSION_EXIT_CODE."
 
-# 6. Copy results back to local code/results/
-log_info "Copying results back to local directory..."
+# 6. Copy results back to local code/results/: only what this all.sh run
+# wrote (listed in its stage's copyback.tsv, see reproduce/all.sh) and this
+# VM's per-instance evidence files, never other run dirs or sessions that may
+# be on the VM's disk (stale or invalid runs, other sessions' copies).
+log_info "Copying this stage's results back to the local directory..."
 mkdir -p "$CODE_DIR/results"
-"$GCLOUD" compute scp --recurse --zone="$ZONE" \
-    "$INSTANCE:$REMOTE_DIR_ACTUAL/results/*" "$CODE_DIR/results/" || {
-    log_warn "Some results failed to copy back from $INSTANCE."
+COPY_FAILED=0
+COPYBACK_LIST=$("$GCLOUD" compute ssh "$INSTANCE" --zone="$ZONE" --command \
+    "f=\$(cat '$REMOTE_COPYBACK' 2>/dev/null) && cat \"\$f\"" 2>/dev/null | tr -d '\r') || COPYBACK_LIST=""
+if [ -z "$COPYBACK_LIST" ]; then
+    log_warn "all.sh wrote no copy-back list ($REMOTE_COPYBACK); nothing copied. The results stay on the VM."
+    COPY_FAILED=1
+fi
+
+safe_rel_path() {
+    case "$1" in
+        ''|-|*[!A-Za-z0-9._/-]*|/*|*..*) return 1 ;;
+    esac
+    return 0
 }
+copy_remote() {
+    # $1: path relative to results/; copied into the same place locally.
+    _local_parent="$CODE_DIR/results/$(dirname -- "$1")"
+    mkdir -p "$_local_parent"
+    "$GCLOUD" compute scp --recurse --zone="$ZONE" \
+        "$INSTANCE:$REMOTE_DIR_ACTUAL/results/$1" "$_local_parent/" || COPY_FAILED=1
+}
+
+# The session-level schedule.json is append-only. A session may have run
+# stages on more than one VM, so merge the VM's stage entries into the local
+# file (same stage tag: the VM's entry wins) instead of overwriting it.
+merge_session_schedule() {
+    _incoming=$(mktemp -d "${TMPDIR:-/tmp}/rbd-schedule.XXXXXX") || { COPY_FAILED=1; return; }
+    if "$GCLOUD" compute scp --zone="$ZONE" \
+        "$INSTANCE:$REMOTE_DIR_ACTUAL/results/$1" "$_incoming/schedule.json"; then
+        mkdir -p "$CODE_DIR/results/$(dirname -- "$1")"
+        python3 - "$_incoming/schedule.json" "$CODE_DIR/results/$1" <<'PY' || COPY_FAILED=1
+import json, os, sys
+incoming_path, local_path = sys.argv[1], sys.argv[2]
+with open(incoming_path, encoding="utf-8") as f:
+    incoming = json.load(f)
+try:
+    with open(local_path, encoding="utf-8") as f:
+        local = json.load(f)
+except (OSError, ValueError):
+    local = None
+if isinstance(local, dict) and "stages" in local and "stages" in incoming:
+    tags = {e.get("stage") for e in incoming["stages"]}
+    kept = [e for e in local["stages"] if e.get("stage") not in tags]
+    incoming["stages"] = sorted(kept + incoming["stages"], key=lambda e: (e.get("started_utc") or "", e.get("stage") or ""))
+    for p in local.get("profiles", []):
+        if p not in incoming.setdefault("profiles", []):
+            incoming["profiles"].append(p)
+    if "legacy_schedule" in local:
+        incoming.setdefault("legacy_schedule", local["legacy_schedule"])
+elif isinstance(local, dict) and "stages" not in local:
+    incoming.setdefault("legacy_schedule", local)
+tmp = local_path + ".tmp"
+with open(tmp, "w", encoding="utf-8") as f:
+    json.dump(incoming, f, indent=2)
+    f.write("\n")
+os.replace(tmp, local_path)
+PY
+    else
+        COPY_FAILED=1
+    fi
+    rm -rf "$_incoming"
+}
+
+TAB=$(printf '\t')
+COPYBACK_FILE_LOCAL=$(mktemp "${TMPDIR:-/tmp}/rbd-copyback.XXXXXX") || exit 1
+printf '%s\n' "$COPYBACK_LIST" > "$COPYBACK_FILE_LOCAL"
+while IFS="$TAB" read -r kind rel prev exists; do
+    [ -n "$kind" ] || continue
+    if ! safe_rel_path "$rel"; then
+        log_warn "Skipping unexpected copy-back path: $rel"
+        COPY_FAILED=1
+        continue
+    fi
+    case "$kind" in
+        session)
+            mkdir -p "$CODE_DIR/results/$rel"
+            ;;
+        file)
+            case "$rel" in
+                */schedule.json) merge_session_schedule "$rel" ;;
+                *) copy_remote "$rel" ;;
+            esac
+            ;;
+        stage)
+            copy_remote "$rel"
+            ;;
+        block)
+            local_block="$CODE_DIR/results/$rel"
+            if [ -e "$local_block" ]; then
+                # The VM moved its earlier copy of this block to $prev; do
+                # the same here (or use a local .prev- name) before copying.
+                if safe_rel_path "$prev" && [ ! -e "$CODE_DIR/results/$prev" ]; then
+                    local_prev="$CODE_DIR/results/$prev"
+                else
+                    local_prev="$local_block.prev-local-$(date -u +%Y%m%dT%H%M%SZ)"
+                fi
+                mv "$local_block" "$local_prev" || { COPY_FAILED=1; continue; }
+                log_info "Moved local $(basename "$local_block") to $(basename "$local_prev")"
+            elif safe_rel_path "$prev" && [ ! -e "$CODE_DIR/results/$prev" ]; then
+                copy_remote "$prev"
+            fi
+            if [ "$exists" = 1 ]; then
+                copy_remote "$rel"
+            fi
+            ;;
+        *)
+            log_warn "Unknown copy-back entry: $kind"
+            ;;
+    esac
+done < "$COPYBACK_FILE_LOCAL"
+rm -f "$COPYBACK_FILE_LOCAL"
+
+# This VM's per-instance evidence files.
+REMOTE_EVIDENCE=$("$GCLOUD" compute ssh "$INSTANCE" --zone="$ZONE" --command \
+    "cd '$REMOTE_DIR_ACTUAL/results' 2>/dev/null && ls -d '$REMOTE_HOST_PROFILE'/host-profile-'$INSTANCE'.json '$REMOTE_HOST_PROFILE'/first-boot-manifest-'$INSTANCE'.json 2>/dev/null || true" | tr -d '\r') || REMOTE_EVIDENCE=""
+for remote_path in $REMOTE_EVIDENCE; do
+    if safe_rel_path "$remote_path"; then
+        copy_remote "$remote_path"
+    else
+        log_warn "Skipping unexpected remote path: $remote_path"
+    fi
+done
+if [ "$COPY_FAILED" -ne 0 ]; then
+    log_warn "Some results failed to copy back from $INSTANCE."
+    [ "$SESSION_EXIT_CODE" -ne 0 ] || SESSION_EXIT_CODE=1
+fi
 
 if [ "$SESSION_EXIT_CODE" -ne 0 ]; then
     log_error "Remote session $SESSION_ID failed with exit code $SESSION_EXIT_CODE."
@@ -338,6 +470,6 @@ fi
 
 log_info "=========================================================="
 log_info "Session $SESSION_ID finished successfully!"
-log_info "Results copied to: $CODE_DIR/results/"
+log_info "Results copied to: $CODE_DIR/results/$(printf '%s\n' "$COPYBACK_LIST" | awk -F '\t' '$1 == "session" { print $2; exit }')"
 log_info "=========================================================="
 exit 0

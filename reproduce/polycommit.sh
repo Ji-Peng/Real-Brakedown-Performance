@@ -150,6 +150,10 @@ DRIVER_BINARY="$TARGET_DIR/release/polycommit-bench-driver"
     log_error "Expected benchmark binary not found: $DRIVER_BINARY"
     exit 1
 }
+# Record the rustflags Cargo actually used (Cargo defaults: none, so generic
+# x86-64 codegen with auto-vectorization on), from the build fingerprint.
+POLY_EFFECTIVE_RUSTFLAGS_JSON=$(cargo_fingerprint_rustflags "$TARGET_DIR/release" polycommit-bench-driver)
+log_info "PolyCommit effective rustflags: $POLY_EFFECTIVE_RUSTFLAGS_JSON"
 
 log_info "Checking arkworks linear-encoder correctness at logN=$LOGN"
 taskset -c "$CORES" "$DRIVER_BINARY" \
@@ -178,9 +182,12 @@ POLY_REFERENCE_FIELD="$REFERENCE_FIELD" \
 POLY_PATCH_SHA="$PATCH_SHA256" \
 POLY_SEC_PARAM="$SEC_PARAM" \
 POLYCOMMIT_COMMIT="$POLYCOMMIT_COMMIT" \
+POLY_EFFECTIVE_RUSTFLAGS_JSON="$POLY_EFFECTIVE_RUSTFLAGS_JSON" \
 python3 - <<'PY'
 import json
 import os
+
+flags = json.loads(os.environ["POLY_EFFECTIVE_RUSTFLAGS_JSON"])
 
 extra = {
     "baseline": {
@@ -203,6 +210,15 @@ extra = {
             "comparison_note": "Matches LCPC Mont127; arkworks sec_param=80 is used for column openings because the 127-bit field cannot satisfy default 128-bit soundness.",
         },
         "parameters": "patched BrakedownPCParams::with_dims; default code constants; explicit square matrix",
+        "code_parameters_note": "arkworks' default Brakedown code constants, not LCPC sdig6: the codeword per row is shorter than This Work/LCPC sdig6 at the same N (see the per-record dimensions)",
+        "build": {
+            "cwd": "/ (code/.cargo/config.toml and its rustc-wrapper do not apply)",
+            "cargo_profile": "release",
+            "effective_rustflags": " ".join(flags),
+            "effective_rustflags_source": "Cargo fingerprint of the built polycommit-bench-driver binary",
+            "auto_vectorization": "disabled" if "no-vectorize-loops" in flags else "enabled (Cargo default)",
+            "target_cpu": "native" if "target-cpu=native" in flags else "Cargo default (generic for the host triple)",
+        },
         "measurement_scope": "linear-code encoding of all coefficient-matrix rows; setup and input generation separate",
         "hashing": "not invoked; private marker hash types only instantiate arkworks generics",
         "logN": [int(value) for value in os.environ["POLY_LOGN"].split(",")],
@@ -222,5 +238,7 @@ LCPC_COMMIT=""
 PARAMS="polycommit-brakedown-square"
 FIELD="Mont127"
 SLICES="not-applicable"
+MANIFEST_RUST_OVERRIDES_JSON="{\"effective_rustflags\": $POLY_EFFECTIVE_RUSTFLAGS_JSON, \"rustflags_source\": \"Cargo fingerprint (built from /, code/.cargo/config.toml not applied)\", \"cargo_rustc_wrapper\": null}"
+export MANIFEST_RUST_OVERRIDES_JSON
 write_manifest "$DEST/manifest.json" "$EXTRA_FILE"
 log_info "PolyCommit raw JSON and manifest written under $DEST"

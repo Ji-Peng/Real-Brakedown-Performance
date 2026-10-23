@@ -99,6 +99,78 @@ load_host_profile() {
     fi
 }
 
+# Name of the machine instance, used to key per-VM evidence files (host
+# profile, first-boot manifest) so that two VMs of the same machine type never
+# overwrite each other's records. On GCP this is the instance name from the
+# guest metadata server; elsewhere the short host name. The metadata server is
+# addressed by its link-local IP (not metadata.google.internal) so that the
+# short timeout also bounds the lookup on non-GCP hosts (no DNS resolution).
+host_instance_name() {
+    _instance=$(python3 - <<'PY' 2>/dev/null || true
+import os, urllib.request
+host = os.environ.get("GCE_METADATA_HOST", "169.254.169.254")
+req = urllib.request.Request(f"http://{host}/computeMetadata/v1/instance/name",
+                             headers={"Metadata-Flavor": "Google"})
+try:
+    with urllib.request.urlopen(req, timeout=0.3) as response:
+        print(response.read().decode("utf-8", errors="replace").strip())
+except Exception:
+    pass
+PY
+)
+    if [ -z "$_instance" ]; then
+        _instance=$(hostname -s 2>/dev/null || echo unknown-host)
+    fi
+    # Keep the name safe for use in file names.
+    printf '%s\n' "$_instance" | tr -c 'A-Za-z0-9._\n-' '_'
+}
+
+# Print the rustflags that the fork's committed .cargo/config.toml applies on
+# this host (space separated). Cargo uses target.<host-triple>.rustflags when
+# present and otherwise build.rustflags (the two are not merged), so on x86_64
+# this includes target-cpu=native and on aarch64 only the no-vectorize flags.
+fork_config_rustflags() {
+    FORK_CONFIG="$CODE_DIR/.cargo/config.toml" python3 - <<'PY'
+import os, subprocess, sys
+try:
+    import tomllib
+except ImportError:
+    sys.exit("python3 >= 3.11 (tomllib) is required to read .cargo/config.toml")
+host = None
+out = subprocess.run(["rustc", "-vV"], capture_output=True, text=True, check=True).stdout
+for line in out.splitlines():
+    if line.startswith("host:"):
+        host = line.split(":", 1)[1].strip()
+with open(os.environ["FORK_CONFIG"], "rb") as f:
+    config = tomllib.load(f)
+# Cargo also applies (and joins) [target.'cfg(...)'] rustflags; this reader
+# does not evaluate cfg() expressions, so refuse rather than report wrong flags.
+cfg_sections = [k for k in config.get("target", {}) if k.startswith("cfg(")]
+if cfg_sections:
+    sys.exit(f"fork .cargo/config.toml has [target.'cfg(...)'] sections {cfg_sections}; "
+             "fork_config_rustflags (reproduce/common.sh) must be extended to evaluate them")
+flags = config.get("target", {}).get(host, {}).get("rustflags")
+if flags is None:
+    flags = config.get("build", {}).get("rustflags", [])
+print(" ".join(flags))
+PY
+}
+
+# Print the rustflags Cargo actually used for a built binary, read from the
+# Cargo fingerprint of that binary (newest one if several exist), as a JSON
+# list. Arguments: <target-dir>/<profile-dir> and the binary name.
+cargo_fingerprint_rustflags() {
+    FP_PROFILE_DIR="$1" FP_BIN="$2" python3 - <<'PY'
+import glob, json, os, sys
+pattern = os.path.join(os.environ["FP_PROFILE_DIR"], ".fingerprint", "*", "bin-" + os.environ["FP_BIN"] + ".json")
+paths = sorted(glob.glob(pattern), key=os.path.getmtime)
+if not paths:
+    sys.exit(f"no Cargo fingerprint matches {pattern}")
+with open(paths[-1], "r", encoding="utf-8") as f:
+    print(json.dumps(json.load(f).get("rustflags", [])))
+PY
+}
+
 # Helper to expand a core list (e.g. "0,1,3-7") into space-separated integers
 expand_cores() {
     _raw_cores="${1:-}"
@@ -438,7 +510,7 @@ cache_topology = list(cache_instances.values())
 # GCP instance identity is available from the guest metadata server. Local runs
 # keep these fields null and remain explicitly marked by their host profile.
 def gce_metadata(path):
-    host = os.environ.get("GCE_METADATA_HOST", "metadata.google.internal")
+    host = os.environ.get("GCE_METADATA_HOST", "169.254.169.254")
     req = urllib.request.Request(
         f"http://{host}/computeMetadata/v1/{path}",
         headers={"Metadata-Flavor": "Google"},
@@ -547,6 +619,9 @@ if effective_rustflags is None and cargo_config_raw:
             configured_flags = cargo_config.get("build", {}).get("rustflags")
         effective_rustflags = configured_flags
         rustflags_source = f"{cargo_config_path} target={rustc_host}"
+        cfg_sections = [k for k in cargo_config.get("target", {}) if k.startswith("cfg(")]
+        if cfg_sections:
+            rustflags_source += f" (WARNING: [target.'cfg(...)'] sections {cfg_sections} not evaluated)"
     except Exception:
         rustflags_source = f"{cargo_config_path} (raw config retained; TOML parse unavailable)"
 
@@ -603,6 +678,17 @@ rust_info = {
     "cargo_rustc_wrapper": cargo_config.get("build", {}).get("rustc-wrapper") if "cargo_config" in locals() else None,
     "cargo_config_raw": cargo_config_raw
 }
+# Scripts that build outside code/ (baselines built with Cargo defaults) are
+# not subject to code/.cargo/config.toml; they pass the flags they actually
+# used (e.g. from the Cargo fingerprint) so the manifest records the truth.
+rust_overrides = os.environ.get("MANIFEST_RUST_OVERRIDES_JSON", "")
+if rust_overrides:
+    rust_info.update(json.loads(rust_overrides))
+    # The fork's config did not apply to such a build: keep its text only
+    # under a name that says so, never as this build's cargo_config_raw.
+    if rust_info.get("cargo_config_raw") is not None:
+        rust_info["fork_cargo_config_raw_not_applied"] = rust_info["cargo_config_raw"]
+        rust_info["cargo_config_raw"] = None
 
 # 7. Compilers for SIMD-Spielman
 simd_compilers = {

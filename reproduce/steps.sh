@@ -25,6 +25,7 @@ OUT="$CODE_DIR/results"
 HOST_NAME=$(hostname -s 2>/dev/null || echo generic)
 TIMEOUT_SEC=1800
 RUN_CLASS="campaign"
+MODE=both
 
 usage() {
     cat <<EOF
@@ -33,6 +34,9 @@ Usage: $0 [options]
 Runs E3 at step/01-modernize through HEAD with the external steps-driver.
 Options:
   --tags <list>       Comma-separated tags (default: all step/* tags, then HEAD)
+  --mode a|b|both     Mode (a) lcpc-sdig6 Mont127 (Ft127 at step/01-modernize),
+                      mode (b) simd-spielman Mers127 (N/A before step/04-r2l), or
+                      both (default). Campaign blocks run one mode each.
   --logN <list>       Even log2(N) values (default: 16,20,24,28)
   --runs <n>          Timed runs (default: 5)
   --warmup <n>        Warm-ups (default: 2; automatically 1 for logN >= 26)
@@ -50,6 +54,7 @@ EOF
 while [ $# -gt 0 ]; do
     case "$1" in
         --tags) [ $# -ge 2 ] || { echo "--tags requires a value" >&2; exit 2; }; SPECIFIC_TAGS=$2; shift 2 ;;
+        --mode) [ $# -ge 2 ] || { echo "--mode requires a value" >&2; exit 2; }; MODE=$2; shift 2 ;;
         --logN) [ $# -ge 2 ] || { echo "--logN requires a value" >&2; exit 2; }; LOGN=$2; shift 2 ;;
         --runs) [ $# -ge 2 ] || { echo "--runs requires a value" >&2; exit 2; }; RUNS=$2; shift 2 ;;
         --warmup) [ $# -ge 2 ] || { echo "--warmup requires a value" >&2; exit 2; }; WARMUP_OVERRIDE=$2; shift 2 ;;
@@ -64,6 +69,15 @@ while [ $# -gt 0 ]; do
         *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
     esac
 done
+
+case "$MODE" in
+    a|b|both) ;;
+    *) echo "--mode must be a, b or both" >&2; exit 2 ;;
+esac
+RUN_MODE_A=0
+RUN_MODE_B=0
+case "$MODE" in a|both) RUN_MODE_A=1 ;; esac
+case "$MODE" in b|both) RUN_MODE_B=1 ;; esac
 
 if [ "$THREADS" != "1" ]; then
     echo "E3 is fixed at T=1; --threads only accepts 1" >&2
@@ -164,7 +178,7 @@ cleanup_worktree() {
 }
 trap cleanup_worktree EXIT HUP INT TERM
 
-echo "[steps] E3 per-tag comparison; T=1; logN=$LOGN; runs=$RUNS; cores=$CORES"
+echo "[steps] E3 per-tag comparison; mode=$MODE; T=1; logN=$LOGN; runs=$RUNS; cores=$CORES"
 echo "[steps] Same timing loop: steps-driver-v1; run class: $RUN_CLASS"
 echo "[steps] Output: $DEST"
 echo "[steps] CARGO_TARGET_DIR: $TARGET_ROOT"
@@ -393,13 +407,17 @@ for TAG in $TAGS_TO_RUN; do
         runtime-adaptive) MODE_A_ADAPTER=runtime-adaptive.rs ;;
     esac
 
-    prepare_driver a "$MODE_A_FIELD_TYPE" "$MODE_A_FIELD_NAME" "$MODE_A_ADAPTER" "$MODE_A_MANIFEST"
-    ADAPTER_VERSION=$(grep '^pub const ADAPTER_VERSION:' "$DRIVER_SRC/src/adapters/$MODE_A_ADAPTER" | sed 's/.*= "\([^"]*\)";.*/\1/')
-    DRIVER_FIELD_NAME=$MODE_A_FIELD_NAME
-    PARAMS_NAME=lcpc-sdig6
-    for LOG_N_VALUE in $LOGN_LIST; do run_configuration a "$LOG_N_VALUE" || exit 1; done
+    if [ "$RUN_MODE_A" -eq 1 ]; then
+        prepare_driver a "$MODE_A_FIELD_TYPE" "$MODE_A_FIELD_NAME" "$MODE_A_ADAPTER" "$MODE_A_MANIFEST"
+        ADAPTER_VERSION=$(grep '^pub const ADAPTER_VERSION:' "$DRIVER_SRC/src/adapters/$MODE_A_ADAPTER" | sed 's/.*= "\([^"]*\)";.*/\1/')
+        DRIVER_FIELD_NAME=$MODE_A_FIELD_NAME
+        PARAMS_NAME=lcpc-sdig6
+        for LOG_N_VALUE in $LOGN_LIST; do run_configuration a "$LOG_N_VALUE" || exit 1; done
+    fi
 
-    if [ "$MODE_B_AVAILABLE" -eq 1 ]; then
+    if [ "$RUN_MODE_B" -eq 0 ]; then
+        :
+    elif [ "$MODE_B_AVAILABLE" -eq 1 ]; then
         MODE_B_FIELD_TYPE=lcpc_fields::Mers127
         MODE_B_FIELD_NAME=Mers127
         MODE_B_MANIFEST=fields
@@ -432,11 +450,25 @@ for TAG in $TAGS_TO_RUN; do
     STEP_TAG="$TAG" STEP_COMMIT="$TAG_COMMIT" STEP_SUBJECT="$TAG_SUBJECT" \
     STEP_STAGE="$API_STAGE" STEP_TEST_LOG="$TEST_LOG" STEP_CODEGEN="$STEP_DEST/codegen_report.json" \
     STEP_INDEX="$STEP_INDEX" STEP_RUN_CLASS="$RUN_CLASS" \
-    STEP_SESSION_ID="$SESSION_ID" \
+    STEP_SESSION_ID="$SESSION_ID" STEP_MODE_A_FIELD="$MODE_A_FIELD_NAME" STEP_MODE="$MODE" \
     python3 - <<'PY'
 import json
 import os
 
+# A codegen PASS is only evidence of scalar hot kernels when the checker
+# matched hot-kernel symbols; early steps (before the column-major kernels
+# existed) match none or few, so state that instead of a bare PASS.
+codegen_note = None
+try:
+    with open(os.environ["STEP_CODEGEN"], encoding="utf-8") as f:
+        codegen = json.load(f)
+    checked = codegen.get("hot_kernels_checked")
+    if checked == 0:
+        codegen_note = "no hot-kernel symbols matched the checker's patterns; scalar codegen is not established for this step"
+    elif os.environ["STEP_STAGE"] in ("rowwise", "batched"):
+        codegen_note = f"non-strict check (pre-runtime API); {checked} hot-kernel symbols matched"
+except (OSError, ValueError):
+    codegen_note = "codegen report unreadable"
 manifest = {
     "schema_version": "steps-tag-manifest-v1",
     "harness_version": "steps-driver-v1",
@@ -450,6 +482,10 @@ manifest = {
     "watermark": "LOCAL SMOKE — NOT A RESULT" if os.environ["STEP_RUN_CLASS"] == "local-smoke-not-a-result" else None,
     "workspace_tests": os.environ["STEP_TEST_LOG"],
     "codegen_report": os.environ["STEP_CODEGEN"],
+    "codegen_note": codegen_note,
+    "modes_run": os.environ["STEP_MODE"],
+    # Only a run that included mode (a) has a mode (a) field.
+    "mode_a_field": os.environ["STEP_MODE_A_FIELD"] if os.environ["STEP_MODE"] in ("a", "both") else None,
 }
 with open(os.environ["TAG_MANIFEST"], "w", encoding="utf-8") as output:
     json.dump(manifest, output, indent=2)
@@ -465,7 +501,7 @@ RUN_MANIFEST="$DEST/manifest.json" \
 RUN_ID_VALUE="$RUN_ID" RUN_SESSION_ID="$SESSION_ID" RUN_HOST="$HOST_NAME" RUN_CORES="$CORES" RUN_CORE_LIST="$CORE_LIST" \
 RUN_LOGN="$LOGN" RUNS_VALUE="$RUNS" WARMUP_OVERRIDE_VALUE="$WARMUP_OVERRIDE" \
 RUN_TIMEOUT="$TIMEOUT_SEC" RUN_CLASS_VALUE="$RUN_CLASS" RUN_TARGET_ROOT="$TARGET_ROOT" \
-RUN_TAGS="$TAGS_TO_RUN" RUN_SOURCE_SHA="$CODE_SHA" RUN_SIMD_DIR="$TV_DIR" \
+RUN_TAGS="$TAGS_TO_RUN" RUN_SOURCE_SHA="$CODE_SHA" RUN_SIMD_DIR="$TV_DIR" RUN_MODE_VALUE="$MODE" \
 python3 - <<'PY'
 import glob
 import json
@@ -500,6 +536,7 @@ manifest = {
     "machine": {"platform": platform.platform(), "uname": platform.uname()._asdict()},
     "configuration": {
         "modes": {"a": "lcpc-sdig6 / Mont127 (Ft127 at step/01-modernize)", "b": "simd-spielman / Mers127 from step/04-r2l"},
+        "modes_run": os.environ["RUN_MODE_VALUE"],
         "threads": 1,
         "log_n": os.environ["RUN_LOGN"],
         "runs": int(os.environ["RUNS_VALUE"]),
