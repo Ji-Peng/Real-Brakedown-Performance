@@ -227,6 +227,8 @@ The strict check (`--check`) fails on
 `reproduce/all.sh` (Arm is not run locally, and the smoke subset omits the campaign's larger field measurements).
 Run `python3 scripts/analyze.py --self-test` to check the missing-cell rules.
 
+The committed campaign results store each `codegen_report.json` (about 18 MB of disassembly listings) xz-compressed as `codegen_report.json.xz` (`xz -9`; 2.5 GB down to about 90 MB); `analyze.py` reads `*.json.xz` like `*.json`, and `xz -dk <file>` restores the original byte for byte. New runs still write plain `codegen_report.json`.
+
 Outputs (under `--out-dir`):
 - **CSV** (`csv/`) and **LaTeX** (`latex/`): `table_T0_correctness`, `table_T1_headline_encoding`, `table_T2_simd_spielman`, `table_T3_steps_breakdown`, `table_T4_slice_sweep`, `table_T5_field_comparison`, `table_T6_pcs_breakdown`, `table_T7_verifier_encoding`, `table_T8_setup_memory`, `table_T9_orion_shape`, `table_T10_brakedown_vs_rs`, `table_T11_codegen_evidence`, `table_T12_arm_portability` (`.csv` / `.tex`).
 - **Figures** (`plots/`): `figure_F1_steps_breakdown`, `figure_F2_llc_scaling`, `figure_F3_thread_scaling` (`.pdf` and `.png`).

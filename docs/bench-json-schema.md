@@ -102,3 +102,7 @@ are the union of their cartesian products) lists the rows each table must contai
 `scripts/analyze.py --selection results/selection.json` refuses records that
 the selection does not cover. The campaign record in `docs/STATUS.md` (§7)
 explains every exclusion.
+
+## Compressed records
+
+`analyze.py` reads any `<name>.json.xz` as `<name>.json`. The committed campaign results use this for the large codegen reports (`codegen_report.json.xz`, `xz -9`); the record schema is unchanged.

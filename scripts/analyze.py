@@ -55,6 +55,7 @@ import fnmatch
 import glob
 import hashlib
 import json
+import lzma
 import math
 import os
 import re
@@ -797,11 +798,17 @@ class BenchmarkAnalyzer:
                     if fname == "failed_blocks.tsv":
                         self._load_failed_blocks(os.path.join(dirpath, fname))
                         continue
-                    if not fname.endswith(".json"):
+                    # Large records (codegen reports) are committed xz-compressed
+                    # as <name>.json.xz and read as <name>.json.
+                    if fname.endswith(".json.xz"):
+                        opener, fname = lzma.open, fname[:-len(".xz")]
+                    elif fname.endswith(".json"):
+                        opener = open
+                    else:
                         continue
-                    path = os.path.join(dirpath, fname)
+                    path = os.path.join(dirpath, fname if opener is open else fname + ".xz")
                     try:
-                        with open(path, "r", encoding="utf-8") as f:
+                        with opener(path, "rt", encoding="utf-8") as f:
                             data = json.load(f)
                     except Exception:
                         continue

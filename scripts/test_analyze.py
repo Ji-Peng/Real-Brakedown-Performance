@@ -14,6 +14,7 @@ import contextlib
 import csv
 import io
 import json
+import lzma
 import os
 import shutil
 import sys
@@ -423,6 +424,20 @@ class InterfaceTests(unittest.TestCase):
         for sid in ("s1",):
             self.fx.write(sid, "full_this_work_mode_a_t1_n20", "tw/a.json", [tw_record(sid)])
             self.fx.write(sid, "full_this_work_mode_a_t1_n20", "this_work/codegen/codegen_report.json", report)
+
+    def test_codegen_report_read_from_xz(self):
+        # Committed codegen reports are <name>.json.xz; they load like <name>.json.
+        self._codegen_fixture(codegen_report("FAIL", "aarch64", arith=["add v0.2d, v1.2d, v2.2d"],
+                                             moves=["movi v0.2d, #0"]))
+        d = os.path.join(self.fx.session("s1"), "full_this_work_mode_a_t1_n20", "this_work", "codegen")
+        plain = os.path.join(d, "codegen_report.json")
+        with open(plain, "rb") as src, lzma.open(plain + ".xz", "wb") as dst:
+            dst.write(src.read())
+        os.remove(plain)
+        a = self.fx.analyzer(self.fx.selection(sessions=("s1",), expected=("s1",)))
+        ok, out = self._check(a)
+        self.assertFalse(ok)
+        self.assertIn("Codegen report not PASS", out)
 
     def test_codegen_fail_fails_check_unless_documented(self):
         # (c): any selected FAIL report fails --check; T0 derives its status from the reports.
