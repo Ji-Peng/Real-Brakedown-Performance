@@ -279,9 +279,8 @@ class BenchmarkAnalyzer:
     def _categorize_report(self, path: str, item: Dict):
         norm_path = path.replace("\\", "/")
 
-        # Record provenance fields
-        if item.get("upstream_commit") and item.get("implementation") == "lcpc-fork":
-            self.fork_shas.add(str(item.get("upstream_commit"))[:12])
+        # Provenance: fork commits come from manifests' git_commit; a report's
+        # upstream_commit is the pinned upstream LCPC base, not the fork.
 
         # Detect Arm runs
         if "/arm" in norm_path or item.get("arch") == "aarch64" or "c4a" in norm_path:
@@ -844,7 +843,8 @@ class BenchmarkAnalyzer:
     def generate_T2_simd_spielman(self):
         headers = [
             "Field", "T", "log2(N)",
-            "This Work (ms)", "SIMD-Spielman (ms)", "SIMD Gap Recovered",
+            "This Work (ms)", "SIMD-Spielman T workers (ms)",
+            "SIMD-Spielman 8 cores: 7 workers + coordinator (ms)", "SIMD Gap Recovered",
             "[KDHR26] Reported (ms)", "[KDHR26] LCPC Speedup", "E15 Cross-Check"
         ]
         tw_grouped = self._group_by_core_config(self.reports_this_work)
@@ -857,7 +857,7 @@ class BenchmarkAnalyzer:
         rows = []
         for key in sorted(set(list(tw_grouped.keys()) + list(simd_grouped.keys()))):
             field, params, shape, log_n, threads = key
-            if params != "simd-spielman" or shape != "brakedown":
+            if params != "simd-spielman" or shape != "brakedown" or threads == 7:
                 continue
 
             tw_reps = tw_grouped.get(key, [])
@@ -877,9 +877,22 @@ class BenchmarkAnalyzer:
                     and self.skipped_baselines.get("SIMD-Spielman")):
                 simd_ms_str = "SKIPPED"
 
+            # Upstream's MT encoder adds a spin-waiting coordinator thread, so on the
+            # 8-core host T=8 over-subscribes a core; 7 workers + coordinator is the
+            # other 8-core configuration. The gap uses the faster of the two.
+            simd7_ms_str = "-"
+            simd_best_ns = simd_stats["mean_median_ns"]
+            if threads == 8:
+                simd7_stats = self._compute_stat_across_sessions(
+                    simd_grouped.get((field, params, shape, log_n, 7), []))
+                simd7_ms_str = format_ns_to_ms(simd7_stats["mean_median_ns"])
+                if simd7_stats["mean_median_ns"] and (
+                        simd_best_ns is None or simd7_stats["mean_median_ns"] < simd_best_ns):
+                    simd_best_ns = simd7_stats["mean_median_ns"]
+
             gap_recovered = "-"
-            if tw_stats["mean_median_ns"] and simd_stats["mean_median_ns"]:
-                ratio = simd_stats["mean_median_ns"] / tw_stats["mean_median_ns"]
+            if tw_stats["mean_median_ns"] and simd_best_ns:
+                ratio = simd_best_ns / tw_stats["mean_median_ns"]
                 gap_recovered = f"{ratio:.2f}x"
 
             # KDHR26 Reported values
@@ -899,13 +912,15 @@ class BenchmarkAnalyzer:
 
             rows.append([
                 field, threads, log_n,
-                tw_ms_str, simd_ms_str, gap_recovered,
+                tw_ms_str, simd_ms_str, simd7_ms_str, gap_recovered,
                 reported_ms, reported_spd, e15_check
             ])
 
         notes = [
             "Mode (b) parameters matching [KDHR26]. All runtimes in milliseconds.",
             "SIMD Gap Recovered = T_SIMD / T_ThisWork. Values >= 1.0x indicate This Work matches or exceeds AVX-512.",
+            "At T=8 the 8-core host cannot give upstream's spin-waiting coordinator thread its own core; "
+            "the gap uses the faster of T=8 (coordinator shares a worker core) and 7 workers + coordinator.",
             "[KDHR26] reported numbers quoted verbatim from SIMD-Spielman paper Table 2 (page 11) on AMD EPYC 9754."
         ]
         if self.has_smoke_watermark:
