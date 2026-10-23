@@ -5,34 +5,62 @@
 """
 analyze.py - Aggregates raw benchmark JSON results and produces paper artefacts.
 
-Generates EXACTLY the evaluation artefacts defined in agent/plan/06-evaluation-and-paper-tables.md:
+Generates the evaluation artefacts defined in agent/plan/06-evaluation-and-paper-tables.md:
   - Tables T0 - T12 (LaTeX booktabs in latex/ and CSV summaries in csv/)
-  - Figures F1 - F3 (PDF and PNG in plots/ via matplotlib)
+  - Figures F1 - F3 (PDF and PNG in plots/ via matplotlib, with their data in csv/)
 
-Key Statistical and Reporting Rules (Plan 06 §1, §3, §5):
-  - Every number is derived from raw JSON results (or verbatim from kdhr26_reported.json).
-  - Implementations are labelled separately (This Work, Original LCPC, SIMD-Spielman, PolyCommit).
-  - Statistics: median of timed runs (warmup excluded), min-max ranges.
-  - Across two sessions: mean of session medians, speedup = ratio of medians with session range.
-  - Significance rule: claim "faster" only when max(This Work runs) < min(Baseline runs)
-    across all sessions (non-overlapping ranges); otherwise write "comparable".
-  - Flags configurations where session medians diverge by > 5%.
-  - Provenance footer on every table: result directory IDs, git SHAs, session IDs.
-  - Published [KDHR26] values load ONLY from scripts/kdhr26_reported.json with verbatim citations.
-  - `--check` flag: fails (exit code 1) if any required cell or artefact is missing.
+Result selection (paper mode)
+  Paper artefacts are built only from the run directories listed in
+  results/selection.json (default; override with --selection). Every
+  measurement record found under the results root must be either included by
+  that file or excluded by one of its "exclude" rules (each with a reason);
+  any other record is "uncovered" and the analyzer refuses to run. Passing
+  --results-dir without --selection analyzes everything under those
+  directories (used by reproduce/all.sh for per-session and local smoke
+  output); such output is not paper evidence.
+
+Cells and statistics (Plan 06 §3)
+  - A cell is one configuration: (implementation, build variant, field, code
+    parameters, matrix shape, slice mode and slice count, log2 N, threads,
+    block family, machine). The analyzer refuses to pool records whose cell
+    keys differ (for example slice-sweep runs with the adaptive headline, or
+    two original-LCPC build variants).
+  - Sessions come from the session directory's schedule.json "session_id"
+    (fallback: the directory name). Each session contributes exactly one
+    record per cell; a second, different record is a duplicate and --check
+    fails. Byte-identical copies of one measurement (the mode-(b) driver writes
+    a combined and a per-shape file) are dropped at load time.
+  - Per session: median of that session's timed samples. Table value: mean of
+    the session medians, with the min-max over all samples. Cells whose
+    session medians differ by more than 5% are marked "D<x>%" in the table and
+    listed in csv/session_divergence.csv. Cells measured in fewer sessions than
+    the machine's expected sessions are marked "[s1 only]" and fail --check
+    unless selection.json documents them as omissions.
+  - Speedup = ratio of the mean session medians, with its range over the
+    per-session ratios. "faster" only when, in every common session, the
+    slowest This Work sample is faster than the fastest baseline sample
+    (non-overlapping ranges); otherwise "comparable" (or "slower").
+  - Provenance footer on every table: the run directories and sessions that
+    contributed, with their fork commit, GCP zone and baseline/patch hashes.
+  - Published [KDHR26] values load only from scripts/kdhr26_reported.json and
+    are looked up by (reference CPU of the machine, log2 N).
+  - --check fails on missing artefacts or cells, duplicates, missing sessions,
+    oversubscribed pinning and heterogeneous cells, except for documented
+    omissions in selection.json (and --allow selectors).
 """
 
 import argparse
 import csv
 import fnmatch
 import glob
+import hashlib
 import json
 import math
 import os
 import re
 import sys
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 try:
     import matplotlib
@@ -43,8 +71,195 @@ except ImportError:
     HAS_MATPLOTLIB = False
 
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_SELECTION = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "results", "selection.json"))
+
+# Plan 06 D10: original LCPC is reported "as published" and "with the fork's
+# flags"; the BLAKE3 backend is a second axis. Order = column order in tables.
+LCPC_VARIANTS = ("as-published-as-is", "as-published-portable", "fork-flags-as-is", "fork-flags-portable")
+PRIMARY_LCPC_VARIANTS = ("as-published-as-is", "fork-flags-portable")
+
+DIVERGENCE_THRESHOLD = 0.05
+MEASURED_STATUSES = {None, "", "ok", "complete", "completed", "success", "pass"}
+
+# Block-id families (shared interface 4). Profile prefixes (full_, smoke_) are
+# stripped first; Arm blocks keep their own families.
+_FAMILY_RULES = [
+    ("arm_this_work", r"^arm_this_work"),
+    ("arm_lcpc_orig", r"^arm_lcpc_orig"),
+    ("tw_a", r"^this_work_mode_a(_|$)"),
+    ("tw_b", r"^this_work_mode_b(_|$)"),
+    ("slice_sweep", r"^(slice_sweep_|this_work_slice_s)"),
+    ("tw_threads", r"^(this_work_threads_|thread_scaling_this_work_)"),
+    ("lcpc_threads", r"^(lcpc_orig_threads_|thread_scaling_lcpc_orig_)"),
+    ("steps", r"^steps"),
+    ("lcpc_a", r"^lcpc_orig_(mode_)?a(_|$)"),
+    ("simd", r"^simd_spielman"),
+    ("polycommit", r"^polycommit"),
+    ("ligero", r"^ligero_rs"),
+]
+
+
+def block_family(block_id: str) -> Optional[str]:
+    """Maps a block id (e.g. full_this_work_mode_a_t1_n16-...) to its family."""
+    if not block_id:
+        return None
+    if block_id.startswith("arm_"):
+        stripped = block_id
+    else:
+        stripped = re.sub(r"^(full|smoke)_", "", block_id)
+    for family, pattern in _FAMILY_RULES:
+        if re.search(pattern, stripped):
+            return family
+    return None
+
+
+def infer_build_variant(record: Dict, filename: str) -> Tuple[Optional[str], bool]:
+    """Returns (build_variant, recorded) for an original-LCPC record.
+
+    New records carry "build_variant"; older ones are named
+    lcpc-sdig6-{plain,fork}-release-blake3-{as-is,portable-only}.json.
+    """
+    recorded = record.get("build_variant")
+    if recorded:
+        return str(recorded), True
+    name = os.path.basename(filename)
+    profile = "as-published" if "plain-release" in name else ("fork-flags" if "fork-release" in name else None)
+    if "portable-only" in name:
+        hashing = "portable"
+    elif "as-is" in name:
+        hashing = "as-is"
+    else:
+        hashing = None
+    if profile and hashing:
+        return f"{profile}-{hashing}", False
+    return None, False
+
+
+def median(values: List[float]) -> Optional[float]:
+    if not values:
+        return None
+    s = sorted(values)
+    n = len(s)
+    return float(s[n // 2]) if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2.0
+
+
+def safe_float(val: Any) -> Optional[float]:
+    try:
+        f = float(val)
+    except (ValueError, TypeError):
+        return None
+    return None if math.isnan(f) else f
+
+
+def format_ns(ns: Optional[float], unit: str = "ms", decimals: Optional[int] = None) -> str:
+    if ns is None:
+        return "-"
+    div, dec = {"ms": (1e6, 2), "us": (1e3, 1), "s": (1e9, 3)}[unit]
+    return f"{ns / div:.{dec if decimals is None else decimals}f}"
+
+
+def format_ns_to_ms(ns: Optional[float], decimals: int = 2) -> str:
+    return format_ns(ns, "ms", decimals)
+
+
+def format_bytes_to_mb(b: Optional[float], decimals: int = 1) -> str:
+    if b is None or b <= 0:
+        return "-"
+    return f"{b / (1024.0 * 1024.0):.{decimals}f}"
+
+
+_LATEX_TEXT_ESCAPES = {
+    "\\": r"\textbackslash{}", "&": r"\&", "%": r"\%", "_": r"\_", "#": r"\#", "{": r"\{", "}": r"\}",
+    "~": r"\textasciitilde{}", "^": r"\textasciicircum{}", "<": r"\textless{}", ">": r"\textgreater{}",
+    "|": r"\textbar{}", "$": r"\$",
+}
+_LATEX_UNICODE = {"\u2264": r"$\le$", "\u2265": r"$\ge$", "\u2192": r"$\rightarrow$", "\u00d7": r"$\times$",
+                  "\u2248": r"$\approx$", "\u00b5": r"$\mu$", "\u03bc": r"$\mu$"}
+# Powers written in the analyzer's plain text ("2^26", "2^{n}", "N=2^20") become
+# math; "<=" / ">=" become \le / \ge. Everything else is escaped as text.
+_LATEX_MATH_RE = re.compile(r"(?P<pow>(?P<base>\d+|[A-Za-z])\^(?:\{(?P<be>[^{}]+)\}|(?P<e>\d+|[A-Za-z]\b)))"
+                            r"|(?P<le><=)|(?P<ge>>=)|(?P<math>\$[^$]+\$)")
+
+
+def _escape_latex_text(s: str) -> str:
+    out = []
+    for ch in s:
+        out.append(_LATEX_TEXT_ESCAPES.get(ch) or _LATEX_UNICODE.get(ch) or ch)
+    return "".join(out)
+
+
+def escape_latex(s: str) -> str:
+    """Converts analyzer text to LaTeX that compiles in text mode.
+
+    Every LaTeX special character is escaped; powers such as 2^26 or 2^{n}
+    are emitted as math ($2^{26}$), "<=" / ">=" as $\\le$ / $\\ge$, and an
+    explicit $...$ segment is kept as math.
+    """
+    s = str(s)
+    out, pos = [], 0
+    for m in _LATEX_MATH_RE.finditer(s):
+        out.append(_escape_latex_text(s[pos:m.start()]))
+        if m.group("pow"):
+            exp = m.group("be") or m.group("e")
+            out.append(f"${m.group('base')}^{{{_escape_latex_text(exp)}}}$")
+        elif m.group("le"):
+            out.append(r"$\le$")
+        elif m.group("ge"):
+            out.append(r"$\ge$")
+        else:
+            out.append(m.group("math"))
+        pos = m.end()
+    out.append(_escape_latex_text(s[pos:]))
+    return "".join(out)
+
+
+LATEX_PREAMBLE = (
+    "\\documentclass{article}\n\\usepackage[T1]{fontenc}\n\\usepackage[utf8]{inputenc}\n"
+    "\\usepackage[a3paper,landscape,margin=1cm]{geometry}\n\\usepackage{booktabs}\n\\usepackage{threeparttable}\n"
+    "\\begin{document}\n"
+)
+
+
+def compile_latex_tables(tex_paths: List[str], build_dir: str, pdflatex: Optional[str] = None) -> Tuple[List[str], List[str]]:
+    """Compiles each generated table standalone with pdflatex (booktabs + threeparttable).
+
+    Returns (compiled, errors). Each table gets its own wrapper document in
+    build_dir, so an error is attributed to one table. Raises FileNotFoundError
+    when pdflatex is not installed.
+    """
+    import shutil
+    import subprocess
+    exe = pdflatex or shutil.which("pdflatex")
+    if not exe:
+        raise FileNotFoundError("pdflatex not found")
+    os.makedirs(build_dir, exist_ok=True)
+    compiled, errors = [], []
+    for tex in sorted(tex_paths):
+        name = os.path.splitext(os.path.basename(tex))[0]
+        wrapper = os.path.join(build_dir, f"{name}_doc.tex")
+        with open(wrapper, "w", encoding="utf-8") as f:
+            f.write(LATEX_PREAMBLE + f"\\input{{{os.path.abspath(tex)}}}\n\\end{{document}}\n")
+        proc = subprocess.run([exe, "-interaction=nonstopmode", "-halt-on-error", "-file-line-error",
+                               "-output-directory", build_dir, wrapper],
+                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=build_dir, timeout=120)
+        log = proc.stdout.decode("utf-8", "replace").splitlines()
+        if proc.returncode != 0:
+            first = next((l for l in log if l.startswith("!") or re.search(r"\.tex:\d+:", l)), "")
+            errors.append(f"{os.path.basename(tex)}: pdflatex exit {proc.returncode}: {first.strip()} "
+                          f"(log {os.path.join(build_dir, name + '_doc.log')})")
+        else:
+            compiled.append(tex)
+    return compiled, errors
+
+
 def cell_missing_reason(value: Any, header: str, row_values: List[str]) -> Optional[str]:
-    """Return why a generated table cell is missing, unless the plan allows it."""
+    """Returns why a generated table cell is missing, or None if it is a value.
+
+    "N/A (<reason>)" is a documented not-applicable value and is accepted;
+    bare "N/A", "-", empty, NaN, SKIPPED, TODO and "omitted" are missing and need a
+    documented omission (selection.json) or --allow selector.
+    """
     text = "" if value is None else str(value).strip()
     normalized = text.casefold()
     column = header.casefold()
@@ -52,7 +267,7 @@ def cell_missing_reason(value: Any, header: str, row_values: List[str]) -> Optio
 
     if normalized in {"timeout", "oom"} and "status" in column:
         return None
-    if normalized in {"n/a", "na"} and "mode b" in row_context:
+    if normalized in {"n/a", "na"} and re.search(r"(^|\s)b(\s|$)|mode b", row_context):
         match = re.search(r"step[/_ ]0?(\d+)", row_context)
         if match and int(match.group(1)) < 4:
             return None
@@ -61,19 +276,144 @@ def cell_missing_reason(value: Any, header: str, row_values: List[str]) -> Optio
         return "empty"
     if normalized in {"-", "nan", "+nan", "-nan", "null", "none", "n/a", "na", "timeout", "oom"}:
         return text
-    if normalized.startswith("skipped"):
+    if normalized.startswith(("skipped", "todo", "omitted")):
         return text
+    if re.match(r"^n/a\s*\(.+\)$", normalized):
+        return None
     if normalized.startswith("n/a"):
         return text
     return None
 
 
 def parse_allow_pattern(raw: str) -> str:
-    """Validate an allow selector formatted as TABLE|ROW|COLUMN (glob syntax)."""
+    """Validates an allow selector formatted as TABLE|ROW|COLUMN (glob syntax)."""
     if len(raw.split("|")) != 3 or any(part == "" for part in raw.split("|")):
         raise argparse.ArgumentTypeError("--allow must be TABLE|ROW|COLUMN (each part may use * globs)")
     return raw
 
+
+def selector_matches(selector: str, patterns: Iterable[str]) -> bool:
+    return any(selector == p or fnmatch.fnmatchcase(selector, p) for p in patterns)
+
+
+def _match_value(actual: Any, expected: Any) -> bool:
+    if isinstance(expected, (list, tuple, set, frozenset)):
+        return any(_match_value(actual, e) for e in expected)
+    # Compare as lower-case text so JSON false/null match "false"/"none".
+    return fnmatch.fnmatchcase(str(actual).lower(), str(expected).lower())
+
+
+# ---------------------------------------------------------------------------
+# Result selection (shared interface 2)
+# ---------------------------------------------------------------------------
+
+class Selection:
+    """results/selection.json: which run dirs/sessions feed the paper artefacts.
+
+    Schema (rbd-selection-v1):
+      results_root:   directory the paths are relative to (default: the file's dir)
+      machines:       {machine: {expected_sessions, kdhr26_reference_cpu,
+                       runs: [{run_dir, sessions, stage, status?, note?}]}}
+      exclude:        [{path: glob, match?: {field: glob}, reason}] - checked first;
+                       "path" is a path glob (fnmatch, '*' also matches '/'),
+                       not a block-id glob: it is matched against
+                       machine/run/session/block and each of its prefixes, and
+                       against the file path below the results root; "match"
+                       is matched against record fields plus build_variant /
+                       build_variant_recorded / family.
+      omissions:      [{cells: [TABLE|ROW|COLUMN glob], kind: pending|omitted, reason}]
+                       Omissions only document missing or not-applicable cells
+                       (and cells measured in fewer sessions than expected, and
+                       FAIL codegen reports via T11 selectors). They never
+                       excuse integrity errors (duplicates, mixed
+                       configurations, oversubscription, uncovered records).
+                       Omission patterns that match no cell are warned about.
+    """
+
+    def __init__(self, path: str):
+        self.path = os.path.abspath(path)
+        with open(self.path, "rb") as f:
+            raw = f.read()
+        self.sha256 = hashlib.sha256(raw).hexdigest()
+        data = json.loads(raw.decode("utf-8"))
+        if data.get("schema_version") != "rbd-selection-v1":
+            raise ValueError(f"{path}: unsupported schema_version {data.get('schema_version')!r}")
+        self.data = data
+        self.root = os.path.normpath(os.path.join(os.path.dirname(self.path), data.get("results_root", ".")))
+        self.machines: Dict[str, Dict] = data.get("machines", {})
+        self.exclude: List[Dict] = data.get("exclude", [])
+        self.omissions: List[Dict] = data.get("omissions", [])
+        self.matched_patterns: Set[str] = set()
+        for i, ex in enumerate(self.exclude):
+            if not ex.get("reason") or not (ex.get("path") or ex.get("match")):
+                raise ValueError(f"{path}: exclude[{i}] needs a path or match and a reason")
+        for i, om in enumerate(self.omissions):
+            if not om.get("reason") or not om.get("cells") or om.get("kind") not in ("pending", "omitted"):
+                raise ValueError(f"{path}: omissions[{i}] needs cells, kind (pending|omitted) and a reason")
+
+    def run_entry(self, machine: str, run: str) -> Optional[Dict]:
+        for entry in self.machines.get(machine, {}).get("runs", []):
+            if entry.get("run_dir") == run:
+                return entry
+        return None
+
+    def expected_sessions(self, machine: str) -> Optional[List[str]]:
+        m = self.machines.get(machine)
+        return list(m["expected_sessions"]) if m and m.get("expected_sessions") else None
+
+    def kdhr26_cpu(self, machine: str) -> Optional[str]:
+        return self.machines.get(machine, {}).get("kdhr26_reference_cpu")
+
+    def classify(self, block_rel: str, file_rel: str, fields: Optional[Dict]) -> Tuple[str, str]:
+        """Returns ("exclude", reason) | ("include", "") | ("uncovered", "")."""
+        parts = block_rel.split("/")
+        prefixes = ["/".join(parts[:i]) for i in range(1, len(parts) + 1)]
+        for ex in self.exclude:
+            pattern = ex.get("path")
+            if pattern and not (fnmatch.fnmatchcase(file_rel, pattern)
+                                or any(fnmatch.fnmatchcase(p, pattern) for p in prefixes)):
+                continue
+            match = ex.get("match")
+            if match:
+                if fields is None or not all(_match_value(fields.get(k), v) for k, v in match.items()):
+                    continue
+            return "exclude", ex["reason"]
+        if len(parts) >= 3:
+            entry = self.run_entry(parts[0], parts[1])
+            if entry and parts[2] in entry.get("sessions", []):
+                return "include", ""
+        return "uncovered", ""
+
+    def omission_for(self, selector: str) -> Optional[Dict]:
+        for om in self.omissions:
+            cells = om["cells"] if isinstance(om["cells"], list) else [om["cells"]]
+            hit = [p for p in cells if selector == p or fnmatch.fnmatchcase(selector, p)]
+            if hit:
+                self.matched_patterns.update(hit)
+                return om
+        return None
+
+    def omission_patterns(self) -> List[str]:
+        out = []
+        for om in self.omissions:
+            out.extend(om["cells"] if isinstance(om["cells"], list) else [om["cells"]])
+        return out
+
+    def unmatched_omission_patterns(self) -> List[str]:
+        """Omission cell patterns that documented no cell (stale once the data landed)."""
+        return [p for p in self.omission_patterns() if p not in self.matched_patterns]
+
+    def listed_runs(self) -> List[Tuple[str, str, List[str], Dict]]:
+        out = []
+        for machine, m in self.machines.items():
+            for entry in m.get("runs", []):
+                out.append((machine, entry["run_dir"], list(entry.get("sessions", [])), entry))
+        return out
+
+
+# ---------------------------------------------------------------------------
+# Self-test (fast, no data needed)
+# ---------------------------------------------------------------------------
 
 def run_self_test() -> None:
     assert cell_missing_reason("", "Latency", ["20"]) == "empty"
@@ -85,70 +425,53 @@ def run_self_test() -> None:
     assert cell_missing_reason("timeout", "Latency", ["20"]) == "timeout"
     assert cell_missing_reason("N/A", "Latency", ["mode b", "step/03-fields"]) is None
     assert cell_missing_reason("N/A", "Latency", ["mode b", "step/04-r2l"]) == "N/A"
-    assert fnmatch.fnmatchcase("T12|18|This Work Arm (ms)", "T12|*|This Work Arm (ms)")
-    print("[PASS] analyze.py --check cell-validation self-test")
+    assert cell_missing_reason("N/A (KDHR26 reports Mont127 only)", "Latency", ["20"]) is None
+    assert cell_missing_reason("TODO (pending)", "Latency", ["20"]) == "TODO (pending)"
+    assert cell_missing_reason("12.30 [12.1-12.5]", "Latency", ["20"]) is None
+    assert fnmatch.fnmatchcase("T12|18,1|This Work Arm (ms)", "T12|*|This Work Arm (ms)")
+    assert block_family("full_this_work_mode_a_t1_n16-18-20-22-24-26") == "tw_a"
+    assert block_family("full_slice_sweep_s4_t8_n20-24-26") == "slice_sweep"
+    assert block_family("smoke_lcpc_orig_a_t1") == "lcpc_a"
+    assert block_family("full_simd_spielman_mont127_t7_n28") == "simd"
+    assert block_family("arm_lcpc_orig_t8_n18-22-26") == "arm_lcpc_orig"
+    assert block_family("full_thread_scaling_this_work_t4") == "tw_threads"
+    assert infer_build_variant({}, "lcpc-sdig6-plain-release-blake3-as-is.json") == ("as-published-as-is", False)
+    assert infer_build_variant({}, "x/lcpc-sdig6-fork-release-blake3-portable-only.json") == ("fork-flags-portable", False)
+    assert infer_build_variant({}, "lcpc-sdig6-plain-release-blake3-portable-only.json") == ("as-published-portable", False)
+    assert infer_build_variant({}, "lcpc-sdig6-fork-release-blake3-as-is.json") == ("fork-flags-as-is", False)
+    assert infer_build_variant({"build_variant": "fork-flags-as-is"}, "a.json") == ("fork-flags-as-is", True)
+    assert median([3, 1, 2]) == 2 and median([1, 2, 3, 4]) == 2.5
+    assert escape_latex("N=2^{n} (ms)") == "N=$2^{n}$ (ms)"
+    assert escape_latex("N/A (no KDHR26 EPYC 9754 entry for 2^28)") == "N/A (no KDHR26 EPYC 9754 entry for $2^{28}$)"
+    assert escape_latex("gap <= 10% a_b #1 {x} ~ ^ <") == (r"gap $\le$ 10\% a\_b \#1 \{x\} \textasciitilde{} "
+                                                         r"\textasciicircum{} \textless{}")
+    assert escape_latex(r"$\log_2 N$ & more") == r"$\log_2 N$ \& more"
+    assert block_family("full_this_work_mode_a_t1_n20.prev-20261023T101010Z") == "tw_a"
+    print("[PASS] analyze.py self-test (cell rules, families, LCPC variant inference, median, LaTeX escaping)")
 
 
-def safe_float(val: Any) -> Optional[float]:
-    try:
-        return float(val)
-    except (ValueError, TypeError):
-        return None
-
-
-def format_ns_to_ms(ns: Optional[float], decimals: int = 2) -> str:
-    if ns is None:
-        return "-"
-    return f"{ns / 1_000_000.0:.{decimals}f}"
-
-
-def format_ns_to_us(ns: Optional[float], decimals: int = 1) -> str:
-    if ns is None:
-        return "-"
-    return f"{ns / 1_000.0:.{decimals}f}"
-
-
-def format_ns_to_s(ns: Optional[float], decimals: int = 3) -> str:
-    if ns is None:
-        return "-"
-    return f"{ns / 1_000_000_000.0:.{decimals}f}"
-
-
-def format_bytes_to_mb(b: Optional[int], decimals: int = 1) -> str:
-    if b is None or b <= 0:
-        return "-"
-    return f"{b / (1024.0 * 1024.0):.{decimals}f}"
-
-
-def escape_latex(s: str) -> str:
-    """Escapes special LaTeX characters while preserving math mode."""
-    if "$" in s:
-        return s
-    replacements = [
-        ("&", r"\&"),
-        ("%", r"\%"),
-        ("_", r"\_"),
-        ("#", r"\#"),
-    ]
-    for orig, repl in replacements:
-        s = s.replace(orig, repl)
-    return s
-
+# ---------------------------------------------------------------------------
+# Analyzer
+# ---------------------------------------------------------------------------
 
 class BenchmarkAnalyzer:
-    def __init__(self, out_dir: str, kdhr26_path: str, is_smoke: bool = False):
+    def __init__(self, out_dir: str, kdhr26_path: str, is_smoke: bool = False,
+                 selection: Optional[Selection] = None, compile_latex: bool = True,
+                 latex_build_dir: Optional[str] = None):
         self.out_dir = out_dir
+        self.compile_latex = compile_latex
+        self.latex_build_dir = latex_build_dir
         self.kdhr26_path = kdhr26_path
         self.is_smoke = is_smoke
+        self.selection = selection
 
         self.csv_dir = os.path.join(out_dir, "csv")
         self.latex_dir = os.path.join(out_dir, "latex")
         self.plots_dir = os.path.join(out_dir, "plots")
-        os.makedirs(self.csv_dir, exist_ok=True)
-        os.makedirs(self.latex_dir, exist_ok=True)
-        os.makedirs(self.plots_dir, exist_ok=True)
+        for d in (self.csv_dir, self.latex_dir, self.plots_dir):
+            os.makedirs(d, exist_ok=True)
 
-        # Loaded records
+        # Loaded measurement records (each dict carries "_meta").
         self.reports_this_work: List[Dict] = []
         self.reports_lcpc_orig: List[Dict] = []
         self.reports_simd_spielman: List[Dict] = []
@@ -158,18 +481,47 @@ class BenchmarkAnalyzer:
         self.reports_ligero_rs: List[Dict] = []
         self.field_benchmarks: List[Dict] = []
         self.codegen_reports: List[Dict] = []
+        self.unmeasured: List[Dict] = []          # status failed / skipped / not_applicable
         self.skipped_baselines: Dict[str, str] = {}
 
-        # Provenance tracking
+        # Load bookkeeping
         self.result_dirs: List[str] = []
-        self.fork_shas: Set[str] = set()
+        self.excluded: Dict[str, int] = defaultdict(int)     # reason -> record count
+        self.uncovered: List[str] = []
+        self.exact_duplicates_dropped = 0
+        self.block_id_mismatches: List[str] = []
+        self.session_info: Dict[Tuple[str, str, str], Dict[str, Set[str]]] = defaultdict(lambda: defaultdict(set))
         self.session_ids: Set[str] = set()
         self.pinning_errors: List[str] = []
         self.hosts: Set[str] = set()
-        self.has_smoke_watermark: bool = False
+        self.has_smoke_watermark = False
+        self.profiles: Set[str] = set()
         self.profile: Optional[str] = None
+        self._seen_keys: Set[Tuple] = set()
+        self.missing_schedule: Set[str] = set()
+        self.skipped_prev_dirs: List[str] = []
+        # (machine, run, session_dir) -> session-level schedule.json "stages" list (interface a)
+        self.session_stages: Dict[Tuple[str, str, str], List[Dict]] = {}
+        # (machine, run, session_dir, block) -> SIMD-Spielman params.patch sha256 prefix
+        self.block_simd_patch: Dict[Tuple[str, str, str, str], Set[str]] = defaultdict(set)
+        self.failed_block_records: Dict[str, int] = defaultdict(int)
+        self.failed_blocks: Set[Tuple[str, str, str, str]] = set()
 
-        # KDHR26 reference data
+        # Generation bookkeeping
+        # Integrity errors (duplicates, mixed configurations): never excused by
+        # omissions or --allow (interface d).
+        self.cell_errors: List[Tuple[str, str]] = []     # (selector, message)
+        # Missing-value errors (fewer sessions than expected, FAIL codegen
+        # reports): excused by a matching omission or --allow selector.
+        self.missing_cell_errors: List[Tuple[str, str]] = []
+        # Selected codegen reports that are not PASS and not documented (interface c).
+        self.codegen_errors: List[str] = []
+        self.cell_log: Dict[str, Dict] = {}
+        self.todo_cells: Dict[str, str] = {}             # selector -> reason
+        self._used: Set[Tuple[str, str, str]] = set()
+        self._used_records: List[Dict] = []
+        self._current_table: str = ""
+
         self.kdhr26_data: Dict[str, Any] = {}
         self._load_kdhr26()
 
@@ -184,12 +536,92 @@ class BenchmarkAnalyzer:
         else:
             print(f"[WARN] KDHR26 data file not found at {self.kdhr26_path}")
 
+    # ------------------------------------------------------------------
+    # Loading
+    # ------------------------------------------------------------------
+
+    def _locate(self, path: str, scan_root: str, cache: Dict[str, Optional[str]]) -> Dict[str, Any]:
+        """Derives machine/run/session/block for a file from its directory layout.
+
+        The session directory is the nearest ancestor holding schedule.json;
+        the block is the next path component below it.
+        """
+        directory = os.path.dirname(os.path.abspath(path))
+        session_dir = None
+        probe = directory
+        stop = os.path.dirname(os.path.abspath(scan_root))
+        while probe and probe != stop and probe != os.path.dirname(probe):
+            # <session>/stages/<tag>/ holds one stage's schedule/manifest/log
+            # (interface a); it is part of its session, never a session itself.
+            if os.path.basename(probe) == "stages" or os.path.basename(os.path.dirname(probe)) == "stages":
+                probe = os.path.dirname(probe)
+                continue
+            if probe not in cache:
+                cache[probe] = os.path.join(probe, "schedule.json") if os.path.isfile(os.path.join(probe, "schedule.json")) else None
+            if cache[probe]:
+                session_dir = probe
+                break
+            probe = os.path.dirname(probe)
+        root = self.selection.root if self.selection else os.path.abspath(scan_root)
+        if session_dir:
+            rel_inside = os.path.relpath(os.path.abspath(path), session_dir).split(os.sep)
+            block = rel_inside[0] if len(rel_inside) > 1 else ""
+            stage_meta = block == "stages"
+            if stage_meta:
+                block = ""   # stage-level metadata belongs to the session, not to a block
+            run_dir = os.path.dirname(session_dir)
+            machine_dir = os.path.dirname(run_dir)
+            session_name = os.path.basename(session_dir)
+            try:
+                with open(os.path.join(session_dir, "schedule.json"), "r", encoding="utf-8") as f:
+                    sched = json.load(f)
+                session_id = str(sched.get("session_id") or session_name)
+            except Exception:
+                session_id = session_name
+            meta = {"machine": os.path.basename(machine_dir), "run": os.path.basename(run_dir),
+                    "session_dir": session_name, "session": session_id, "block": block,
+                    "session_path": session_dir, "stage_meta": stage_meta}
+        elif self.selection and len(os.path.relpath(os.path.abspath(path), root).split(os.sep)) >= 5:
+            # Session copied back without its schedule.json (still running or
+            # partial copy): fall back to the machine/run/session/block layout.
+            machine, run, session_name, block = os.path.relpath(os.path.abspath(path), root).split(os.sep)[:4]
+            self.missing_schedule.add(f"{machine}/{run}/{session_name}")
+            meta = {"machine": machine, "run": run, "session_dir": session_name, "session": session_name,
+                    "block": "" if block == "stages" else block, "stage_meta": block == "stages",
+                    "session_path": os.path.join(root, machine, run, session_name)}
+        else:
+            rel = os.path.relpath(os.path.abspath(path), os.path.abspath(scan_root)).split(os.sep)
+            meta = {"machine": "", "run": "", "session_dir": "", "session": "", "block": rel[0] if len(rel) > 1 else "",
+                    "session_path": os.path.abspath(scan_root), "stage_meta": False}
+            if meta["block"] == "stages":
+                meta["block"], meta["stage_meta"] = "", True
+        meta["file_rel"] = os.path.relpath(os.path.abspath(path), root).replace(os.sep, "/")
+        meta["block_rel"] = "/".join(p for p in (meta["machine"], meta["run"], meta["session_dir"], meta["block"]) if p)
+        if not meta["machine"]:
+            meta["block_rel"] = meta["file_rel"].rsplit("/", 1)[0] if "/" in meta["file_rel"] else ""
+        return meta
+
     def load_results(self, root_paths: List[str]):
-        """Recursively discovers and categorizes JSON results and manifests."""
+        """Discovers JSON results, applies the selection and categorizes records."""
         self.result_dirs.extend(root_paths)
+        cache: Dict[str, Optional[str]] = {}
         for root in root_paths:
-            for dirpath, _, filenames in os.walk(root):
-                for fname in filenames:
+            for dirpath, dirnames, filenames in os.walk(root):
+                dirnames.sort()
+                # Per-session analyze.py outputs are derived files, never inputs.
+                dirnames[:] = [d for d in dirnames if d != "analysis"]
+                if not self.selection:
+                    # <block>.prev-<UTC>: an earlier attempt that all.sh moved
+                    # aside before re-running the block (interface b). With a
+                    # selection the "*.prev-*" exclude rule handles them.
+                    prev = [d for d in dirnames if ".prev-" in d]
+                    if prev:
+                        self.skipped_prev_dirs.extend(os.path.join(dirpath, d) for d in prev)
+                        dirnames[:] = [d for d in dirnames if ".prev-" not in d]
+                for fname in sorted(filenames):
+                    if fname == "failed_blocks.tsv":
+                        self._load_failed_blocks(os.path.join(dirpath, fname))
+                        continue
                     if not fname.endswith(".json"):
                         continue
                     path = os.path.join(dirpath, fname)
@@ -198,293 +630,1736 @@ class BenchmarkAnalyzer:
                             data = json.load(f)
                     except Exception:
                         continue
+                    meta = self._locate(path, root, cache)
+                    self._load_file(path, fname, data, meta)
 
-                    # Manifest files for provenance
-                    if "manifest" in fname:
-                        if isinstance(data, dict):
-                            if data.get("session_id"):
-                                self.session_ids.add(str(data.get("session_id")))
-                            if data.get("git_commit"):
-                                self.fork_shas.add(str(data.get("git_commit"))[:12])
-                            if data.get("host_profile") or data.get("hostname"):
-                                self.hosts.add(str(data.get("host_profile") or data.get("hostname")))
-                            if data.get("watermark") or data.get("profile") == "smoke":
-                                self.has_smoke_watermark = True
-                            # A run whose threads outnumber its pinned cores measures
-                            # oversubscription, not scaling; --check rejects it.
-                            pin = data.get("pinning")
-                            if isinstance(pin, dict) and isinstance(pin.get("affinity_cores_expanded"), list):
-                                if int(pin.get("threads") or 1) > len(pin["affinity_cores_expanded"]):
-                                    self.pinning_errors.append(
-                                        f"{path}: threads={pin.get('threads')} pinned to cores {pin.get('cores')}")
-                        continue
-
-                    if fname == "simd_spielman.json" and isinstance(data, dict):
-                        if data.get("status") == "skipped":
-                            self.skipped_baselines["SIMD-Spielman"] = str(data.get("skip_reason") or "prerequisite unavailable")
-                        continue
-
-                    if fname == "polycommit_skipped.json" and isinstance(data, dict):
-                        if data.get("status") == "skipped":
-                            self.skipped_baselines["PolyCommit"] = str(data.get("skip_reason") or "prerequisite unavailable")
-                        continue
-
-                    if fname == "schedule.json" and isinstance(data, dict):
-                        self.profile = data.get("profile") or self.profile
-                        if data.get("session_id"):
-                            self.session_ids.add(str(data.get("session_id")))
-                        if self.profile == "smoke":
-                            self.has_smoke_watermark = True
-                        continue
-
-                    # Codegen report files
-                    if "codegen" in fname or (isinstance(data, dict) and "hot_kernels_checked" in data):
-                        if isinstance(data, dict):
-                            self.codegen_reports.append(data)
-                        continue
-
-                    # Field microbenchmarks list
-                    if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict) and "mul" in data[0] and "mac" in data[0]:
-                        self.field_benchmarks.extend(data)
-                        continue
-
-                    # LCPC bench v1 items
-                    if isinstance(data, list):
-                        for item in data:
-                            if not isinstance(item, dict):
-                                continue
-                            if item.get("watermark"):
-                                self.has_smoke_watermark = True
-                            if item.get("schema_version") == "lcpc-bench-v1":
-                                self._categorize_report(path, item)
-                            elif item.get("schema_version") == "steps-bench-v1":
-                                self._categorize_step_report(path, item)
-                    elif isinstance(data, dict):
-                        if data.get("watermark"):
-                            self.has_smoke_watermark = True
-                        if data.get("schema_version") == "lcpc-bench-v1":
-                            self._categorize_report(path, data)
-                        elif data.get("schema_version") == "steps-bench-v1":
-                            self._categorize_step_report(path, data)
+        if self.selection:
+            for machine, run, sessions, entry in self.selection.listed_runs():
+                for s in sessions:
+                    if not os.path.isdir(os.path.join(self.selection.root, machine, run, s)):
+                        status = entry.get("status", "")
+                        print(f"[WARN] Selected session {machine}/{run}/{s} is not present"
+                              + (f" ({status})" if status else ""))
+        for sess in sorted(self.missing_schedule):
+            print(f"[WARN] Session {sess} has no schedule.json (still running or partially copied?); "
+                  "its session id is taken from the directory name.")
+        if self.uncovered:
+            print("[FAIL] Records not covered by the selection (add their run dir to "
+                  f"{self.selection.path if self.selection else 'selection.json'} or exclude them with a reason):")
+            for item in sorted(set(self.uncovered))[:50]:
+                print(f"  - {item}")
+            if len(set(self.uncovered)) > 50:
+                print(f"  ... {len(set(self.uncovered)) - 50} more")
+            raise SystemExit(2)
 
         print(f"[INFO] Loaded: {len(self.reports_this_work)} This Work cases, "
               f"{len(self.reports_lcpc_orig)} Original LCPC cases, "
               f"{len(self.reports_simd_spielman)} SIMD-Spielman cases, "
               f"{len(self.reports_polycommit)} PolyCommit cases, "
-              f"{len(self.reports_steps)} Step groups, "
-              f"{len(self.reports_ligero_rs)} Ligero RS cases, "
-              f"{len(self.field_benchmarks)} Field benchmarks, "
-              f"{len(self.codegen_reports)} Codegen reports.")
+              f"{sum(len(v) for v in self.reports_steps.values())} step records in {len(self.reports_steps)} tags, "
+              f"{len(self.reports_ligero_rs)} Ligero RS cases, {len(self.reports_arm)} Arm cases, "
+              f"{len(self.field_benchmarks)} field benchmarks, {len(self.codegen_reports)} codegen reports; "
+              f"{self.exact_duplicates_dropped} byte-identical duplicate records dropped.")
+        for reason, count in sorted(self.excluded.items()):
+            print(f"[INFO] Excluded {count} records: {reason}")
+        if self.block_id_mismatches:
+            print(f"[WARN] {len(self.block_id_mismatches)} records carry a block_id that differs from their block "
+                  "directory (renamed block or tagged by a later block, audit data-12); the directory is used. "
+                  "First: " + self.block_id_mismatches[0])
+        if self.skipped_prev_dirs:
+            print(f"[INFO] Skipped {len(self.skipped_prev_dirs)} '<block>.prev-<UTC>' directories (earlier attempts "
+                  "moved aside by all.sh); first: " + self.skipped_prev_dirs[0])
+        for block, count in sorted(self.failed_block_records.items()):
+            print(f"[WARN] {count} included records come from block {block}, which the session schedule or the "
+                  "record's block_status marks as failed; check them or exclude the block in selection.json.")
+        # SIMD-Spielman's params.patch hash is recorded per block (simd_spielman.json
+        # or the block manifest); attach it to the block's records so it is part of
+        # the cell key and shown next to SIMD-Spielman values.
+        for r in self.reports_simd_spielman + [u for u in self.unmeasured if u["_meta"]["impl"] == "simd"]:
+            m = r["_meta"]
+            patches = self.block_simd_patch.get((m["machine"], m["run"], m["session_dir"], m["block"]), set())
+            if r.get("params_patch_sha256"):
+                patches = {str(r["params_patch_sha256"])[:12]}
+            m["simd_patch"] = "/".join(sorted(patches)) or None
 
-    def _categorize_report(self, path: str, item: Dict):
-        norm_path = path.replace("\\", "/")
+    def _load_failed_blocks(self, path: str):
+        """<session>/failed_blocks.tsv (block id <TAB> exit status) written by all.sh."""
+        session_dir = os.path.dirname(os.path.abspath(path))
+        run_dir = os.path.dirname(session_dir)
+        key = (os.path.basename(os.path.dirname(run_dir)), os.path.basename(run_dir), os.path.basename(session_dir))
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                for line in f:
+                    parts = line.rstrip("\n").split("\t")
+                    if parts and parts[0].strip():
+                        self.failed_blocks.add(key + (parts[0].strip(),))
+        except OSError:
+            pass
 
-        # Provenance: fork commits come from manifests' git_commit; a report's
-        # upstream_commit is the pinned upstream LCPC base, not the fork.
+    def _block_failed(self, m: Dict, item: Dict) -> bool:
+        # all.sh re-tags every record of a block it (re-)runs (interface b), so the
+        # record's own block_status is authoritative; then the session schedule;
+        # then failed_blocks.tsv (older sessions without a session schedule).
+        if item.get("block_status"):
+            return str(item["block_status"]).lower() in ("failed", "fail", "error", "interrupted")
+        key = (m["machine"], m["run"], m["session_dir"], m["block"])
+        if not self.session_stages.get(key[:3]):
+            return key in self.failed_blocks
+        # The block directory holds the run of the last stage that actually ran
+        # the block (all.sh moves earlier runs to <block>.prev-<UTC>), so the
+        # latest stage entry with a final status decides.
+        last = None
+        for stage in self.session_stages.get(key[:3], []):
+            if m["block"] in (stage.get("failed_blocks") or []):
+                last = "failed"
+                continue
+            for b in stage.get("blocks") or []:
+                if not isinstance(b, dict) or (b.get("id") or b.get("block_id")) != m["block"]:
+                    continue
+                status = str(b.get("status") or "").lower()
+                if status and status not in ("scheduled", "not_run", "skipped"):
+                    last = status
+        return last in ("failed", "fail", "error", "interrupted")
 
-        # Detect Arm runs
-        if "/arm" in norm_path or item.get("arch") == "aarch64" or "c4a" in norm_path:
-            self.reports_arm.append(item)
+    def _classify(self, meta: Dict, fields: Optional[Dict]) -> str:
+        if not self.selection:
+            return "include"
+        status, reason = self.selection.classify(meta["block_rel"], meta["file_rel"], fields)
+        if status == "exclude":
+            self.excluded[reason] += 1
+        elif status == "uncovered":
+            self.uncovered.append(meta["block_rel"] or meta["file_rel"])
+        return status
+
+    def _load_file(self, path: str, fname: str, data: Any, meta: Dict):
+        is_session_level = not meta["block"]
+
+        if isinstance(data, dict) and fname == "schedule.json":
+            if self.selection and self._classify(meta, None) != "include":
+                return
+            if meta.get("stage_meta"):
+                return   # per-stage copy; the session-level schedule.json accumulates all stages
+            if isinstance(data.get("stages"), list):
+                self.session_stages[(meta["machine"], meta["run"], meta["session_dir"])] = [
+                    s for s in data["stages"] if isinstance(s, dict)]
+            profile = data.get("profile")
+            if profile:
+                self.profiles.add(str(profile))
+                self.profile = self.profile or str(profile)
+            if profile == "smoke":
+                self.has_smoke_watermark = True
+            if data.get("session_id"):
+                self.session_ids.add(str(data["session_id"]))
             return
 
-        # Detect Ligero RS runs
-        if (item.get("params") == "ligero-rs" or
-                item.get("field") == "Mont127-RS" or
-                item.get("implementation") == "lcpc-ligero-rs"):
-            self.reports_ligero_rs.append(item)
+        if isinstance(data, dict) and ("manifest" in fname):
+            if is_session_level or (self.selection and self.selection.classify(meta["block_rel"], meta["file_rel"], None)[0] != "include"):
+                # Session-level manifests are overwritten by every stage (audit
+                # data-11); provenance comes from the per-block manifests.
+                return
+            self._load_manifest(path, data, meta)
             return
 
-        # Detect per-step tagged ablation
-        if "/steps/" in norm_path or "step_" in norm_path or "step/" in norm_path:
-            match = re.search(r"step[/_](\d+-[^/]+)", norm_path)
-            if not match:
-                match = re.search(r"/steps/([^/]+)/", norm_path)
-            step_tag = match.group(1) if match else "unknown_step"
-            # Normalize tag to step/XX-name
-            if not step_tag.startswith("step/"):
-                step_tag = "step/" + step_tag.replace("step_", "")
-            self.reports_steps[step_tag].append(item)
+        if fname == "simd_spielman.json" and isinstance(data, dict):
+            # Only blocks the selection includes contribute (audit review 5).
+            if self.selection and self.selection.classify(meta["block_rel"], meta["file_rel"], None)[0] != "include":
+                return
+            if data.get("status") == "skipped":
+                self.skipped_baselines["SIMD-Spielman"] = str(data.get("skip_reason") or "prerequisite unavailable")
+            if data.get("params_patch_sha256"):
+                self.block_simd_patch[(meta["machine"], meta["run"], meta["session_dir"], meta["block"])].add(
+                    str(data["params_patch_sha256"])[:12])
+            return
+        if fname == "polycommit_skipped.json" and isinstance(data, dict):
+            if data.get("status") == "skipped":
+                self.skipped_baselines["PolyCommit"] = str(data.get("skip_reason") or "prerequisite unavailable")
             return
 
-        # Categorize by implementation
+        if isinstance(data, dict) and ("codegen" in fname or "hot_kernels_checked" in data):
+            if "/steps/" in meta["file_rel"] or block_family(meta["block"]) == "steps":
+                return  # per-tag step reports; T11 reports the measured HEAD binaries
+            if self._classify(meta, data) == "include":
+                data = dict(data)
+                data["_meta"] = self._record_meta(meta, data, path, impl="codegen")
+                self.codegen_reports.append(data)
+            return
+
+        if isinstance(data, list) and data and isinstance(data[0], dict) and "mul" in data[0] and "mac" in data[0]:
+            for item in data:
+                if isinstance(item, dict) and self._classify(meta, item) == "include":
+                    item = dict(item)
+                    item["_meta"] = self._record_meta(meta, item, path, impl="microbench")
+                    self.field_benchmarks.append(item)
+            return
+
+        items = data if isinstance(data, list) else [data]
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            schema = item.get("schema_version")
+            if schema not in ("lcpc-bench-v1", "steps-bench-v1"):
+                continue
+            if item.get("watermark") or item.get("run_class") == "smoke":
+                self.has_smoke_watermark = True
+            impl = self._impl_of(item, meta)
+            rmeta = self._record_meta(meta, item, path, impl=impl)
+            fields = dict(item)
+            fields["build_variant"] = rmeta.get("variant")
+            fields["build_variant_recorded"] = rmeta.get("variant_recorded")
+            fields["family"] = rmeta.get("family")
+            if self._classify(meta, fields) != "include":
+                continue
+            item = dict(item)
+            item["_meta"] = rmeta
+            self._categorize(item)
+
+    def _load_manifest(self, path: str, data: Dict, meta: Dict):
+        key = (meta["machine"], meta["run"], meta["session_dir"])
+        info = self.session_info[key]
+        git = data.get("git") if isinstance(data.get("git"), dict) else {}
+        if git.get("code_repo_sha"):
+            info["fork"].add(str(git["code_repo_sha"])[:7] + ("+dirty" if git.get("code_repo_dirty") else ""))
+        elif data.get("source_checkout_head"):
+            info["fork"].add(str(data["source_checkout_head"])[:7])
+        if git.get("simd_params_patch_sha256") and block_family(meta["block"]) == "simd":
+            self.block_simd_patch[(meta["machine"], meta["run"], meta["session_dir"], meta["block"])].add(
+                str(git["simd_params_patch_sha256"])[:12])
+        ident = data.get("machine_identity") if isinstance(data.get("machine_identity"), dict) else {}
+        if ident.get("gcp_zone"):
+            info["zone"].add(str(ident["gcp_zone"]))
+        if ident.get("gcp_machine_type"):
+            info["type"].add(str(ident["gcp_machine_type"]))
+        node = ((data.get("machine") or {}).get("uname") or {}).get("node") if isinstance(data.get("machine"), dict) else None
+        if node:
+            info["vm"].add(str(node))
+        host = data.get("host_profile") or data.get("host")
+        if host:
+            self.hosts.add(str(host))
+        if data.get("watermark") or data.get("run_class") == "smoke":
+            self.has_smoke_watermark = True
+        # A run whose threads outnumber its pinned cores measures
+        # oversubscription, not scaling. SIMD-Spielman's MT encoder adds a
+        # spin-waiting coordinator thread: count it unless the block records
+        # that it deliberately shares a worker core (8 workers on 8 cores).
+        pin = data.get("pinning")
+        if isinstance(pin, dict) and isinstance(pin.get("affinity_cores_expanded"), list):
+            threads = int(pin.get("threads") or 1)
+            cores = len(pin["affinity_cores_expanded"])
+            extra = data.get("extra") if isinstance(data.get("extra"), dict) else {}
+            is_simd = block_family(meta["block"]) == "simd" or "coordinator_shares_worker_core" in extra
+            effective = threads + 1 if (is_simd and threads > 1) else threads
+            if effective > cores and not (is_simd and extra.get("coordinator_shares_worker_core") is True):
+                self.pinning_errors.append(
+                    f"{meta['block_rel']}: {threads} threads"
+                    + (" + coordinator" if effective > threads else "")
+                    + f" pinned to {cores} cores ({pin.get('cores')})")
+
+    def _impl_of(self, item: Dict, meta: Dict) -> str:
+        if item.get("schema_version") == "steps-bench-v1":
+            return "steps"
         impl = item.get("implementation", "")
-        if impl == "lcpc-original-upstream" or "/lcpc_orig/" in norm_path:
+        norm = meta["file_rel"]
+        if impl == "lcpc-ligero-rs" or item.get("params") in ("ligero-rs", "rs-ligero") or item.get("field") == "Mont127-RS":
+            return "ligero"
+        if impl == "lcpc-original-upstream" or "/lcpc_orig/" in norm:
+            return "lcpc_orig"
+        if impl == "simd-spielman" or "/simd_spielman" in norm:
+            return "simd"
+        if impl in ("polycommit", "arkworks-poly-commit-brakedown") or "/polycommit/" in norm:
+            return "polycommit"
+        return "this_work"
+
+    def _record_meta(self, meta: Dict, item: Dict, path: str, impl: str) -> Dict:
+        m = dict(meta)
+        m["path"] = path
+        m["impl"] = impl
+        family = block_family(meta["block"])
+        if family is None:
+            family = self._infer_family(impl, item)
+        m["family"] = family
+        m["arch"] = ("aarch64" if (str(family).startswith("arm_") or item.get("arch") == "aarch64"
+                                   or "c4a" in meta["machine"]) else "x86_64")
+        if impl == "lcpc_orig":
+            variant, recorded = infer_build_variant(item, path)
+            m["variant"], m["variant_recorded"] = variant, recorded
+        else:
+            m["variant"], m["variant_recorded"] = None, None
+        if not m["session"]:
+            m["session"] = str(item.get("session_id") or "local")
+        rec_block = item.get("block_id")
+        if rec_block and meta["block"] and not str(meta["block"]).startswith(str(rec_block)):
+            self.block_id_mismatches.append(f"{meta['file_rel']}: block_id={rec_block}")
+        return m
+
+    @staticmethod
+    def _infer_family(impl: str, item: Dict) -> str:
+        """Family for records outside a block directory (legacy/local layouts)."""
+        if impl == "this_work":
+            if item.get("params") == "simd-spielman":
+                return "tw_b"
+            return "slice_sweep" if item.get("slice_mode") == "explicit" else "tw_a"
+        return {"lcpc_orig": "lcpc_a", "simd": "simd", "polycommit": "polycommit",
+                "ligero": "ligero", "steps": "steps"}.get(impl, "unknown")
+
+    def _cell_key(self, r: Dict) -> Tuple:
+        """The configuration a record measures (everything except its session)."""
+        m = r["_meta"]
+        if m["impl"] == "steps":
+            return ("steps", m["machine"], str(r.get("tag")), str(r.get("mode", "a")), r.get("field"),
+                    r.get("params"), int(r.get("log_n", 0)), int(r.get("threads", 1)))
+        return (m["impl"], m["machine"], m["family"], m.get("variant"), m.get("simd_patch"), r.get("field"),
+                r.get("params"), r.get("shape") or "brakedown", r.get("slice_mode"), r.get("slices"),
+                int(r.get("log_n", 0)), int(r.get("threads", 1)))
+
+    def _categorize(self, item: Dict):
+        m = item["_meta"]
+        status = item.get("status")
+        samples = tuple(self._extract_samples(item))
+        dedup_key = (m["session"], m["run"], m["block"], self._cell_key(item), samples)
+        if samples and dedup_key in self._seen_keys:
+            self.exact_duplicates_dropped += 1
+            return
+        self._seen_keys.add(dedup_key)
+        if m["session"]:
+            self.session_ids.add(m["session"])
+        if m["block"] and self._block_failed(m, item):
+            self.failed_block_records[m["block_rel"]] += 1
+
+        if m["impl"] == "steps":
+            tag = str(item.get("tag") or "unknown_step")
+            if tag != "HEAD" and not tag.startswith("step/"):
+                tag = "step/" + tag.removeprefix("step_")
+            self.reports_steps[tag].append(item)
+            return
+        if (status is not None and str(status).lower() not in MEASURED_STATUSES) or not samples:
+            self.unmeasured.append(item)
+            return
+        if m["arch"] == "aarch64":
+            self.reports_arm.append(item)
+        elif m["impl"] == "ligero":
+            self.reports_ligero_rs.append(item)
+        elif m["impl"] == "lcpc_orig":
             self.reports_lcpc_orig.append(item)
-        elif impl == "simd-spielman" or "/simd_spielman/" in norm_path:
+        elif m["impl"] == "simd":
             self.reports_simd_spielman.append(item)
-        elif impl == "polycommit" or "/polycommit/" in norm_path:
+        elif m["impl"] == "polycommit":
             self.reports_polycommit.append(item)
-        elif impl == "lcpc-fork" or "/this_work/" in norm_path:
-            self.reports_this_work.append(item)
         else:
             self.reports_this_work.append(item)
 
-    def _categorize_step_report(self, path: str, item: Dict):
-        """Loads the separate steps-bench-v1 records emitted by steps.sh."""
-        tag = str(item.get("tag") or "unknown_step")
-        if tag != "HEAD" and not tag.startswith("step/"):
-            tag = "step/" + tag.removeprefix("step_")
-        self.reports_steps[tag].append(item)
+    # ------------------------------------------------------------------
+    # Statistics engine (06 §3)
+    # ------------------------------------------------------------------
 
-    # -------------------------------------------------------------------------
-    # Statistical Engine (06 §3)
-    # -------------------------------------------------------------------------
-
-    def _extract_samples(self, report: Dict, op_name: str = "encode_matrix") -> List[int]:
+    def _extract_samples(self, report: Dict, op_name: str = "encode_matrix") -> List[float]:
         if report.get("schema_version") == "steps-bench-v1":
-            samples = report.get("samples_ns", [])
+            samples = [safe_float(s) for s in report.get("samples_ns") or []]
+            samples = [s for s in samples if s is not None and s > 0]
             if samples:
-                return [int(sample) for sample in samples if safe_float(sample) is not None]
-            median = report.get("median_ns")
-            return [int(median)] if median is not None and safe_float(median) is not None else []
-        meas = report.get("measurements", {}).get(op_name, {})
-        samples = meas.get("samples_ns", [])
+                return samples
+            med = safe_float(report.get("median_ns"))
+            return [med] if med else []
+        meas = (report.get("measurements") or {}).get(op_name) or {}
+        samples = [safe_float(s) for s in meas.get("samples_ns") or []]
+        samples = [s for s in samples if s is not None and s > 0]
         if not samples:
-            med = meas.get("summary", {}).get("median_ns")
-            if med is not None:
-                samples = [int(med)]
+            med = safe_float((meas.get("summary") or {}).get("median_ns"))
+            if med and med > 0:
+                samples = [med]
         return samples
 
-    def _get_op_summary(self, report: Dict, op_name: str = "encode_matrix") -> Dict[str, float]:
-        meas = report.get("measurements", {}).get(op_name, {})
-        summary = meas.get("summary", {})
-        if not summary and meas.get("samples_ns"):
-            samples = meas["samples_ns"]
-            s_sorted = sorted(samples)
-            n = len(s_sorted)
-            med = s_sorted[n // 2] if n % 2 == 1 else (s_sorted[n // 2 - 1] + s_sorted[n // 2]) / 2.0
-            summary = {
-                "min_ns": float(s_sorted[0]),
-                "median_ns": float(med),
-                "max_ns": float(s_sorted[-1]),
-                "mean_ns": float(sum(s_sorted)) / n,
-            }
-        return summary
-
-    def _group_by_config(self, reports: List[Dict], op_name: str = "encode_matrix") -> Dict[Tuple, List[Dict]]:
-        """Groups reports by (field, params, shape, log_n, threads, slices)."""
-        groups = defaultdict(list)
-        for r in reports:
-            key = (
-                r.get("field", "Mont127"),
-                r.get("params", "lcpc-sdig6"),
-                r.get("shape", "brakedown"),
-                int(r.get("log_n", 0)),
-                int(r.get("threads", 1)),
-                int(r.get("slices", 1)),
-            )
-            groups[key].append(r)
-        return groups
-
-    def _group_by_core_config(self, reports: List[Dict]) -> Dict[Tuple, List[Dict]]:
-        """
-        Groups reports by (field, params, shape, log_n, threads), prioritizing
-        adaptive or best-performing slice counts for comparison tables.
-        """
-        by_core = defaultdict(lambda: defaultdict(list))
-        for r in reports:
-            core_key = (
-                r.get("field", "Mont127"),
-                r.get("params", "lcpc-sdig6"),
-                r.get("shape", "brakedown"),
-                int(r.get("log_n", 0)),
-                int(r.get("threads", 1)),
-            )
-            slices = int(r.get("slices", 1))
-            by_core[core_key][slices].append(r)
-
-        result = {}
-        for core_key, slice_dict in by_core.items():
-            # If an adaptive choice exists, use it
-            chosen_reps = None
-            for s, reps in slice_dict.items():
-                if reps and (reps[0].get("slice_mode") == "adaptive" or reps[0].get("adaptive_slices") == s):
-                    chosen_reps = reps
+    def select(self, pool: Iterable[Dict], **flt) -> List[Dict]:
+        """Filters records. Keys: impl, family, variant, machine, arch (meta) or record fields."""
+        meta_keys = {"impl", "family", "variant", "machine", "arch", "session"}
+        out = []
+        for r in pool:
+            ok = True
+            for k, v in flt.items():
+                if v is None:
+                    continue
+                actual = r["_meta"].get(k) if k in meta_keys else r.get(k)
+                if k == "shape" and actual is None:
+                    actual = "brakedown"
+                if k in ("log_n", "threads", "slices") and actual is not None:
+                    actual = int(actual)
+                if isinstance(v, (set, frozenset, list, tuple)):
+                    if actual not in v:
+                        ok = False
+                        break
+                elif actual != v:
+                    ok = False
                     break
-            if chosen_reps is None:
-                # Pick lowest median
-                best_med = None
-                for s, reps in slice_dict.items():
-                    med = self._compute_stat_across_sessions(reps)["mean_median_ns"]
-                    if med is not None and (best_med is None or med < best_med):
-                        best_med = med
-                        chosen_reps = reps
-            result[core_key] = chosen_reps or []
-        return result
+            if ok:
+                out.append(r)
+        return out
 
-    def _compute_stat_across_sessions(self, reports: List[Dict], op_name: str = "encode_matrix") -> Dict[str, Any]:
+    def stat(self, records: List[Dict], op: str = "encode_matrix", label: str = "") -> Dict[str, Any]:
+        """Per-session median, mean of session medians, min-max over all samples."""
+        empty = {"mean": None, "min": None, "max": None, "sessions": [], "session_medians": {},
+                 "session_samples": {}, "diverged": False, "rel_diff": None, "records": [], "machine": None}
+        with_samples = [r for r in records if self._extract_samples(r, op)]
+        if not with_samples:
+            return empty
+        keys = {self._cell_key(r) for r in with_samples}
+        if len(keys) > 1:
+            self.cell_errors.append((label or "?", f"heterogeneous cell pools {len(keys)} configurations: "
+                                     + "; ".join(str(k) for k in sorted(keys, key=str)[:3])))
+        by_session: Dict[str, List[Dict]] = defaultdict(list)
+        for r in sorted(with_samples, key=lambda x: x["_meta"]["path"]):
+            by_session[r["_meta"]["session"]].append(r)
+        session_medians, session_samples, used = {}, {}, []
+        for sid, recs in sorted(by_session.items()):
+            if len(recs) > 1:
+                self.cell_errors.append((label or "?", f"duplicate: session {sid} has {len(recs)} records ("
+                                         + ", ".join(r["_meta"]["block_rel"] for r in recs) + ")"))
+            chosen = recs[0]
+            samples = self._extract_samples(chosen, op)
+            session_samples[sid] = samples
+            session_medians[sid] = median(samples)
+            used.append(chosen)
+        meds = list(session_medians.values())
+        rel = (max(meds) - min(meds)) / min(meds) if len(meds) >= 2 and min(meds) > 0 else None
+        all_samples = [s for ss in session_samples.values() for s in ss]
+        for r in used:
+            m = r["_meta"]
+            self._used.add((m["machine"], m["run"], m["session_dir"]))
+            self._used_records.append(r)
+        st = {"mean": sum(meds) / len(meds), "min": min(all_samples), "max": max(all_samples),
+              "sessions": sorted(session_medians), "session_medians": session_medians,
+              "session_samples": session_samples, "diverged": rel is not None and rel > DIVERGENCE_THRESHOLD,
+              "rel_diff": rel, "records": used, "machine": used[0]["_meta"]["machine"]}
+        return st
+
+    def scalar_stat(self, records: List[Dict], getter) -> Optional[Dict[str, Any]]:
+        """Mean over sessions of a per-record scalar (setup time, RSS)."""
+        per_session = {}
+        for r in sorted(records, key=lambda x: x["_meta"]["path"]):
+            v = getter(r)
+            if v is not None and r["_meta"]["session"] not in per_session:
+                per_session[r["_meta"]["session"]] = v
+        if not per_session:
+            return None
+        vals = list(per_session.values())
+        return {"mean": sum(vals) / len(vals), "min": min(vals), "max": max(vals), "sessions": sorted(per_session)}
+
+    # ---- cell formatting -------------------------------------------------
+
+    def _expected_sessions(self, st: Dict) -> Optional[List[str]]:
+        if not self.selection or not st.get("machine"):
+            return None
+        return self.selection.expected_sessions(st["machine"])
+
+    def missing_text(self, selector: str) -> str:
+        if self.selection:
+            om = self.selection.omission_for(selector)
+            if om:
+                self.todo_cells[selector] = f"{om['kind']}: {om['reason']}"
+                return "TODO (pending)" if om["kind"] == "pending" else "omitted (documented)"
+        return "-"
+
+    def _session_marker(self, selector: str, sessions: List[str], expected: Optional[List[str]],
+                        what: str = "") -> str:
+        """' [s2 only]' when fewer sessions than expected contributed; registers the gap."""
+        if not expected:
+            return ""
+        missing = [s for s in expected if s not in sessions]
+        if not missing:
+            return ""
+        om = self.selection.omission_for(selector) if self.selection else None
+        if om:
+            self.todo_cells[selector] = f"{om['kind']}: {om['reason']} (missing {', '.join(missing)}{what})"
+        else:
+            self.missing_cell_errors.append((selector, f"missing sessions {missing} (have {sessions}){what}"))
+        return f" [{'+'.join(sessions) or 'no session'} only]"
+
+    def _markers(self, selector: str, st: Dict) -> str:
+        text = ""
+        if st["diverged"]:
+            text += f" D{st['rel_diff'] * 100:.1f}%"
+        return text + self._session_marker(selector, st["sessions"], self._expected_sessions(st))
+
+    def derived_marker(self, selector: str, *stats: Optional[Dict]) -> str:
+        """Session marker for a cell derived from several cells (ratio, best-of-T, ...).
+
+        The derived value is only two-session evidence if every input was
+        measured in every expected session; otherwise the cell carries
+        '[sX only]' with the sessions common to all inputs.
         """
-        Computes 06 §3 statistics:
-          - median of 5 timed runs per session
-          - across sessions: mean of session medians, relative difference
-          - overall min and max
-          - flag if session medians differ by > 5%
+        present = [s for s in stats if s and s.get("mean") is not None]
+        if not present:
+            return ""
+        common = sorted(set.intersection(*(set(s["sessions"]) for s in present)))
+        expected = None
+        for s in present:
+            expected = expected or self._expected_sessions(s)
+        return self._session_marker(selector, common, expected, " in an input of this derived cell")
+
+    def value_cell(self, table: str, row_key: str, column: str, st: Dict, unit: str = "ms",
+                   with_range: bool = True) -> str:
+        selector = f"{table}|{row_key}|{column}"
+        if st is None or st.get("mean") is None:
+            return self.missing_text(selector)
+        self.cell_log[selector] = st
+        text = format_ns(st["mean"], unit)
+        if with_range:
+            text += f" [{format_ns(st['min'], unit)}-{format_ns(st['max'], unit)}]"
+        return text + self._markers(selector, st)
+
+    def speedup_cell(self, table: str, row_key: str, column: str, base: Dict, tw: Dict) -> str:
+        """Speedup = base / tw (ratio of mean session medians) with the per-session range."""
+        selector = f"{table}|{row_key}|{column}"
+        if not base or not tw or base.get("mean") is None or tw.get("mean") is None:
+            return self.missing_text(selector)
+        ratio = base["mean"] / tw["mean"]
+        common = [s for s in tw["sessions"] if s in base["sessions"]]
+        text = f"{ratio:.2f}x"
+        if len(common) >= 2:
+            per = [base["session_medians"][s] / tw["session_medians"][s] for s in common]
+            text += f" ({min(per):.2f}-{max(per):.2f})"
+        return text + self.derived_marker(selector, base, tw)
+
+    def ratio_cell(self, table: str, row_key: str, column: str, num: Optional[Dict], den: Optional[Dict],
+                   fmt: str = "{:.2f}x") -> str:
+        """num/den of two cells' means (no per-session range), with the derived session marker."""
+        selector = f"{table}|{row_key}|{column}"
+        if not num or not den or not num.get("mean") or not den.get("mean"):
+            return self.missing_text(selector)
+        return fmt.format(num["mean"] / den["mean"]) + self.derived_marker(selector, num, den)
+
+    def best_value_cell(self, table: str, row_key: str, column: str, best: Optional[Dict], suffix: str = "") -> str:
+        """A value picked from several cells (best-of-T): its mean plus session markers."""
+        selector = f"{table}|{row_key}|{column}"
+        if not best or best.get("mean") is None:
+            return self.missing_text(selector)
+        self.cell_log[selector] = best
+        return format_ns(best["mean"]) + suffix + self._markers(selector, best)
+
+    def significance(self, tw: Dict, base: Dict, selector: str = "") -> str:
+        """'faster' only with non-overlapping ranges in every common session."""
+        if not tw or not base or tw.get("mean") is None or base.get("mean") is None:
+            return self.missing_text(selector) if selector else "-"
+        common = [s for s in tw["sessions"] if s in base["sessions"]]
+        pairs = ([(tw["session_samples"][s], base["session_samples"][s]) for s in common] if common else
+                 [([x for v in tw["session_samples"].values() for x in v],
+                   [x for v in base["session_samples"].values() for x in v])])
+        mark = self.derived_marker(selector, tw, base) if selector else ""
+        if all(max(t) < min(b) for t, b in pairs):
+            return "faster" + mark
+        if all(min(t) > max(b) for t, b in pairs):
+            return "slower" + mark
+        return "comparable" + mark
+
+    @staticmethod
+    def _dims(r: Dict) -> str:
+        d = r.get("dimensions") or {}
+        return f"{d.get('n_rows')}x{d.get('n_cols')}" if isinstance(d, dict) and d.get("n_rows") else "?"
+
+    def ns_per_mac_cell(self, table: str, row_key: str, column: str, st: Dict) -> str:
+        selector = f"{table}|{row_key}|{column}"
+        macs = {r.get("total_edge_row_macs") for r in st.get("records") or []}
+        if st.get("mean") and len(macs) == 1 and (next(iter(macs)) or 0) > 0:
+            return f"{st['mean'] / next(iter(macs)):.2f}" + self.derived_marker(selector, st)
+        return self.missing_text(selector)
+
+    @staticmethod
+    def rustflags_notes(records: List[Dict]) -> List[str]:
+        """Original-LCPC build flags as recorded (effective_rustflags), per build variant."""
+        by_variant: Dict[str, Set[str]] = defaultdict(set)
+        for r in records:
+            if r["_meta"]["impl"] != "lcpc_orig":
+                continue
+            flags = r.get("effective_rustflags")
+            by_variant[r["_meta"].get("variant") or "?"].add(
+                "not recorded" if flags is None else (f"'{flags}'" if flags else "'' (empty: Cargo defaults)"))
+        if not by_variant:
+            return []
+        return ["Original LCPC effective RUSTFLAGS (record field effective_rustflags): "
+                + "; ".join(f"{v}: {' / '.join(sorted(f))}" for v, f in sorted(by_variant.items())) + "."]
+
+    def kdhr26_entry(self, table: str, log_n: int, machine: Optional[str]) -> Tuple[Optional[Dict], str]:
+        """[KDHR26] entry keyed by (reference CPU for the machine, log2 N)."""
+        cpu = (self.selection.kdhr26_cpu(machine) if (self.selection and machine) else None) or "EPYC 9754"
+        for entry in self.kdhr26_data.get(table, {}).get("entries", []):
+            if entry.get("log_n") == log_n and entry.get("cpu", cpu) == cpu:
+                return entry, cpu
+        return None, cpu
+
+    # ------------------------------------------------------------------
+    # Provenance
+    # ------------------------------------------------------------------
+
+    def _get_provenance_text(self) -> str:
+        used = sorted(self._used)
+        parts = []
+        for machine, run, sess in used:
+            info = self.session_info.get((machine, run, sess), {})
+            desc = []
+            if info.get("fork"):
+                desc.append("fork " + "/".join(sorted(info["fork"])))
+            if info.get("zone"):
+                desc.append("/".join(sorted(info["zone"])))
+            if info.get("vm"):
+                desc.append("VM " + "/".join(sorted(info["vm"])))
+            label = "/".join(p for p in (machine, run, sess) if p) or "local"
+            parts.append(label + (f" ({', '.join(desc)})" if desc else ""))
+        recs = self._used_records
+        lcpc = sorted({str(r.get("upstream_commit"))[:7] for r in recs if r["_meta"]["impl"] == "lcpc_orig" and r.get("upstream_commit")})
+        simd = sorted({str(r.get("upstream_commit"))[:7] for r in recs if r["_meta"]["impl"] == "simd" and r.get("upstream_commit")})
+        simd_patch = sorted({str(r["_meta"].get("simd_patch")) for r in recs
+                             if r["_meta"]["impl"] == "simd" and r["_meta"].get("simd_patch")})
+        poly = sorted({f"{str(r.get('upstream_commit'))[:7]} patch {str(r.get('patch_sha256'))[:12]}"
+                       for r in recs if r["_meta"]["impl"] == "polycommit"})
+        base = []
+        if lcpc:
+            base.append("LCPC " + "/".join(lcpc))
+        if simd:
+            base.append("SIMD-Spielman " + "/".join(simd) + (" params.patch " + "/".join(simd_patch) if simd_patch else ""))
+        if poly:
+            base.append("PolyCommit " + "/".join(poly))
+        sel = (f"selection {os.path.basename(self.selection.path)} sha256 {self.selection.sha256[:12]}"
+               if self.selection else "UNSELECTED (all records under " + ", ".join(self.result_dirs) + "; not paper evidence)")
+        watermark = " [LOCAL SMOKE - NOT A RESULT]" if (self.is_smoke or self.has_smoke_watermark) else ""
+        data = "; ".join(parts) if parts else "no measured records"
+        return (f"Provenance: {sel}; data: {data}"
+                + (f"; baselines: {'; '.join(base)}" if base else "") + f".{watermark}")
+
+    # ------------------------------------------------------------------
+    # Writers
+    # ------------------------------------------------------------------
+
+    def _begin(self, table: str):
+        self._current_table = table
+        self._used = set()
+        self._used_records = []
+
+    def _write_artefact(self, name: str, caption: str, label: str, headers: List[str],
+                        rows: List[List[Any]], notes: Optional[List[str]] = None,
+                        col_align: Optional[str] = None, key_cols: int = 1):
+        """Writes a LaTeX booktabs table and a CSV with provenance footers."""
+        provenance = self._get_provenance_text()
+        notes = list(notes or [])
+        if any("D" in str(c) and re.search(r" D\d+\.\d%", str(c)) for row in rows for c in row):
+            notes.append("D<x>%: the two session medians differ by more than 5% (Plan 06 §3); see csv/session_divergence.csv.")
+        if any(re.search(r"\[[^\]]+ only\]", str(c)) for row in rows for c in row):
+            notes.append("[sX only]: measured in fewer sessions than planned; see csv/todo_cells.csv.")
+        if (self.is_smoke or self.has_smoke_watermark) and name.startswith("table_"):
+            notes.append("LOCAL SMOKE - NOT A RESULT. Do not copy these values to paper/.")
+
+        csv_path = os.path.join(self.csv_dir, f"{name}.csv")
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow([f"# {caption}"])
+            writer.writerow([f"# {provenance}"])
+            writer.writerow([f"# Key columns: {key_cols}"])
+            for note in notes:
+                writer.writerow([f"# Note: {note}"])
+            writer.writerow(headers)
+            for row in rows:
+                writer.writerow(row)
+        print(f"[INFO] Wrote CSV: {csv_path}")
+
+        def tex(cell: Any) -> str:
+            text = escape_latex(str(cell))
+            # Session-divergence marker " D6.1%" -> " $\Delta$6.1\%".
+            return re.sub(r" D(\d+\.\d\\%)", r" $\\Delta$\1", text, count=1)
+
+        tex_path = os.path.join(self.latex_dir, f"{name}.tex")
+        col_spec = col_align or ("l" + "r" * (len(headers) - 1))
+        table_env = "table*" if len(headers) > 6 else "table"
+        with open(tex_path, "w", encoding="utf-8") as f:
+            f.write("% Auto-generated by analyze.py. Do not edit by hand.\n")
+            f.write("% Needs \\usepackage{booktabs,threeparttable}.\n")
+            f.write(f"\\begin{{{table_env}}}[t]\n\\centering\n")
+            f.write(f"\\caption{{{escape_latex(caption)}}}\n\\label{{{label}}}\n")
+            f.write("\\begin{threeparttable}\n")
+            f.write(f"\\begin{{tabular}}{{{col_spec}}}\n\\toprule\n")
+            f.write(" & ".join(escape_latex(h) for h in headers) + " \\\\\n\\midrule\n")
+            for row in rows:
+                f.write(" & ".join(tex(cell) for cell in row) + " \\\\\n")
+            f.write("\\bottomrule\n\\end{tabular}\n\\begin{tablenotes}\\footnotesize\n")
+            for note in notes:
+                f.write(f"\\item {escape_latex(note)}\n")
+            f.write(f"\\item \\textbf{{{escape_latex(provenance)}}}\n")
+            f.write("\\end{tablenotes}\n\\end{threeparttable}\n")
+            f.write(f"\\end{{{table_env}}}\n")
+        print(f"[INFO] Wrote LaTeX: {tex_path}")
+
+    def _write_plain_csv(self, name: str, headers: List[str], rows: List[List[Any]], comment: str = ""):
+        path = os.path.join(self.csv_dir, f"{name}.csv")
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            if comment:
+                writer.writerow([f"# {comment}"])
+            writer.writerow(headers)
+            writer.writerows(rows)
+        print(f"[INFO] Wrote CSV: {path}")
+
+    # ------------------------------------------------------------------
+    # Artefacts
+    # ------------------------------------------------------------------
+
+    def generate_all(self):
+        """Generates T0-T12 and F1-F3, then the per-cell statistics reports."""
+        for gen in (self.generate_T0_correctness, self.generate_T1_headline_encoding,
+                    self.generate_T2_simd_spielman, self.generate_T3_steps_breakdown,
+                    self.generate_T4_slice_sweep, self.generate_T5_field_comparison,
+                    self.generate_T6_pcs_breakdown, self.generate_T7_verifier_encoding,
+                    self.generate_T8_setup_memory, self.generate_T9_orion_shape,
+                    self.generate_T10_brakedown_vs_rs, self.generate_T11_codegen_evidence,
+                    self.generate_T12_arm_portability):
+            gen()
+        if HAS_MATPLOTLIB:
+            self.generate_F1_steps_breakdown()
+            self.generate_F2_llc_scaling()
+            self.generate_F3_thread_scaling()
+        else:
+            print("[WARN] Matplotlib not installed; skipping F1-F3 figure generation.")
+        self.write_cell_reports()
+
+    def write_cell_reports(self):
+        rows, div_rows = [], []
+        for label, st in sorted(self.cell_log.items()):
+            if st.get("mean") is None:
+                continue
+            meds = "; ".join(f"{s}={format_ns(st['session_medians'][s], 'ms', 3)}" for s in st["sessions"])
+            rel = f"{st['rel_diff'] * 100:.1f}" if st["rel_diff"] is not None else ""
+            blocks = "; ".join(sorted({r["_meta"]["block_rel"] for r in st["records"]}))
+            row = [label, len(st["sessions"]), meds, format_ns(st["mean"], "ms", 3),
+                   format_ns(st["min"], "ms", 3), format_ns(st["max"], "ms", 3), rel, blocks]
+            rows.append(row)
+            if st["diverged"]:
+                div_rows.append(row)
+        headers = ["Cell", "Sessions", "Session medians (ms)", "Mean of medians (ms)", "Min (ms)",
+                   "Max (ms)", "Session rel. diff (%)", "Blocks"]
+        self._write_plain_csv("cell_statistics", headers, rows,
+                              "Every table cell: per-session medians, mean of session medians, min-max over samples.")
+        self._write_plain_csv("session_divergence", headers, div_rows,
+                              "Cells whose session medians differ by more than 5% (Plan 06 §3: flag; re-run if VM time allows).")
+        self._write_plain_csv("todo_cells", ["Cell", "Status"], sorted(self.todo_cells.items()),
+                              "Cells that are pending re-measurement or documented omissions (selection.json).")
+
+    # ---- T0 ---------------------------------------------------------------
+    def generate_T0_correctness(self):
+        self._begin("T0")
+        headers = ["Gate / Invariant", "Evaluation Target", "Oracle / Reference", "Commit / Tag", "Status"]
+        rows = [
+            ["Bit-exact prover encoding (mode a)", "SdigCode6 (Mont127)", "Original LCPC (f0e2116)", "step/01..HEAD", "PASS"],
+            ["Bit-exact encoding (mode b)", "Mont127, Mers127, Fp2M61", "SIMD-Spielman tv/ files", "step/02..HEAD", "PASS"],
+            ["Horizontal slice invariance", "s in {1, 2, 4, 8, 16, 32}", "s = 1 non-sliced baseline", "step/07..HEAD", "PASS"],
+            ["Expander thread invariance", "T in {1, 2, 4, 8, 15}", "T = 1 single-threaded baseline", "step/08..HEAD", "PASS"],
+            ["Field differential tests", "Mont127, Mers127, Fp2M61", "BigUint / rug big-integer oracle", "step/02..HEAD", "PASS"],
+            ["PCS end-to-end verification", "Commitment & proof verification", "Upstream Ligero/Brakedown PCS", "step/01..HEAD", "PASS"],
+        ]
+        # Vector-instruction audit rows are derived from the selected codegen
+        # reports (one per architecture), never hard-coded.
+        by_arch: Dict[str, List[Dict]] = defaultdict(list)
+        for g in self.codegen_groups():
+            by_arch[g["arch"]].append(g)
+            for r in g["reports"]:
+                m = r["_meta"]
+                self._used.add((m["machine"], m["run"], m["session_dir"]))
+        for arch in sorted(by_arch) or ["(none)"]:
+            gs = by_arch.get(arch, [])
+            statuses = sorted({st for g in gs for st in g["statuses"]})
+            if not gs:
+                status = self.missing_text("T0|Vector-instruction audit|Status")
+            elif all(g["ok"] for g in gs):
+                status = "PASS"
+            else:
+                documented = all(g["ok"] or (self.selection and self.selection.omission_for(g["selector"])) for g in gs)
+                status = "/".join(statuses) + (" (documented, see T11)" if documented else "")
+            n_rep = sum(len(g["reports"]) for g in gs)
+            arith = "/".join(str(g["vec_arith"]) for g in gs) or "-"
+            rows.insert(5, [f"Vector-instruction audit ({arch})", f"Hot kernels of the measured binaries ({n_rep} reports)",
+                            f"check_codegen.py: zero vector arithmetic (found {arith})",
+                            "@ " + "/".join(sorted({g["fork"] for g in gs})) if gs else "-", status])
+        notes = ["Gates run by the reproduction scripts before every benchmark block (tests must pass or the block is not timed).",
+                 "The vector-instruction audit rows are derived from the selected check_codegen.py reports (T11)."]
+        self._write_artefact("table_T0_correctness", "Correctness Gates and Verification Summary for Measured Binaries",
+                             "tab:correctness_gates", headers, rows, notes, col_align="lllll", key_cols=1)
+
+    # ---- T1 ---------------------------------------------------------------
+    def generate_T1_headline_encoding(self):
+        """E1: This Work (adaptive headline blocks only) vs original LCPC per build variant vs PolyCommit."""
+        self._begin("T1")
+        T = "T1"
+        variant_cols = []
+        for v in PRIMARY_LCPC_VARIANTS:
+            variant_cols += [f"LCPC {v} (ms)", f"Speedup vs LCPC {v}", f"Significance vs {v}"]
+        headers = (["log2(N)", "T", "k x n (TW/LCPC)", "This Work (ms)", "TW ns/MAC"] + variant_cols
+                   + ["PolyCommit k x n", "PolyCommit sec=80 (ms)", "Speedup vs PolyCommit", "Significance vs PolyCommit"])
+        tw_pool = self.select(self.reports_this_work, family="tw_a", params="lcpc-sdig6", shape="brakedown")
+        lcpc_pool = self.select(self.reports_lcpc_orig, family="lcpc_a", params="lcpc-sdig6")
+        poly_pool = self.select(self.reports_polycommit, family="polycommit")
+        keys = sorted({(int(r["log_n"]), int(r.get("threads", 1))) for r in tw_pool + lcpc_pool + poly_pool})
+        rows = []
+        dims_mismatch = []
+        for log_n, threads in keys:
+            if threads not in (1, 8):
+                continue
+            rk = f"{log_n},{threads}"
+            tw_recs = self.select(tw_pool, log_n=log_n, threads=threads, slice_mode="adaptive")
+            tw = self.stat(tw_recs, label=f"{T}|{rk}|This Work")
+            tw_dims = sorted({self._dims(r) for r in tw_recs})
+            lcpc_dims = sorted({self._dims(r) for r in self.select(lcpc_pool, log_n=log_n, threads=threads)})
+            dims = ("/".join(tw_dims) or "-") + " / " + ("/".join(lcpc_dims) or "-")
+            if tw_dims and tw_dims == lcpc_dims:
+                dims = "/".join(tw_dims) + " (both)"
+            if tw_dims and lcpc_dims and tw_dims != lcpc_dims:
+                dims_mismatch.append(f"2^{log_n} T={threads}: This Work {'/'.join(tw_dims)}, LCPC {'/'.join(lcpc_dims)}")
+            ns_mac = self.ns_per_mac_cell(T, rk, "TW ns/MAC", tw)
+            row = [log_n, threads, dims, self.value_cell(T, rk, "This Work (ms)", tw), ns_mac]
+            for v in PRIMARY_LCPC_VARIANTS:
+                recs = self.select(lcpc_pool, variant=v, log_n=log_n, threads=threads)
+                st = self.stat(recs, label=f"{T}|{rk}|LCPC {v}")
+                row += [self.value_cell(T, rk, f"LCPC {v} (ms)", st),
+                        self.speedup_cell(T, rk, f"Speedup vs LCPC {v}", st, tw),
+                        self.significance(tw, st, f"{T}|{rk}|Significance vs {v}")]
+            precs = self.select(poly_pool, log_n=log_n, threads=threads)
+            pst = self.stat(precs, label=f"{T}|{rk}|PolyCommit")
+            pd = (precs[0].get("dimensions") or {}) if precs else {}
+            row += [f"{pd.get('n_rows')}x{pd.get('n_cols')}" if precs else self.missing_text(f"{T}|{rk}|PolyCommit k x n"),
+                    self.value_cell(T, rk, "PolyCommit sec=80 (ms)", pst),
+                    self.speedup_cell(T, rk, "Speedup vs PolyCommit", pst, tw),
+                    self.significance(tw, pst, f"{T}|{rk}|Significance vs PolyCommit")]
+            rows.append(row)
+        notes = [
+            "Mode (a) SdigCode6; This Work = blocks full_this_work_mode_a_* only (adaptive slices, Mont127); "
+            "original LCPC = blocks full_lcpc_orig_mode_a_* over Ft127 (the same prime), one column group per build variant (D10).",
+            "LCPC as-published-as-is: upstream Cargo defaults with default BLAKE3 features; fork-flags-portable: the fork's "
+            "rustflags with portable-only BLAKE3. The variants are never pooled.",
+            "PolyCommit: same prime, pinned default graph constants, explicit square shape, opening sec_param 80; its codeword "
+            "length differs (PolyCommit k x n column). Encoding only.",
+            "Cells: mean of per-session medians [min-max over all timed runs]. Speedup = ratio of the means "
+            "(range over per-session ratios). 'faster' only with non-overlapping ranges in every common session.",
+            "ns/MAC = mean encode time / total edge-row MACs of the same records.",
+        ]
+        notes.append("k x n column: This Work / original LCPC matrix (rows x codeword length); '(both)' when equal.")
+        if dims_mismatch:
+            notes.append("LCPC matrix dimensions differ from This Work at: " + "; ".join(dims_mismatch) + ".")
+        notes += self.rustflags_notes(self._used_records)
+        if self.profile == "smoke" and self.skipped_baselines.get("PolyCommit"):
+            notes.append("PolyCommit cells marked SKIPPED for this local smoke: " + self.skipped_baselines["PolyCommit"])
+        self._write_artefact("table_T1_headline_encoding",
+                             "Headline Prover Encoding Comparison (This Work vs. Original LCPC vs. PolyCommit)",
+                             "tab:headline_encoding", headers, rows, notes, key_cols=2)
+
+    # ---- T2 ---------------------------------------------------------------
+    def generate_T2_simd_spielman(self):
+        """E2/E15: mode (b) This Work vs SIMD-Spielman (T=1, T=8 and 7 workers + coordinator)."""
+        self._begin("T2")
+        T = "T2"
+        headers = ["Field", "T", "log2(N)", "This Work (ms)", "SIMD-Spielman T workers (ms)",
+                   "SIMD-Spielman 7 workers + coordinator (ms)", "SIMD Gap Recovered (8 cores)",
+                   "SIMD best-of-T incl. T=1 (ms)", "Gap vs SIMD best-of-T", "SIMD MT slower than its T=1",
+                   "SIMD params.patch", "[KDHR26] SIMD reported (ms)", "[KDHR26] LCPC/SIMD reported",
+                   "E15 measured LCPC as-published-as-is/SIMD", "Measured LCPC fork-flags-portable/SIMD"]
+        tw_pool = self.select(self.reports_this_work, family="tw_b", params="simd-spielman", shape="brakedown")
+        simd_pool = self.select(self.reports_simd_spielman, family="simd", params="simd-spielman", shape="brakedown")
+        lcpc_pool = self.select(self.reports_lcpc_orig, family="lcpc_a", params="lcpc-sdig6")
+        keys = sorted({(r.get("field"), int(r["log_n"]), int(r.get("threads", 1))) for r in tw_pool + simd_pool
+                       if int(r.get("threads", 1)) in (1, 8)}, key=lambda k: (str(k[0]), k[2], k[1]))
+        rows = []
+        cpu_used = set()
+        mt_overhead_rows, mixed_patch_rows = [], []
+        for field, log_n, threads in keys:
+            rk = f"{field},{threads},{log_n}"
+            tw_recs = self.select(tw_pool, field=field, log_n=log_n, threads=threads)
+            if self.has_smoke_watermark and not tw_recs:
+                continue
+            tw = self.stat(tw_recs, label=f"{T}|{rk}|This Work")
+            mt = self.simd_multithread_cells(T, rk, self.select(simd_pool, field=field, log_n=log_n), threads, tw,
+                                             "SIMD-Spielman T workers (ms)", "SIMD-Spielman 7 workers + coordinator (ms)",
+                                             "SIMD Gap Recovered (8 cores)")
+            simd, best_all = mt["simd"], mt["best_all"]
+            simd_text = mt["simd_text"]
+            if simd.get("mean") is None and self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
+                simd_text = "SKIPPED"
+            if mt["slower"]:
+                mt_overhead_rows.append(f"{field} 2^{log_n}")
+            if mt["mixed_patch"]:
+                mixed_patch_rows.append(f"{field} 2^{log_n}")
+            machine = tw.get("machine") or simd.get("machine")
+            entry, cpu = self.kdhr26_entry("table_2", log_n, machine)
+            if field != "Mont127":
+                rep_ms = rep_ratio = "N/A (KDHR26 Table 2 reports Mont127 only)"
+            elif entry is None:
+                rep_ms = rep_ratio = f"N/A (no KDHR26 {cpu} entry for 2^{log_n})"
+            else:
+                cpu_used.add(cpu)
+                key_ms = "simd_spielman_1t_ms" if threads == 1 else "simd_spielman_8t_ms"
+                key_sp = "lcpc_1t_speedup" if threads == 1 else "lcpc_8t_speedup"
+                rep_ms = f"{entry[key_ms]}" if entry.get(key_ms) is not None else f"N/A (not reported for {cpu})"
+                rep_ratio = f"{entry[key_sp]}x" if entry.get(key_sp) is not None else f"N/A (not reported for {cpu})"
+            measured_ratios = []
+            for v in PRIMARY_LCPC_VARIANTS:
+                col = ("E15 measured LCPC as-published-as-is/SIMD" if v == "as-published-as-is"
+                       else "Measured LCPC fork-flags-portable/SIMD")
+                if field != "Mont127":
+                    measured_ratios.append("N/A (original LCPC measured over Ft127/Mont127 prime only)")
+                    continue
+                lst = self.stat(self.select(lcpc_pool, variant=v, log_n=log_n, threads=threads),
+                                label=f"{T}|{rk}|LCPC {v}")
+                # At T=8 the SIMD reference is its best-of-T time (incl. T=1), so the
+                # ratio is not inflated by SIMD-Spielman's small-N threading overhead.
+                measured_ratios.append(self.speedup_cell(T, rk, col, lst, best_all or {}))
+            rows.append([field, threads, log_n, self.value_cell(T, rk, "This Work (ms)", tw), simd_text,
+                         mt["simd7_text"], mt["gap"], mt["best_text"], mt["gap_best"], mt["slower_text"],
+                         mt["patch_text"], rep_ms, rep_ratio] + measured_ratios)
+        cpu_text = ", ".join(sorted(cpu_used)) or "EPYC 9754"
+        notes = [
+            "Mode (b) parameters matching [KDHR26]; This Work = blocks full_this_work_mode_b_*; SIMD-Spielman runs its "
+            "upstream slice table (slice_mode 'table').",
+            "SIMD Gap Recovered = T_SIMD / T_ThisWork (>1: This Work faster in that configuration). At T=8 SIMD-Spielman's "
+            "upstream encoder adds a spin-waiting coordinator thread; on the 8-core host the T=8 blocks let it share a worker "
+            "core, and the 7 workers + coordinator blocks use exactly 8 cores. The 8-core gap uses the faster of the two.",
+            "SIMD best-of-T also includes SIMD-Spielman's own T=1 time. Where 'SIMD MT slower than its T=1' is yes, the 8-core "
+            "gap reflects SIMD-Spielman's multithreading overhead at that size, not a faster encoder; use the best-of-T gap.",
+            f"[KDHR26] columns quoted verbatim from Table 2 (page 11) for {cpu_text}, the reference CPU recorded for this "
+            "machine in selection.json (Zen 4c; our host is a Zen 4 EPYC 9B14). E15 compares our measured LCPC/SIMD ratio "
+            "with their reported LCPC speedup; at T=8 our ratio uses SIMD-Spielman's best-of-T time.",
+        ]
+        if mt_overhead_rows:
+            notes.append("SIMD-Spielman 8-core time exceeds its T=1 time at: " + ", ".join(mt_overhead_rows) + ".")
+        notes += self.simd_patch_notes(mixed_patch_rows)
+        if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
+            notes.append("SIMD-Spielman cells marked SKIPPED for this local smoke: " + self.skipped_baselines["SIMD-Spielman"])
+        self._write_artefact("table_T2_simd_spielman",
+                             "Comparison with SIMD-Spielman (AVX-512 IFMA) and Prior Reported Results",
+                             "tab:simd_spielman_comparison", headers, rows, notes, key_cols=3)
+
+    def simd_multithread_cells(self, T: str, rk: str, recs: List[Dict], threads: int, tw: Dict,
+                               col_t: str, col_7w: str, col_gap: str) -> Dict[str, Any]:
+        """SIMD-Spielman cells shared by T2 and T9 for one (field, N) and row thread count.
+
+        At T=8 the 8-core SIMD time is the faster of its T=8 run (coordinator
+        sharing a worker core) and its 7 workers + coordinator run; best-of-T
+        additionally includes its own T=1 time, and 'MT slower than its T=1'
+        flags sizes where SIMD-Spielman's multithreading is a slowdown.
         """
-        if not reports:
-            return {"mean_median_ns": None, "min_ns": None, "max_ns": None, "diverged": False, "samples": []}
+        simd = self.stat(self.select(recs, threads=threads), label=f"{T}|{rk}|SIMD T")
+        simd_t1 = simd if threads == 1 else self.stat(self.select(recs, threads=1), label=f"{T}|{rk}|SIMD T=1")
+        out: Dict[str, Any] = {"simd": simd, "slower": False, "mixed_patch": False}
+        out["simd_text"] = self.value_cell(T, rk, col_t, simd)
+        used = [simd]
+        if threads == 8:
+            simd7 = self.stat(self.select(recs, threads=7), label=f"{T}|{rk}|SIMD 7W")
+            out["simd7_text"] = self.value_cell(T, rk, col_7w, simd7)
+            cands = [st for st in (simd, simd7) if st.get("mean") is not None]
+            best8 = min(cands, key=lambda st: st["mean"]) if cands else None
+            pool = cands + ([simd_t1] if simd_t1.get("mean") is not None else [])
+            best_all = min(pool, key=lambda st: st["mean"]) if pool else None
+            used += [simd7, simd_t1]
+        else:
+            out["simd7_text"] = "N/A (T=1 row)"
+            best8 = simd if simd.get("mean") is not None else None
+            best_all = best8
+        out["best8"], out["best_all"] = best8, best_all
+        out["gap"] = self.speedup_cell(T, rk, col_gap, best8, tw)
+        if threads == 1:
+            out["best_text"] = out["gap_best"] = out["slower_text"] = "N/A (T=1 row)"
+        else:
+            which = ""
+            if best_all is not None:
+                which = " (T=1)" if best_all is simd_t1 else (" (7W+coord)" if best_all is not simd else " (T=8)")
+            out["best_text"] = self.best_value_cell(T, rk, "SIMD best-of-T incl. T=1 (ms)", best_all, which)
+            out["gap_best"] = self.speedup_cell(T, rk, "Gap vs SIMD best-of-T", best_all, tw)
+            if best8 and simd_t1.get("mean") is not None:
+                out["slower"] = best8["mean"] > simd_t1["mean"]
+                out["slower_text"] = ("yes" if out["slower"] else "no") + self.derived_marker(
+                    f"{T}|{rk}|SIMD MT slower than its T=1", best8, simd_t1)
+            else:
+                out["slower_text"] = self.missing_text(f"{T}|{rk}|SIMD MT slower than its T=1")
+        patches = []
+        for st, label in ((simd_t1, "T=1"), (simd, f"T={threads}"), (used[1] if threads == 8 else None, "7W")):
+            if st and st.get("records") and (threads == 8 or label == "T=1"):
+                ps = sorted({str(r["_meta"].get("simd_patch") or "?")[:8] for r in st["records"]})
+                patches.append((label, "/".join(ps)))
+        distinct = {p for _, p in patches}
+        if not patches:
+            out["patch_text"] = self.missing_text(f"{T}|{rk}|SIMD params.patch")
+        elif len(distinct) == 1:
+            out["patch_text"] = next(iter(distinct))
+        else:
+            out["mixed_patch"] = True
+            out["patch_text"] = "MIXED " + ", ".join(f"{l}:{p}" for l, p in patches)
+        return out
 
-        # Collect session medians
-        session_medians = []
-        all_samples = []
-        for r in reports:
-            samples = self._extract_samples(r, op_name)
-            if samples:
-                all_samples.extend(samples)
-                s_sorted = sorted(samples)
-                n = len(s_sorted)
-                med = s_sorted[n // 2] if n % 2 == 1 else (s_sorted[n // 2 - 1] + s_sorted[n // 2]) / 2.0
-                session_medians.append(float(med))
+    def simd_patch_notes(self, mixed_rows: List[str]) -> List[str]:
+        notes = ["SIMD params.patch: sha256 prefix of the hash-checked patch applied to SIMD-Spielman in the blocks "
+                 "used by the row (part of the cell key; records of different patches are never pooled). "
+                 "12f29de2 and d9cf97f0 differ only by a pinThread(THREADS) call added at the start of the benchmark "
+                 "mains, which pins the spin-waiting coordinator (main) thread after the workers "
+                 "(external/simd_spielman/params.patch); the encoder code is unchanged."]
+        if mixed_rows:
+            notes.append("WARNING: rows comparing SIMD-Spielman runs built with different params.patch versions "
+                         "(best-of-T and 'MT slower than its T=1' across patches): " + ", ".join(mixed_rows) + ".")
+        return notes
 
-        if not session_medians:
-            return {"mean_median_ns": None, "min_ns": None, "max_ns": None, "diverged": False, "samples": []}
+    # ---- T3 ---------------------------------------------------------------
+    def _steps_rows(self, mode: str) -> Tuple[List[str], Dict[str, Dict[int, Dict]], Dict[str, Set[str]], Dict[str, str], List[int]]:
+        tags = sorted(self.reports_steps, key=lambda t: (t == "HEAD", t))
+        values: Dict[str, Dict[int, Dict]] = {}
+        fields: Dict[str, Set[str]] = {}
+        reasons: Dict[str, str] = {}
+        sizes = sorted({int(r.get("log_n", 0)) for t in tags for r in self.reports_steps[t]
+                        if str(r.get("mode", "a")) == mode})
+        for tag in tags:
+            recs = [r for r in self.reports_steps[tag] if str(r.get("mode", "a")) == mode]
+            values[tag] = {}
+            fields[tag] = {str(r.get("field")) for r in recs if r.get("field") and self._extract_samples(r)}
+            for r in recs:
+                if not self._extract_samples(r) and r.get("reason"):
+                    reasons[tag] = str(r["reason"])
+            for n in sizes:
+                values[tag][n] = self.stat([r for r in recs if int(r.get("log_n", 0)) == n],
+                                           label=f"T3|{mode},{tag}|N=2^{n}")
+        return tags, values, fields, reasons, sizes
 
-        mean_med = sum(session_medians) / len(session_medians)
-        diverged = False
-        if len(session_medians) >= 2:
-            m1, m2 = session_medians[0], session_medians[1]
-            min_m = min(m1, m2)
-            if min_m > 0 and abs(m1 - m2) / min_m > 0.05:
-                diverged = True
-
-        return {
-            "mean_median_ns": mean_med,
-            "min_ns": min(all_samples) if all_samples else mean_med,
-            "max_ns": max(all_samples) if all_samples else mean_med,
-            "session_medians": session_medians,
-            "diverged": diverged,
-            "samples": all_samples,
+    def generate_T3_steps_breakdown(self):
+        """E3: cumulative per-technique breakdown, mode (a) and mode (b), T=1."""
+        self._begin("T3")
+        T = "T3"
+        technique = {
+            "step/01-modernize": "Upstream modernize & workspace harness",
+            "step/02-fields": "Custom field trait & fast Montgomery/Mersenne",
+            "step/03-column-major": "Batched column-major matrix representation",
+            "step/04-r2l": "R2L evaluation order (no transposed graphs)",
+            "step/05-lazy": "Expander-level lazy reduction",
+            "step/06-blocking": "Multi-edge memory cache blocking",
+            "step/07-slicing": "Matrix horizontal LLC slicing",
+            "step/08-threads": "Expander-level multithreading",
+            "step/09-codegen": "Scalar codegen & compiler vectorization verify",
+            "HEAD": "Measured HEAD",
         }
+        all_sizes = sorted({int(r.get("log_n", 0)) for recs in self.reports_steps.values() for r in recs})
+        ref = 20 if 20 in all_sizes else (all_sizes[len(all_sizes) // 2] if all_sizes else 20)
+        headers = ["Mode", "Step Tag", "Field", "Optimization Technique"] + [f"N=2^{n} (ms)" for n in all_sizes] + \
+                  [f"Step Speedup (N=2^{ref})", f"Cumulative Speedup (N=2^{ref})"]
+        rows = []
+        notes_extra = []
+        na_reasons = set()
+        for mode in ("a", "b"):
+            tags, values, fields, reasons, sizes = self._steps_rows(mode)
+            if not sizes:
+                continue
+            na_reasons.update(f"Mode ({mode}) N/A rows: {reasons[t]}" for t in tags if not fields[t] and t in reasons)
+            prev = first = None
+            for tag in tags:
+                rk = f"{mode},{tag}"
+                field_text = "/".join(sorted(fields[tag])) or "-"
+                if not fields[tag]:
+                    na = ("N/A (mode (b) requires step/04-r2l)" if mode == "b" else "N/A (not measured at this tag)")
+                    rows.append([mode, tag, "N/A (not applicable)", technique.get(tag, "Incremental optimization")]
+                                + [na for _ in all_sizes] + [na, na])
+                    continue
+                cells = [self.value_cell(T, rk, f"N=2^{n} (ms)", values[tag].get(n) or {}, with_range=False)
+                         if n in sizes else "N/A (size not run in this mode)" for n in all_sizes]
+                cur_st = values[tag].get(ref) or {}
+                cur = cur_st.get("mean")
+                step_txt = "baseline" if prev is None else self.ratio_cell(T, rk, f"Step Speedup (N=2^{ref})", prev, cur_st)
+                cum_txt = "baseline" if first is None else self.ratio_cell(T, rk, f"Cumulative Speedup (N=2^{ref})",
+                                                                         first, cur_st)
+                if cur:
+                    prev = cur_st
+                    first = first or cur_st
+                rows.append([mode, tag, field_text, technique.get(tag, "Incremental optimization")] + cells + [step_txt, cum_txt])
+            changed = [t for t in tags if fields[t] and fields[t] != fields[tags[-1]]]
+            if changed:
+                notes_extra.append(f"Mode ({mode}): {', '.join(changed)} measured over "
+                                   f"{'/'.join(sorted(set().union(*(fields[t] for t in changed))))}, later tags over "
+                                   f"{'/'.join(sorted(fields[tags[-1]]))}; the following step ratio includes that field change.")
+        notes = [
+            "Evaluated at T=1 with steps.sh: each tag's mode is taken from the block named for it (full_steps_mode_a / "
+            "full_steps_mode_b); both blocks time both modes, the other copy is excluded in selection.json.",
+            f"Measured sizes: {', '.join('2^%d' % n for n in all_sizes)}. Plan 06 E3 also lists 2^28 (not measured).",
+            "Mode (b) uses SIMD-Spielman parameters over Mers127; it is unavailable before step/04-r2l.",
+            "The per-step breakdown is order-dependent; optimizations interact non-linearly.",
+        ] + notes_extra + sorted(na_reasons)
+        self._write_artefact("table_T3_steps_breakdown", "Cumulative Technique Breakdown Across Tagged Commits",
+                             "tab:steps_breakdown", headers, rows, notes, key_cols=2)
 
-    def _compute_significance(self, this_work_reports: List[Dict], baseline_reports: List[Dict],
-                              op_name: str = "encode_matrix") -> str:
+    # ---- T4 ---------------------------------------------------------------
+    def generate_T4_slice_sweep(self):
+        """E5: explicit slice sweep vs the adaptive model."""
+        self._begin("T4")
+        T = "T4"
+        headers = ["log2(N)", "T", "s=1 (ms)", "Best s*", "Best (ms)", "Adaptive s", "Sweep at adaptive s (ms)",
+                   "Headline adaptive (ms)", "Adaptive Gap (%)", "M4 gap <= 10%", "Slicing Speedup (s=1 / best)"]
+        sweep = self.select(self.reports_this_work, family="slice_sweep", params="lcpc-sdig6", shape="brakedown")
+        headline = self.select(self.reports_this_work, family="tw_a", params="lcpc-sdig6", shape="brakedown",
+                               slice_mode="adaptive")
+        rows, verdicts = [], []
+        for log_n, threads in sorted({(int(r["log_n"]), int(r.get("threads", 1))) for r in sweep}):
+            rk = f"{log_n},{threads}"
+            recs = self.select(sweep, log_n=log_n, threads=threads)
+            by_s = {s: self.stat(self.select(recs, slices=s), label=f"{T}|{rk}|s={s}")
+                    for s in sorted({int(r["slices"]) for r in recs})}
+            measured = {s: st for s, st in by_s.items() if st.get("mean") is not None}
+            if not measured:
+                continue
+            best_s = min(measured, key=lambda s: measured[s]["mean"])
+            adapt = {int(r["adaptive_slices"]) for r in recs if r.get("adaptive_slices") is not None}
+            adapt_s = next(iter(adapt)) if len(adapt) == 1 else None
+            head = self.stat(self.select(headline, log_n=log_n, threads=threads), label=f"{T}|{rk}|headline adaptive")
+            gap_txt = verdict = "-"
+            if adapt_s in measured:
+                gap = (measured[adapt_s]["mean"] - measured[best_s]["mean"]) / measured[best_s]["mean"] * 100.0
+                gap_txt = f"{gap:.1f}%" + self.derived_marker(f"{T}|{rk}|Adaptive Gap (%)", measured[adapt_s],
+                                                              measured[best_s])
+                verdict = "yes" if gap <= 10.0 else "no"
+                verdicts.append(verdict)
+            else:
+                gap_txt = verdict = self.missing_text(f"{T}|{rk}|Adaptive Gap (%)")
+            s1 = by_s.get(1) or {}
+            spd = self.ratio_cell(T, rk, "Slicing Speedup (s=1 / best)", s1, measured[best_s])
+            rows.append([log_n, threads, self.value_cell(T, rk, "s=1 (ms)", s1, with_range=False), best_s,
+                         self.value_cell(T, rk, "Best (ms)", measured[best_s], with_range=False),
+                         adapt_s if adapt_s is not None else self.missing_text(f"{T}|{rk}|Adaptive s"),
+                         self.value_cell(T, rk, "Sweep at adaptive s (ms)", measured.get(adapt_s) or {}, with_range=False),
+                         self.value_cell(T, rk, "Headline adaptive (ms)", head, with_range=False),
+                         gap_txt, verdict, spd])
+        swept = sorted({int(r["slices"]) for r in sweep})
+        notes = [
+            "Blocks full_slice_sweep_* (explicit slices s in {" + ", ".join(map(str, swept)) + "}), Mont127, mode (a). "
+            "Adaptive s = the model's choice recorded in the sweep records; the headline column is the separately measured "
+            "full_this_work_mode_a_* block.",
+            "Adaptive Gap = (T(s_adapt) - T(s*)) / T(s*) within the sweep. "
+            + (f"M4 criterion (gap <= 10%) met in {verdicts.count('yes')} of {len(verdicts)} rows." if verdicts else
+               "M4 criterion not evaluated (no sweep at the adaptive s)."),
+        ]
+        self._write_artefact("table_T4_slice_sweep", "LLC Slice Sweep and Adaptive Cache Model Validation",
+                             "tab:slice_sweep", headers, rows, notes, key_cols=2)
+
+    # ---- T5 ---------------------------------------------------------------
+    def generate_T5_field_comparison(self):
+        """E7: field microbenchmarks + mode (b) encodings at T=1 (same parameters for every field)."""
+        self._begin("T5")
+        T = "T5"
+        sizes = (20, 24)
+        headers = ["Field", "Security (bits)", "Mul (ns)", "MAC (ns)", "Reduce (ns)"] + \
+                  [f"Encode N=2^{n} T=1 (ms)" for n in sizes] + [f"Cost N=2^{n} (ns/MAC)" for n in sizes]
+        micro = [fb for fb in self.field_benchmarks if fb["_meta"]["family"] in ("tw_a", "tw_b", "unknown", None)
+                 or not self.selection]
+        pool = self.select(self.reports_this_work, family="tw_b", params="simd-spielman", shape="brakedown", threads=1)
+        rows = []
+        for f in ("Mont127", "Mers127", "Fp2M61", "Ft127"):
+            rk = f
+            ops = []
+            for op in ("mul", "mac", "reduce"):
+                per_session: Dict[str, List[float]] = defaultdict(list)
+                for fb in micro:
+                    if fb.get("field") == f and safe_float((fb.get(op) or {}).get("ns_per_op")):
+                        per_session[fb["_meta"]["session"]].append(float(fb[op]["ns_per_op"]))
+                        m = fb["_meta"]
+                        self._used.add((m["machine"], m["run"], m["session_dir"]))
+                meds = [median(v) for v in per_session.values()]
+                ops.append(f"{sum(meds) / len(meds):.2f}" if meds else self.missing_text(f"{T}|{rk}|{op}"))
+            enc, cost = [], []
+            for n in sizes:
+                if f == "Ft127":
+                    enc.append("N/A (test-only oracle field; no mode (b) encoder)")
+                    cost.append("N/A (test-only oracle field; no mode (b) encoder)")
+                    continue
+                if self.has_smoke_watermark and n == 24:
+                    enc.append("N/A (N=2^24 omitted from local smoke)")
+                    cost.append("N/A (N=2^24 omitted from local smoke)")
+                    continue
+                st = self.stat(self.select(pool, field=f, log_n=n), label=f"{T}|{rk}|encode 2^{n}")
+                enc.append(self.value_cell(T, rk, f"Encode N=2^{n} T=1 (ms)", st))
+                cost.append(self.ns_per_mac_cell(T, rk, f"Cost N=2^{n} (ns/MAC)", st))
+            rows.append([f, 122 if f == "Fp2M61" else 127] + ops + enc + cost)
+        notes = [
+            "Microbenchmarks: per session the median over the field_microbenchmarks records of the headline blocks, then "
+            "the mean over sessions (ns per operation).",
+            "Encodings: mode (b) SIMD-Spielman parameters for every field (blocks full_this_work_mode_b_*), T=1, adaptive "
+            "slices; cost = mean encode time / total edge-row MACs of the same records.",
+            "Security caveat: Fp2M61 is F_{(2^61-1)^2}, 122 bits rather than 127.",
+            "Ft127 is LCPC's field, kept as a test-only oracle in the fork.",
+        ]
+        self._write_artefact("table_T5_field_comparison", "Field Arithmetic Microbenchmarks and Encoding Comparison",
+                             "tab:field_comparison", headers, rows, notes, key_cols=1)
+
+    # ---- T6 ---------------------------------------------------------------
+    @staticmethod
+    def _hash_label(r: Dict) -> str:
+        mode = str(r.get("hash_mode") or "")
+        if mode == "portable-only":
+            return "BLAKE3 portable"
+        if mode.startswith("as-is"):
+            return "BLAKE3 default features (runtime SIMD dispatch)"
+        return mode or "hash unknown"
+
+    def _impl_rows(self, family_tw: str, family_lcpc: str, pool_tw: List[Dict], pool_lcpc: List[Dict]):
+        yield "This Work", self.select(pool_tw, family=family_tw, params="lcpc-sdig6", shape="brakedown", slice_mode="adaptive")
+        for v in PRIMARY_LCPC_VARIANTS:
+            yield f"Original LCPC {v}", self.select(pool_lcpc, family=family_lcpc, params="lcpc-sdig6", variant=v)
+
+    def generate_T6_pcs_breakdown(self):
+        """E8: commit (encode/hash), prove, verify, proof size; per implementation and LCPC variant."""
+        self._begin("T6")
+        T = "T6"
+        headers = ["Implementation", "T", "log2(N)", "Hashing", "Commit (ms)", "Encode (ms)", "Hash (ms)",
+                   "Enc/Hash (%)", "Prove (ms)", "Verify (ms)", "Proof Size (B)"]
+        rows, regress = [], []
+        means: Dict[Tuple[str, int, int, str], Optional[float]] = {}
+        for label, pool in self._impl_rows("tw_a", "lcpc_a", self.reports_this_work, self.reports_lcpc_orig):
+            for threads in (1, 8):
+                for log_n in (20, 24, 28):
+                    recs = self.select(pool, threads=threads, log_n=log_n)
+                    rk = f"{label},{threads},{log_n}"
+                    if not recs and not (self.selection and self.selection.omission_for(f"{T}|{rk}|Commit (ms)")):
+                        continue
+                    sts = {op: self.stat(recs, op, label=f"{T}|{rk}|{op}") for op in
+                           ("commit_total", "encode_matrix", "hash_matrix_decomposition", "prove", "verify")}
+                    for op, st in sts.items():
+                        means[(label, threads, log_n, op)] = st.get("mean")
+                    enc, hsh = sts["encode_matrix"].get("mean"), sts["hash_matrix_decomposition"].get("mean")
+                    split = f"{enc / (enc + hsh) * 100:.1f} / {hsh / (enc + hsh) * 100:.1f}" if enc and hsh else \
+                        self.missing_text(f"{T}|{rk}|Enc/Hash (%)")
+                    proof = {r.get("proof_size_bytes") for r in recs if r.get("proof_size_bytes")}
+                    rows.append([label, threads, log_n,
+                                 "/".join(sorted({self._hash_label(r) for r in recs})) or self.missing_text(f"{T}|{rk}|Hashing"),
+                                 self.value_cell(T, rk, "Commit (ms)", sts["commit_total"], with_range=False),
+                                 self.value_cell(T, rk, "Encode (ms)", sts["encode_matrix"], with_range=False),
+                                 self.value_cell(T, rk, "Hash (ms)", sts["hash_matrix_decomposition"], with_range=False),
+                                 split,
+                                 self.value_cell(T, rk, "Prove (ms)", sts["prove"], with_range=False),
+                                 self.value_cell(T, rk, "Verify (ms)", sts["verify"], with_range=False),
+                                 "/".join(str(p) for p in sorted(proof)) if proof else self.missing_text(f"{T}|{rk}|Proof Size (B)")])
+        for (label, threads, log_n, op), v in means.items():
+            if label == "This Work" or op not in ("prove", "verify"):
+                continue
+            tw = means.get(("This Work", threads, log_n, op))
+            if tw and v and tw > v:
+                regress.append(f"{op} T={threads} 2^{log_n} vs {label.replace('Original LCPC ', '')} ({tw / v:.2f}x slower)")
+        notes = [
+            "Mode (a) only. This Work = full_this_work_mode_a_* (adaptive); original LCPC rows are labelled by build variant "
+            "and BLAKE3 backend (Hashing column): the hash columns are like-for-like only between rows with the same backend.",
+            "Cells: mean of per-session medians of each operation.",
+        ]
+        if regress:
+            notes.append("This Work is slower than original LCPC in: " + "; ".join(sorted(regress)) + ".")
+        self._write_artefact("table_T6_pcs_breakdown",
+                             "End-to-End PCS Breakdown: Commitment, Proving, Verification, and Proof Size",
+                             "tab:pcs_breakdown", headers, rows, notes, key_cols=3)
+
+    # ---- T7 ---------------------------------------------------------------
+    def generate_T7_verifier_encoding(self):
+        """E9: verifier-side encoding of 1 and 2 vectors, T=1."""
+        self._begin("T7")
+        T = "T7"
+        headers = ["Mode", "Field", "log2(N)", "k", "This Work v=1 (us)", "This Work v=2 (us)",
+                   "SIMD-Spielman v=2 (us)", "SIMD / This Work (v=2)", "[KDHR26] Table 6 (us)", "[KDHR26] / This Work (v=2)"]
+        rows = []
+        cpus = set()
+        for mode, family, params in (("a", "tw_a", "lcpc-sdig6"), ("b", "tw_b", "simd-spielman")):
+            pool = self.select(self.reports_this_work, family=family, params=params, shape="brakedown", threads=1,
+                               field="Mont127")
+            for log_n in sorted({int(r["log_n"]) for r in pool}):
+                rk = f"{mode},Mont127,{log_n}"
+                recs = self.select(pool, log_n=log_n)
+                v1 = self.stat(recs, "verifier_encode_1", label=f"{T}|{rk}|v1")
+                v2 = self.stat(recs, "verifier_encode_2", label=f"{T}|{rk}|v2")
+                if v2.get("mean") is None:
+                    v2 = self.stat(recs, "verifier_encode", label=f"{T}|{rk}|v2")
+                k = (recs[0].get("dimensions") or {}).get("n_rows", "-") if recs else "-"
+                if mode == "a":
+                    simd_txt = ratio_simd = "N/A (SIMD-Spielman runs mode (b) parameters only)"
+                    kd_txt = kd_ratio = "N/A (KDHR26 Table 6 uses mode (b) parameters)"
+                else:
+                    simd_recs = self.select(self.reports_simd_spielman, family="simd", field="Mont127", shape="brakedown",
+                                            log_n=log_n, threads=1)
+                    simd = self.stat(simd_recs, "verifier_encode_2", label=f"{T}|{rk}|SIMD v2")
+                    simd_txt = self.value_cell(T, rk, "SIMD-Spielman v=2 (us)", simd, unit="us", with_range=False)
+                    if simd.get("mean") is None and self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
+                        simd_txt = "SKIPPED"
+                    ratio_simd = self.speedup_cell(T, rk, "SIMD / This Work (v=2)", simd, v2)
+                    entry, cpu = self.kdhr26_entry("table_6", log_n, v2.get("machine"))
+                    if entry and entry.get("simd_spielman_us") is not None and v2.get("mean"):
+                        cpus.add(cpu)
+                        kd_txt = f"{entry['simd_spielman_us']:.1f}"
+                        kd_ratio = (f"{entry['simd_spielman_us'] * 1000.0 / v2['mean']:.2f}x"
+                                    + self.derived_marker(f"{T}|{rk}|[KDHR26] / This Work (v=2)", v2))
+                    else:
+                        kd_txt = kd_ratio = f"N/A (no KDHR26 {cpu} entry for 2^{log_n})"
+                rows.append([mode, "Mont127", log_n, k,
+                             self.value_cell(T, rk, "This Work v=1 (us)", v1, unit="us", with_range=False),
+                             self.value_cell(T, rk, "This Work v=2 (us)", v2, unit="us", with_range=False),
+                             simd_txt, ratio_simd, kd_txt, kd_ratio])
+        notes = [
+            "Verifier-side encoding of 1 (v=1) and 2 (v=2) vectors of length k, T=1, from the headline blocks "
+            "(mode (a): full_this_work_mode_a_*, mode (b): full_this_work_mode_b_*). SIMD-Spielman: its T=1 blocks.",
+            "[KDHR26] values quoted verbatim from Table 6 (page 14) for " + (", ".join(sorted(cpus)) or "EPYC 9754")
+            + "; compared with mode (b) only.",
+        ]
+        if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
+            notes.append("SIMD-Spielman verifier cells marked SKIPPED for this local smoke: " + self.skipped_baselines["SIMD-Spielman"])
+        self._write_artefact("table_T7_verifier_encoding", "Verifier-Side Small-Batch Encoding Latency Comparison",
+                             "tab:verifier_encoding", headers, rows, notes, key_cols=3)
+
+    # ---- T8 ---------------------------------------------------------------
+    def generate_T8_setup_memory(self):
+        """E10: setup time and peak RSS, T=1."""
+        self._begin("T8")
+        T = "T8"
+        headers = ["Implementation", "log2(N)", "Setup (ms)", "Encode (ms)", "Setup / Encode", "Peak RSS (MB)"]
+
+        def setup_ns(r):
+            v = r.get("setup_ns")
+            if isinstance(v, dict):
+                vals = [safe_float(x) for x in v.values()]
+                vals = [x for x in vals if x is not None]
+                return sum(vals) if vals else None
+            v = safe_float(v)
+            return v if v and v > 0 else None
+
+        def rss(r):
+            v = safe_float(r.get("peak_rss_bytes"))
+            return v if v and v > 0 else None
+
+        rows = []
+        for label, pool in self._impl_rows("tw_a", "lcpc_a", self.reports_this_work, self.reports_lcpc_orig):
+            for log_n in (20, 24, 28):
+                recs = self.select(pool, threads=1, log_n=log_n)
+                rk = f"{label},{log_n}"
+                if not recs and not (self.selection and self.selection.omission_for(f"{T}|{rk}|Setup (ms)")):
+                    continue
+                enc = self.stat(recs, label=f"{T}|{rk}|encode")
+                su = self.scalar_stat(recs, setup_ns)
+                mem = self.scalar_stat(recs, rss)
+                ratio = self.ratio_cell(T, rk, "Setup / Encode", su, enc) if su else self.missing_text(f"{T}|{rk}|Setup / Encode")
+                rows.append([label, log_n,
+                             (format_ns(su["mean"]) + self.derived_marker(f"{T}|{rk}|Setup (ms)", dict(su, machine=enc.get("machine"))))
+                             if su else self.missing_text(f"{T}|{rk}|Setup (ms)"),
+                             self.value_cell(T, rk, "Encode (ms)", enc, with_range=False), ratio,
+                             (format_bytes_to_mb(mem["max"]) + self.derived_marker(f"{T}|{rk}|Peak RSS (MB)",
+                                                                                   dict(mem, machine=enc.get("machine"))))
+                             if mem else self.missing_text(f"{T}|{rk}|Peak RSS (MB)")])
+        for log_n in (20, 24, 28):
+            recs = self.select(self.reports_simd_spielman, family="simd", threads=1, shape="brakedown", field="Mont127",
+                               params="simd-spielman", log_n=log_n)
+            if not recs:
+                continue
+            rk = f"SIMD-Spielman,{log_n}"
+            na = "N/A (upstream wrapper exposes encoding only)"
+            rows.append(["SIMD-Spielman", log_n, na,
+                         self.value_cell(T, rk, "Encode (ms)", self.stat(recs, label=f"{T}|{rk}|encode"), with_range=False),
+                         na, na])
+        if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
+            rows.append(["SIMD-Spielman", 20, "SKIPPED", "SKIPPED", "SKIPPED", "SKIPPED"])
+        notes = [
+            "T=1. This Work: full_this_work_mode_a_* (adaptive); original LCPC by build variant; SIMD-Spielman: mode (b), Mont127.",
+            "Setup = graph sampling and encoder initialisation + input/row-buffer initialisation + verifier-encoder "
+            "initialisation (mean over sessions); peak RSS = VmHWM, maximum over sessions.",
+            "The SIMD-Spielman wrapper reports encoding only; setup and RSS are not exposed by its upstream benchmark interface.",
+        ]
+        self._write_artefact("table_T8_setup_memory", "One-Time Setup Cost and Peak Memory Overhead",
+                             "tab:setup_memory", headers, rows, notes, key_cols=2)
+
+    # ---- T9 ---------------------------------------------------------------
+    def generate_T9_orion_shape(self):
+        """E11: Orion shape (128 rows), mode (b)."""
+        self._begin("T9")
+        T = "T9"
+        headers = ["Field", "T", "log2(N)", "This Work Orion (ms)", "SIMD-Spielman Orion T workers (ms)",
+                   "SIMD-Spielman Orion 7 workers + coordinator (ms)", "SIMD / This Work",
+                   "SIMD best-of-T incl. T=1 (ms)", "Gap vs SIMD best-of-T", "SIMD MT slower than its T=1",
+                   "SIMD params.patch", "[KDHR26] Table 3 1T (ms)", "This Work Orion / Brakedown"]
+        tw_pool = self.select(self.reports_this_work, family="tw_b", params="simd-spielman")
+        simd_pool = self.select(self.reports_simd_spielman, family="simd", params="simd-spielman", shape="orion")
+        failed_simd = self.select([r for r in self.unmeasured if r["_meta"]["impl"] == "simd"], shape="orion")
+        keys = sorted({(r.get("field"), int(r.get("threads", 1)), int(r["log_n"]))
+                       for r in self.select(tw_pool, shape="orion") + simd_pool + failed_simd
+                       if int(r.get("threads", 1)) in (1, 8)}, key=lambda k: (str(k[0]), k[1], k[2]))
+        rows, cpus = [], set()
+        mt_overhead_rows, mixed_patch_rows = [], []
+        for field, threads, log_n in keys:
+            rk = f"{field},{threads},{log_n}"
+            tw_recs = self.select(tw_pool, shape="orion", field=field, threads=threads, log_n=log_n)
+            if self.has_smoke_watermark and not tw_recs:
+                continue
+            tw = self.stat(tw_recs, label=f"{T}|{rk}|TW orion")
+            brake = self.stat(self.select(tw_pool, shape="brakedown", field=field, threads=threads, log_n=log_n),
+                              label=f"{T}|{rk}|TW brakedown")
+            mt = self.simd_multithread_cells(T, rk, self.select(simd_pool, field=field, log_n=log_n), threads, tw,
+                                             "SIMD-Spielman Orion T workers (ms)",
+                                             "SIMD-Spielman Orion 7 workers + coordinator (ms)", "SIMD / This Work")
+            simd_txt = mt["simd_text"]
+            if mt["simd"].get("mean") is None and self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
+                simd_txt = "SKIPPED"
+            if mt["slower"]:
+                mt_overhead_rows.append(f"{field} 2^{log_n}")
+            if mt["mixed_patch"]:
+                mixed_patch_rows.append(f"{field} 2^{log_n}")
+            if threads != 1:
+                kd = "N/A (KDHR26 Table 3 is single-threaded)"
+            elif field != "Fp2M61":
+                kd = "N/A (KDHR26 Table 3 reports Fp2M61 only)"
+            else:
+                entry, cpu = None, "EPYC 9754"
+                machine = tw.get("machine")
+                cpu = (self.selection.kdhr26_cpu(machine) if self.selection and machine else None) or cpu
+                key = {"EPYC 9754": "simd_spielman_epyc_ms", "i7-11800H": "simd_spielman_i7_ms",
+                       "Xeon Gold 6530": "simd_spielman_xeon_ms"}.get(cpu)
+                for e in self.kdhr26_data.get("table_3", {}).get("entries", []):
+                    if e.get("log_n") == log_n:
+                        entry = e
+                kd = f"{entry[key]}" if entry and key and entry.get(key) is not None else f"N/A (no KDHR26 {cpu} entry for 2^{log_n})"
+                if entry and key and entry.get(key) is not None:
+                    cpus.add(cpu)
+            ratio = self.ratio_cell(T, rk, "This Work Orion / Brakedown", tw, brake)
+            rows.append([field, threads, log_n, self.value_cell(T, rk, "This Work Orion (ms)", tw), simd_txt,
+                         mt["simd7_text"], mt["gap"], mt["best_text"], mt["gap_best"], mt["slower_text"],
+                         mt["patch_text"], kd, ratio])
+        notes = [
+            "Orion matrix shape: 128 rows, N/128 columns; mode (b) parameters; This Work = full_this_work_mode_b_* blocks.",
+            "[KDHR26] Table 3 (single-threaded) reports Fp2M61 only; quoted verbatim for " + (", ".join(sorted(cpus)) or "EPYC 9754") + ".",
+            "At T=8 the SIMD / This Work ratio uses the faster of SIMD-Spielman's T=8 and 7 workers + coordinator runs "
+            "(8 cores). SIMD best-of-T also includes its own T=1 time; where 'SIMD MT slower than its T=1' is yes, use the "
+            "best-of-T gap (as in T2).",
+        ]
+        if mt_overhead_rows:
+            notes.append("SIMD-Spielman 8-core Orion time exceeds its T=1 time at: " + ", ".join(mt_overhead_rows) + ".")
+        notes += self.simd_patch_notes(mixed_patch_rows)
+        if failed_simd:
+            # Status and reason come from the records themselves ("omitted" with
+            # omission_reason from --max-orion-logn, or "failed" with error).
+            by_status: Dict[Tuple[str, str], Set[str]] = defaultdict(set)
+            for r in failed_simd:
+                reason = r.get("omission_reason") or r.get("error") or r.get("failure_reason") or "no reason recorded"
+                by_status[(str(r.get("status")), str(reason))].add(f"{r.get('field')} T={r.get('threads')} 2^{r.get('log_n')}")
+            for (status, reason), cases in sorted(by_status.items()):
+                notes.append(f"SIMD-Spielman Orion-shape records with status '{status}' ({reason}): "
+                             + ", ".join(sorted(cases)) + ".")
+        self._write_artefact("table_T9_orion_shape", "Orion Matrix Shape Encoding Comparison (128 Rows)",
+                             "tab:orion_shape", headers, rows, notes, key_cols=3)
+
+    # ---- T10 --------------------------------------------------------------
+    def generate_T10_brakedown_vs_rs(self):
+        """E12: RS (Ligero) vs Brakedown encoding in the same library, T=1, at the sizes RS was measured."""
+        self._begin("T10")
+        T = "T10"
+        headers = ["log2(N)", "N", "RS field", "RS k x n (rate)", "Brakedown field", "Brakedown k x n (rate)",
+                   "Brakedown Encoding (ms)", "Reed-Solomon Ligero (ms)", "RS / Brakedown Ratio"]
+        rs_pool = self.select(self.reports_ligero_rs, threads=1)
+        tw_pool = self.select(self.reports_this_work, family="tw_a", params="lcpc-sdig6", shape="brakedown",
+                              slice_mode="adaptive", threads=1)
+
+        def dims(recs):
+            if not recs:
+                return "-"
+            d = recs[0].get("dimensions") or {}
+            try:
+                rate = f"1/{d['n_cols'] / d['n_per_row']:.2f}"
+            except (KeyError, TypeError, ZeroDivisionError):
+                rate = "?"
+            return f"{d.get('n_rows')}x{d.get('n_cols')} ({rate})"
+
+        rows = []
+        for log_n in sorted({int(r["log_n"]) for r in rs_pool}):
+            rk = f"{log_n}"
+            rs_recs = self.select(rs_pool, log_n=log_n)
+            tw_recs = self.select(tw_pool, log_n=log_n)
+            rs = self.stat(rs_recs, label=f"{T}|{rk}|RS")
+            tw = self.stat(tw_recs, label=f"{T}|{rk}|Brakedown")
+            rows.append([log_n, 1 << log_n, "/".join(sorted({str(r.get("field")) for r in rs_recs})), dims(rs_recs),
+                         "/".join(sorted({str(r.get("field")) for r in tw_recs})) or "-", dims(tw_recs),
+                         self.value_cell(T, rk, "Brakedown Encoding (ms)", tw),
+                         self.value_cell(T, rk, "Reed-Solomon Ligero (ms)", rs),
+                         self.speedup_cell(T, rk, "RS / Brakedown Ratio", rs, tw)])
+        notes = [
+            "RS: the fork's lcpc-ligero-pc encoding (FFT path not optimized by this work), blocks full_ligero_rs_*. "
+            "Brakedown: full_this_work_mode_a_* (adaptive), T=1.",
+            "Not like-for-like: the RS driver runs LCPC's Ft127 field (ff-derived arithmetic) while Brakedown runs the "
+            "fork's Mont127 (same prime, custom lazy arithmetic), and the matrix shapes and code rates differ (see the "
+            "k x n columns). The ratio therefore mixes field arithmetic, shape and rate with the code family.",
+        ]
+        self._write_artefact("table_T10_brakedown_vs_rs", "Brakedown vs. Reed-Solomon (Ligero) Encoding in the Same Library",
+                             "tab:brakedown_vs_rs", headers, rows, notes, key_cols=1)
+
+    # ---- T11 --------------------------------------------------------------
+    CODEGEN_FAMILIES = ("tw_a", "tw_b", "arm_this_work", "slice_sweep", "tw_threads", "ligero")
+
+    def codegen_groups(self) -> List[Dict[str, Any]]:
+        """Selected codegen reports of the measured This Work binaries, grouped per (arch, fork commit, summary).
+
+        Status comes from each report ("PASS", "FAIL", "NO_HOT_KERNELS");
+        vector arithmetic and vector moves (zeroing/copy data movement) are
+        counted separately, as check_codegen.py reports them (interface c).
         """
-        Significance rule (Plan 06 §3):
-        Claim "faster" only when max(This Work runs) < min(Baseline runs) across all sessions.
-        Otherwise write "comparable".
+        groups: Dict[Tuple, List[Dict]] = defaultdict(list)
+        for cr in self.codegen_reports:
+            m = cr["_meta"]
+            if self.selection and m["family"] not in self.CODEGEN_FAMILIES:
+                continue
+            fork = "/".join(sorted(self.session_info.get((m["machine"], m["run"], m["session_dir"]), {}).get("fork", set()))) or "?"
+            summary = (cr.get("summary") or {}).get("hot_kernels") or {}
+            groups[(str(cr.get("arch", "x86_64")), fork, json.dumps(summary, sort_keys=True))].append(cr)
+        out = []
+        for (arch, fork, _), reports in sorted(groups.items()):
+            s = (reports[0].get("summary") or {}).get("hot_kernels") or {}
+            vec = int(s.get("vector_arithmetic_count", 0) or 0)
+            statuses = sorted({str(r.get("status") or ("PASS" if vec == 0 else "FAIL")) for r in reports})
+            if any(not r.get("hot_kernels_checked") for r in reports) and "NO_HOT_KERNELS" not in statuses \
+                    and all(str(r.get("status")) != "FAIL" for r in reports):
+                statuses = sorted(set(statuses) | {"NO_HOT_KERNELS"})
+            key = f"{arch} @ {fork},hot_kernels (aggregate)"
+            out.append({"arch": arch, "fork": fork, "reports": reports, "summary": s, "vec_arith": vec,
+                        "vec_moves": int(s.get("vector_moves_count", 0) or 0), "statuses": statuses,
+                        "selector": f"T11|{key}|Scalar Status",
+                        "ok": statuses == ["PASS"]})
+        return out
+
+    @staticmethod
+    def recheck_codegen_hits(report: Dict) -> Optional[Dict[str, int]]:
+        """Re-classifies a report's stored vector-arithmetic hits with the current check_codegen.py rules.
+
+        Informational (the status shown is the report's own): it tells whether a
+        FAIL was a classifier false positive that a re-check would clear.
         """
-        tw_samples = []
-        for r in this_work_reports:
-            tw_samples.extend(self._extract_samples(r, op_name))
+        try:
+            import importlib
+            cc = importlib.import_module("check_codegen")
+        except Exception:
+            return None
+        arch = str(report.get("arch", "x86_64"))
+        counts: Dict[str, int] = defaultdict(int)
+        for sym in report.get("symbols", []):
+            if not sym.get("is_hot_kernel"):
+                continue
+            for hit in sym.get("vector_arithmetic", []):
+                text = str(hit.get("insn", "")).strip()
+                mnem, _, ops = text.partition(" ")
+                try:
+                    kind = cc.classify_instruction(arch, mnem, ops)[0]
+                except Exception:
+                    return None
+                counts["arith" if kind == "VEC_ARITH" else ("moves" if kind == "VEC_MOVE" else "scalar")] += 1
+        return dict(counts)
 
-        base_samples = []
-        for r in baseline_reports:
-            base_samples.extend(self._extract_samples(r, op_name))
+    def generate_T11_codegen_evidence(self):
+        """E13: codegen evidence of the measured binaries, one row per (arch, fork commit) build."""
+        self._begin("T11")
+        T = "T11"
+        headers = ["Architecture", "Hot Kernel / Symbol", "Reports", "Total Insns", "mul / mulx", "adc / adcx",
+                   "Vector Arith", "Vector Moves", "Re-check of stored hits (current rules)", "Scalar Status"]
+        rows, notes_extra = [], []
+        for g in self.codegen_groups():
+            cr = g["reports"][0]
+            s = g["summary"]
+            for r in g["reports"]:
+                m = r["_meta"]
+                self._used.add((m["machine"], m["run"], m["session_dir"]))
+            status = "/".join(g["statuses"])
+            if not g["ok"]:
+                om = self.selection.omission_for(g["selector"]) if self.selection else None
+                if om:
+                    self.todo_cells[g["selector"]] = f"{om['kind']}: {om['reason']}"
+                    status += " (documented)"
+                    notes_extra.append(f"{g['arch']} @ {g['fork']}: status {'/'.join(g['statuses'])} documented in "
+                                       f"selection.json ({om['kind']}): {om['reason']}")
+                else:
+                    self.codegen_errors.append(f"{g['selector']}: codegen status {'/'.join(g['statuses'])} "
+                                               f"({g['vec_arith']} vector arithmetic instructions in hot kernels)")
+            recheck = self.recheck_codegen_hits(cr) if g["vec_arith"] else None
+            if not g["vec_arith"]:
+                recheck_txt = "N/A (no stored hits)"
+            elif recheck is None:
+                recheck_txt = "N/A (check_codegen.py not importable)"
+            else:
+                recheck_txt = (f"{recheck.get('arith', 0)} arith, {recheck.get('moves', 0)} moves, "
+                               f"{recheck.get('scalar', 0)} scalar")
+            rows.append([f"{g['arch']} @ {g['fork']}", "hot_kernels (aggregate)", len(g["reports"]),
+                         s.get("total_instructions", 0), s.get("scalar_mulx_count", 0) + s.get("scalar_mul_count", 0),
+                         s.get("scalar_adc_count", 0), g["vec_arith"], g["vec_moves"], recheck_txt, status])
+            for sym in cr.get("symbols", []):
+                if sym.get("is_hot_kernel"):
+                    st = sym.get("scalar_stats", {})
+                    rows.append([f"{g['arch']} @ {g['fork']}",
+                                 sym.get("symbol_demangled", sym.get("symbol_raw", "unknown"))[:45], 1,
+                                 st.get("total", len(sym.get("disassembly_lines", []))),
+                                 st.get("mul", 0) + st.get("mulx", 0), st.get("adc", 0),
+                                 len(sym.get("vector_arithmetic", [])), len(sym.get("vector_moves", [])),
+                                 "N/A (no stored hits)" if not sym.get("vector_arithmetic") else "see aggregate row",
+                                 sym.get("status", "PASS")])
+        if not rows:
+            rows.append(["-", "-", 0, "-", "-", "-", "-", "-", "-", self.missing_text(f"{T}|-,-|Scalar Status")])
+        flags = sorted({str(r.get("effective_rustflags")) for r in self._used_records if r.get("effective_rustflags")})
+        notes = [
+            "Disassembly inspection by scripts/check_codegen.py of the benchmark binaries; identical reports from different "
+            "blocks of the same build are counted in 'Reports'. Vector Arith = vector arithmetic in the hot kernels (a "
+            "failure); Vector Moves = vector-register data movement used for zeroing/copying (reported, not a failure).",
+            "Scalar Status is each report's own verdict. Re-check re-classifies the stored hits with the check_codegen.py "
+            "in this checkout (informational; it does not change the status).",
+            "The fork's .cargo/config.toml builds with -C no-vectorize-loops -C no-vectorize-slp; a FAIL row means the "
+            "check did not confirm scalar hot kernels for that build, so its code must not be described as scalar until "
+            "re-checked.",
+        ] + notes_extra
+        self._write_artefact("table_T11_codegen_evidence", "Compiler Codegen Inspection and Scalar Disassembly Verification",
+                             "tab:codegen_evidence", headers, rows, notes, col_align="llrrrrrrll", key_cols=2)
 
-        if not tw_samples or not base_samples:
-            return "comparable"
+    # ---- T12 --------------------------------------------------------------
+    def generate_T12_arm_portability(self):
+        """E14: Arm (c4a) This Work vs original LCPC per build variant."""
+        self._begin("T12")
+        T = "T12"
+        headers = ["log2(N)", "Threads", "This Work Arm (ms)"]
+        for v in PRIMARY_LCPC_VARIANTS:
+            headers += [f"Original LCPC {v} Arm (ms)", f"Arm Speedup vs {v}"]
+        tw_pool = self.select(self.reports_arm, impl="this_work", params="lcpc-sdig6", shape="brakedown", slice_mode="adaptive")
+        lcpc_pool = self.select(self.reports_arm, impl="lcpc_orig", params="lcpc-sdig6")
+        arm_sizes = sorted({int(r["log_n"]) for r in tw_pool + lcpc_pool}) or [18, 22, 26]
+        no_arm = self.has_smoke_watermark and not self.reports_arm
+        rows = []
+        for log_n in arm_sizes:
+            for threads in (1, 8):
+                rk = f"{log_n},{threads}"
+                if no_arm:
+                    rows.append([log_n, threads] + ["N/A (local smoke)"] * (len(headers) - 2))
+                    continue
+                tw = self.stat(self.select(tw_pool, log_n=log_n, threads=threads), label=f"{T}|{rk}|TW")
+                row = [log_n, threads, self.value_cell(T, rk, "This Work Arm (ms)", tw)]
+                for v in PRIMARY_LCPC_VARIANTS:
+                    st = self.stat(self.select(lcpc_pool, variant=v, log_n=log_n, threads=threads), label=f"{T}|{rk}|LCPC {v}")
+                    row += [self.value_cell(T, rk, f"Original LCPC {v} Arm (ms)", st),
+                            self.speedup_cell(T, rk, f"Arm Speedup vs {v}", st, tw)]
+                rows.append(row)
+        if no_arm:
+            notes = ["Local smoke does not run on Arm; these cells are explicitly not applicable and contain no Arm measurements."]
+        else:
+            notes = [
+                "GCP c4a (Neoverse V2), mode (a); This Work: arm_this_work_* (adaptive slices); original LCPC: arm_lcpc_orig_* "
+                "over Ft127, one column group per build variant.",
+                "Build flags differ across rows on Arm: the fork's .cargo/config.toml sets target-cpu=native for x86-64 only, "
+                "while the lcpc_orig.sh fork-flags variant passes target-cpu=native explicitly (audit "
+                "harness-arm-fork-flags-mismatch).",
+            ]
+            notes += self.rustflags_notes(self._used_records)
+            pending = sorted({sel for sel in self.todo_cells if sel.startswith(f"{T}|")})
+            if pending:
+                reasons = sorted({self.todo_cells[sel] for sel in pending})
+                notes.append("TODO (pending) cells: " + " | ".join(reasons))
+        self._write_artefact("table_T12_arm_portability", "Arm Architecture Portability Benchmark (GCP c4a Neoverse V2)",
+                             "tab:arm_portability", headers, rows, notes, key_cols=2)
 
-        if max(tw_samples) < min(base_samples):
-            return "faster"
-        return "comparable"
+    # ---- Figures -------------------------------------------------------------
+    def _save_figure(self, fig, name: str, data_headers: List[str], data_rows: List[List[Any]]):
+        if self.is_smoke or self.has_smoke_watermark:
+            fig.text(0.5, 0.5, "LOCAL SMOKE - NOT A RESULT", fontsize=20, color="red", alpha=0.25,
+                     ha="center", va="center", rotation=25)
+        fig.tight_layout()
+        pdf_path = os.path.join(self.plots_dir, f"{name}.pdf")
+        png_path = os.path.join(self.plots_dir, f"{name}.png")
+        fig.savefig(pdf_path)
+        fig.savefig(png_path, dpi=300)
+        plt.close(fig)
+        self._write_plain_csv(f"{name}_data", data_headers, data_rows, self._get_provenance_text())
+        print(f"[INFO] Wrote figure: {pdf_path} and {png_path}")
+
+    def generate_F1_steps_breakdown(self):
+        self._begin("F1")
+        fig, ax = plt.subplots(figsize=(8.5, 4.8))
+        data = []
+        width = 0.38
+        for i, mode in enumerate(("a", "b")):
+            tags, values, fields, _, sizes = self._steps_rows(mode)
+            if not sizes:
+                continue
+            n = 20 if 20 in sizes else max(sizes)
+            ys = [((values[t].get(n) or {}).get("mean") or 0.0) / 1e6 for t in tags]
+            xs = [x + (i - 0.5) * width for x in range(len(tags))]
+            ax.bar(xs, ys, width=width, label=f"mode ({mode}) N=2^{n}")
+            data += [[mode, t, n, "/".join(sorted(fields[t])), f"{y:.3f}"] for t, y in zip(tags, ys)]
+            ax.set_xticks(range(len(tags)))
+            ax.set_xticklabels([t.replace("step/", "") for t in tags], rotation=35, ha="right", fontsize=9)
+        ax.set_ylabel("Encode latency (ms, mean of session medians)")
+        ax.set_title("Per-technique latency across tagged commits (T=1)")
+        ax.grid(True, linestyle=":", alpha=0.5, axis="y")
+        if data:
+            ax.legend()
+        else:
+            ax.text(0.5, 0.5, "Steps data pending", ha="center", va="center", color="gray")
+        self._save_figure(fig, "figure_F1_steps_breakdown", ["Mode", "Tag", "log2(N)", "Field", "Latency (ms)"], data)
+
+    def generate_F2_llc_scaling(self):
+        self._begin("F2")
+        fig, ax = plt.subplots(figsize=(7.5, 4.5))
+        data = []
+        series = [("Mont127 mode (a) adaptive", self.select(self.reports_this_work, family="tw_a", params="lcpc-sdig6",
+                                                            shape="brakedown", slice_mode="adaptive", threads=1)),
+                  ("Mont127 mode (a) s=1", self.select(self.reports_this_work, family="slice_sweep", params="lcpc-sdig6",
+                                                       shape="brakedown", slices=1, threads=1))]
+        for f in ("Mont127", "Mers127", "Fp2M61"):
+            series.append((f"{f} mode (b) adaptive", self.select(self.reports_this_work, family="tw_b", params="simd-spielman",
+                                                                 shape="brakedown", field=f, threads=1)))
+        for name, pool in series:
+            xs, ys = [], []
+            for n in sorted({int(r["log_n"]) for r in pool}):
+                st = self.stat(self.select(pool, log_n=n), label=f"F2|{name}|{n}")
+                if st.get("mean"):
+                    xs.append(n)
+                    ys.append(st["mean"] / 1e6)
+                    data.append([name, n, f"{st['mean'] / 1e6:.3f}", len(st["sessions"])])
+            if xs:
+                ax.plot(xs, ys, marker="o", linestyle="--" if "s=1" in name else "-", label=name)
+        ax.set_xlabel(r"Polynomial size ($\log_2 N$)")
+        ax.set_ylabel("Encoding latency (ms)")
+        ax.set_yscale("log")
+        ax.set_title("Scaling with N and the LLC effect (T=1)")
+        ax.grid(True, which="both", linestyle=":", alpha=0.5)
+        if data:
+            ax.legend(fontsize=8)
+        self._save_figure(fig, "figure_F2_llc_scaling", ["Series", "log2(N)", "Latency (ms)", "Sessions"], data)
+
+    def generate_F3_thread_scaling(self):
+        self._begin("F3")
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.5))
+        data = []
+        pools = [("This Work", self.select(self.reports_this_work, family="tw_threads", params="lcpc-sdig6", shape="brakedown"))]
+        for v in PRIMARY_LCPC_VARIANTS:
+            pools.append((f"LCPC {v}", self.select(self.reports_lcpc_orig, family="lcpc_threads", variant=v)))
+        plotted = False
+        for name, pool in pools:
+            for n in sorted({int(r["log_n"]) for r in pool}):
+                base = self.stat(self.select(pool, log_n=n, threads=1), label=f"F3|{name}|{n}|1")
+                if not base.get("mean"):
+                    continue
+                ts, sp, ef = [], [], []
+                for t in sorted({int(r.get("threads", 1)) for r in self.select(pool, log_n=n)}):
+                    st = self.stat(self.select(pool, log_n=n, threads=t), label=f"F3|{name}|{n}|{t}")
+                    if st.get("mean"):
+                        ts.append(t)
+                        sp.append(base["mean"] / st["mean"])
+                        ef.append(base["mean"] / st["mean"] / t)
+                        data.append([name, n, t, f"{st['mean'] / 1e6:.3f}", f"{sp[-1]:.2f}", f"{ef[-1]:.2f}",
+                                     len(st["sessions"])])
+                ax1.plot(ts, sp, marker="o", label=f"{name} 2^{n}")
+                ax2.plot(ts, ef, marker="s", label=f"{name} 2^{n}")
+                plotted = True
+        if plotted:
+            tmax = max(int(r[2]) for r in data)
+            ax1.plot([1, tmax], [1, tmax], linestyle=":", color="gray", label="Ideal")
+            ax1.legend(fontsize=7)
+            ax2.legend(fontsize=7)
+        else:
+            ax1.text(0.5, 0.5, "Thread-scaling data pending", ha="center", va="center", color="gray")
+        ax1.set_xlabel("Threads (T)")
+        ax1.set_ylabel("Speedup S(T) = T(1)/T(T)")
+        ax1.grid(True, linestyle=":", alpha=0.5)
+        ax2.set_xlabel("Threads (T)")
+        ax2.set_ylabel("Parallel efficiency S(T)/T")
+        ax2.set_ylim(0.0, 1.1)
+        ax2.grid(True, linestyle=":", alpha=0.5)
+        self._save_figure(fig, "figure_F3_thread_scaling",
+                          ["Series", "log2(N)", "T", "Latency (ms)", "Speedup", "Efficiency", "Sessions"], data)
+
+    # ------------------------------------------------------------------
+    # Smoke coverage (local dry run, Plan 06 §6.8)
+    # ------------------------------------------------------------------
 
     def _has_measurement(self, report: Dict, op_name: str) -> bool:
-        """Returns true only when a record contains a positive measured value."""
-        measurement = report.get("measurements", {}).get(op_name, {})
-        samples = measurement.get("samples_ns", [])
-        if any((safe_float(sample) or 0) > 0 for sample in samples):
-            return True
-        median = safe_float(measurement.get("summary", {}).get("median_ns"))
-        return median is not None and median > 0
+        return bool(self._extract_samples(report, op_name))
 
     def _has_case(self, reports: List[Dict], *, field: Optional[Set[str]] = None,
                   params: Optional[str] = None, shape: Optional[str] = None,
@@ -501,7 +2376,7 @@ class BenchmarkAnalyzer:
                 continue
             if threads is not None and int(report.get("threads", 1)) != threads:
                 continue
-            if slices is not None and int(report.get("slices", 1)) != slices:
+            if slices is not None and int(report.get("slices") or 1) != slices:
                 continue
             if operation is not None and not self._has_measurement(report, operation):
                 continue
@@ -516,1303 +2391,185 @@ class BenchmarkAnalyzer:
             if not condition:
                 errors.append(f"Smoke coverage missing: {label}")
 
-        require(self._has_case(self.reports_this_work, field={"Mont127"}, params="lcpc-sdig6",
-                               shape="brakedown", log_n=20, threads=1),
-                "T1 This Work mode (a), Mont127, logN=20, T=1")
-        require(self._has_case(self.reports_lcpc_orig, field={"Ft127", "Mont127"}, params="lcpc-sdig6",
-                               shape="brakedown", log_n=20, threads=1),
-                "T1 original LCPC mode (a), logN=20, T=1")
+        require(self._has_case(self.reports_this_work, field={"Mont127"}, params="lcpc-sdig6", shape="brakedown",
+                               log_n=20, threads=1), "T1 This Work mode (a), Mont127, logN=20, T=1")
+        require(self._has_case(self.reports_lcpc_orig, field={"Ft127", "Mont127"}, params="lcpc-sdig6", shape="brakedown",
+                               log_n=20, threads=1), "T1 original LCPC mode (a), logN=20, T=1")
         require(self._has_case(self.reports_polycommit, field={"Mont127"}, log_n=20, threads=1),
                 "T1 PolyCommit Mont127 logN=20, T=1")
-        require(any(r.get("patched") is True and len(str(r.get("patch_sha256", ""))) == 64
-                    and int(r.get("sec_param", 0)) > 0
-                    for r in self.reports_polycommit if int(r.get("log_n", -1)) == 20
-                    and int(r.get("threads", 1)) == 1),
+        require(any(r.get("patched") is True and len(str(r.get("patch_sha256", ""))) == 64 and int(r.get("sec_param", 0)) > 0
+                    for r in self.reports_polycommit if int(r.get("log_n", -1)) == 20 and int(r.get("threads", 1)) == 1),
                 "T1 PolyCommit patched-source hash and opening sec_param")
-
-        require(self._has_case(self.reports_this_work, field={"Mont127"}, params="simd-spielman",
-                               shape="brakedown", log_n=20, threads=1),
-                "T2 This Work mode (b), Mont127, logN=20, T=1")
-        require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman",
-                               shape="brakedown", log_n=20, threads=1),
-                "T2 SIMD-Spielman, Mont127, logN=20, T=1")
-
+        require(self._has_case(self.reports_this_work, field={"Mont127"}, params="simd-spielman", shape="brakedown",
+                               log_n=20, threads=1), "T2 This Work mode (b), Mont127, logN=20, T=1")
+        require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman", shape="brakedown",
+                               log_n=20, threads=1), "T2 SIMD-Spielman, Mont127, logN=20, T=1")
         step_tags = {tag for tag, reports in self.reports_steps.items()
-                     if any(r.get("mode", "a") == "a" and int(r.get("log_n", -1)) == 20
-                            and self._extract_samples(r) for r in reports)}
+                     if any(r.get("mode", "a") == "a" and int(r.get("log_n", -1)) == 20 and self._extract_samples(r)
+                            for r in reports)}
         require("step/01-modernize" in step_tags and "HEAD" in step_tags,
                 "T3/F1 successful mode (a) step/01-modernize and HEAD records at logN=20")
-
-        require(all(self._has_case(self.reports_this_work, field={"Mont127"}, params="lcpc-sdig6",
-                                   shape="brakedown", log_n=20, threads=1, slices=s)
-                    for s in (1, 2)),
+        require(all(self._has_case(self.reports_this_work, field={"Mont127"}, params="lcpc-sdig6", shape="brakedown",
+                                   log_n=20, threads=1, slices=s) for s in (1, 2)),
                 "T4 two explicit slice counts (s=1 and s=2) at logN=20")
-
         micro_by_field = {str(r.get("field")): r for r in self.field_benchmarks}
         for field_name in ("Mont127", "Mers127", "Fp2M61", "Ft127"):
             micro = micro_by_field.get(field_name, {})
-            require(all((safe_float(micro.get(op, {}).get("ns_per_op")) or 0) > 0
-                        for op in ("mul", "mac", "reduce")),
+            require(all((safe_float((micro.get(op) or {}).get("ns_per_op")) or 0) > 0 for op in ("mul", "mac", "reduce")),
                     f"T5 {field_name} mul/mac/reduce microbenchmarks")
-        for field_name, params in (("Mont127", "lcpc-sdig6"),
-                                  ("Mers127", "simd-spielman"),
-                                  ("Fp2M61", "simd-spielman")):
-            require(self._has_case(self.reports_this_work, field={field_name}, params=params,
-                                   shape="brakedown", log_n=20, threads=1),
-                    f"T5 {field_name} encode sample at logN=20")
-
+        for field_name in ("Mont127", "Mers127", "Fp2M61"):
+            require(self._has_case(self.reports_this_work, field={field_name}, params="simd-spielman", shape="brakedown",
+                                   log_n=20, threads=1), f"T5 {field_name} mode (b) encode sample at logN=20")
         pcs_ops = ("commit_total", "encode_matrix", "hash_matrix_decomposition", "prove", "verify")
-        for label, reports, fields, implementation_params in (
-            ("This Work", self.reports_this_work, {"Mont127"}, "lcpc-sdig6"),
-            ("original LCPC", self.reports_lcpc_orig, {"Ft127", "Mont127"}, "lcpc-sdig6"),
-        ):
-            matching = [r for r in reports if r.get("field", "Mont127") in fields
-                        and r.get("params") == implementation_params
-                        and r.get("shape", "brakedown") in ("brakedown", None)
+        for label, reports, fields in (("This Work", self.reports_this_work, {"Mont127"}),
+                                       ("original LCPC", self.reports_lcpc_orig, {"Ft127", "Mont127"})):
+            matching = [r for r in reports if r.get("field", "Mont127") in fields and r.get("params") == "lcpc-sdig6"
                         and int(r.get("log_n", -1)) == 20 and int(r.get("threads", 1)) == 1]
-            require(any(all(self._has_measurement(r, op) for op in pcs_ops)
-                        and (safe_float(r.get("proof_size_bytes")) or 0) > 0 for r in matching),
-                    f"T6 {label} complete PCS record at logN=20, T=1")
-
+            require(any(all(self._has_measurement(r, op) for op in pcs_ops) and (safe_float(r.get("proof_size_bytes")) or 0) > 0
+                        for r in matching), f"T6 {label} complete PCS record at logN=20, T=1")
         for params in ("lcpc-sdig6", "simd-spielman"):
-            matching = [r for r in self.reports_this_work if r.get("field") == "Mont127"
-                        and r.get("params") == params and r.get("shape", "brakedown") == "brakedown"
-                        and int(r.get("log_n", -1)) == 20 and int(r.get("threads", 1)) == 1]
-            require(any(self._has_measurement(r, "verifier_encode_1")
-                        and (self._has_measurement(r, "verifier_encode_2")
-                             or self._has_measurement(r, "verifier_encode")) for r in matching),
-                    f"T7 This Work verifier v=1 and v=2, params={params}")
-        require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman",
-                               shape="brakedown", log_n=20, threads=1, operation="verifier_encode_2"),
-                "T7 SIMD-Spielman verifier v=2 at logN=20")
-
-        require(self._has_case(self.reports_this_work, field={"Mont127"}, params="simd-spielman",
-                               shape="orion", log_n=20, threads=1),
-                "T9 This Work mode (b) Orion sample at logN=20")
-        require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman",
-                               shape="orion", log_n=20, threads=1),
-                "T9 SIMD-Spielman Orion sample at logN=20")
-        require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman",
-                               shape="brakedown", log_n=20, threads=1),
-                "T8 SIMD-Spielman Brakedown sample at logN=20")
-        require(self._has_case(self.reports_this_work, field={"Mont127"}, params="lcpc-sdig6",
-                               shape="brakedown", log_n=20, threads=1),
-                "T10 Brakedown encode sample at logN=20")
-        require(self._has_case(self.reports_ligero_rs, log_n=20, threads=1),
-                "T10 Ligero RS encode sample at logN=20")
-
-        require(any(cr.get("status") == "PASS" and cr.get("hot_kernels_checked")
-                    for cr in self.codegen_reports),
+            matching = [r for r in self.reports_this_work if r.get("field") == "Mont127" and r.get("params") == params
+                        and r.get("shape", "brakedown") == "brakedown" and int(r.get("log_n", -1)) == 20
+                        and int(r.get("threads", 1)) == 1]
+            require(any(self._has_measurement(r, "verifier_encode_1") and (self._has_measurement(r, "verifier_encode_2")
+                                                                         or self._has_measurement(r, "verifier_encode"))
+                        for r in matching), f"T7 This Work verifier v=1 and v=2, params={params}")
+        require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman", shape="brakedown",
+                               log_n=20, threads=1, operation="verifier_encode_2"), "T7 SIMD-Spielman verifier v=2 at logN=20")
+        require(self._has_case(self.reports_this_work, field={"Mont127"}, params="simd-spielman", shape="orion",
+                               log_n=20, threads=1), "T9 This Work mode (b) Orion sample at logN=20")
+        require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman", shape="orion",
+                               log_n=20, threads=1), "T9 SIMD-Spielman Orion sample at logN=20")
+        require(self._has_case(self.reports_ligero_rs, log_n=20, threads=1), "T10 Ligero RS encode sample at logN=20")
+        require(any(cr.get("status") == "PASS" and cr.get("hot_kernels_checked") for cr in self.codegen_reports),
                 "T11 passing hot-kernel codegen report")
-
-        require(any(r.get("params") == "lcpc-sdig6" and r.get("field") == "Mont127"
-                    and int(r.get("log_n", -1)) == 20 and int(r.get("threads", 1)) == 1
-                    and r.get("slice_mode") == "adaptive" and self._has_measurement(r, "encode_matrix")
-                    for r in self.reports_this_work),
-                "F2 adaptive slicing series at logN=20")
         for label, reports, fields in (("This Work", self.reports_this_work, {"Mont127"}),
                                        ("original LCPC", self.reports_lcpc_orig, {"Ft127", "Mont127"})):
             require(any(r.get("field", "Mont127") in fields and r.get("params") == "lcpc-sdig6"
                         and int(r.get("log_n", -1)) == 20 and int(r.get("threads", 1)) == 1
                         and self._has_measurement(r, "encode_matrix")
-                        and r.get("setup_ns") is not None and r.get("peak_rss_bytes") is not None
-                        for r in reports),
+                        and r.get("setup_ns") is not None and r.get("peak_rss_bytes") is not None for r in reports),
                     f"T8 {label} setup, encoding, and peak-RSS record at logN=20")
-
-        tw_threads = {int(r.get("threads", 1)) for r in self.reports_this_work
-                      if r.get("field") == "Mont127" and r.get("params") == "lcpc-sdig6"
-                      and int(r.get("log_n", -1)) == 20
-                      and self._has_measurement(r, "encode_matrix")}
-        lcpc_threads = {int(r.get("threads", 1)) for r in self.reports_lcpc_orig
-                        if r.get("params") == "lcpc-sdig6" and int(r.get("log_n", -1)) == 20
-                        and self._has_measurement(r, "encode_matrix")}
+        tw_threads = {int(r.get("threads", 1)) for r in self.reports_this_work if r.get("field") == "Mont127"
+                      and r.get("params") == "lcpc-sdig6" and int(r.get("log_n", -1)) == 20}
+        lcpc_threads = {int(r.get("threads", 1)) for r in self.reports_lcpc_orig if r.get("params") == "lcpc-sdig6"
+                        and int(r.get("log_n", -1)) == 20}
         require(1 in tw_threads and len(tw_threads) > 1 and 1 in lcpc_threads and len(lcpc_threads) > 1,
                 "F3 This Work and original LCPC at T=1 and a multithreaded configuration")
-
-        if self.has_smoke_watermark and not self.reports_arm:
-            print("[INFO] T12 Arm rows are marked N/A for local smoke; no Arm numbers are inferred.")
         return errors
 
-    def _get_provenance_text(self) -> str:
-        dirs_str = ", ".join(os.path.basename(d.rstrip("/")) for d in self.result_dirs) or "results/"
-        fork_sha_str = ", ".join(sorted(self.fork_shas)) or "HEAD"
-        sessions_str = ", ".join(sorted(self.session_ids)) or "local"
-        hosts_str = ", ".join(sorted(self.hosts)) or "generic"
-        watermark_str = " [LOCAL SMOKE — NOT A RESULT]" if (self.is_smoke or self.has_smoke_watermark) else ""
-        return (f"Provenance: Results: {dirs_str}; Fork commit: {fork_sha_str}; "
-                f"Baselines: LCPC f0e2116, SIMD-Spielman 7b399db; Sessions: {sessions_str}; "
-                f"Hosts: {hosts_str}.{watermark_str}")
+    # ------------------------------------------------------------------
+    # --check
+    # ------------------------------------------------------------------
 
-    def _write_artefact(self, name: str, caption: str, label: str, headers: List[str],
-                         rows: List[List[Any]], notes: Optional[List[str]] = None,
-                         col_align: Optional[str] = None):
-        """Writes both LaTeX booktabs table and CSV summary file with provenance footers."""
-        provenance = self._get_provenance_text()
-        if (self.is_smoke or self.has_smoke_watermark) and name.startswith("table_"):
-            notes = list(notes or [])
-            notes.append("LOCAL SMOKE — NOT A RESULT. Do not copy these values to paper/.")
-
-        # 1. Write CSV
-        csv_path = os.path.join(self.csv_dir, f"{name}.csv")
-        with open(csv_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow([f"# {caption}"])
-            writer.writerow([f"# {provenance}"])
-            if notes:
-                for note in notes:
-                    writer.writerow([f"# Note: {note}"])
-            writer.writerow(headers)
-            for row in rows:
-                writer.writerow(row)
-        print(f"[INFO] Wrote CSV: {csv_path}")
-
-        # 2. Write LaTeX
-        tex_path = os.path.join(self.latex_dir, f"{name}.tex")
-        col_spec = col_align or ("l" + "r" * (len(headers) - 1))
-        is_wide = len(headers) > 6
-        table_env = "table*" if is_wide else "table"
-
-        with open(tex_path, "w", encoding="utf-8") as f:
-            f.write("% Auto-generated by analyze.py. Do not edit by hand.\n")
-            f.write(f"\\begin{{{table_env}}}[t]\n")
-            f.write("\\centering\n")
-            f.write(f"\\caption{{{caption}}}\n")
-            f.write(f"\\label{{{label}}}\n")
-            f.write(f"\\begin{{tabular}}{{{col_spec}}}\n")
-            f.write("\\toprule\n")
-            f.write(" & ".join(escape_latex(h) for h in headers) + " \\\\\n")
-            f.write("\\midrule\n")
-            for row in rows:
-                f.write(" & ".join(escape_latex(str(cell)) for cell in row) + " \\\\\n")
-            f.write("\\bottomrule\n")
-            f.write("\\end{tabular}\n")
-            f.write("\\begin{tablenotes}\\footnotesize\n")
-            if notes:
-                for note in notes:
-                    f.write(f"\\item {escape_latex(note)}\n")
-            f.write(f"\\item \\textbf{{{escape_latex(provenance)}}}\n")
-            f.write("\\end{tablenotes}\n")
-            f.write(f"\\end{{{table_env}}}\n")
-        print(f"[INFO] Wrote LaTeX: {tex_path}")
-
-    # -------------------------------------------------------------------------
-    # Artefacts Generation: T0 - T12 and F1 - F3
-    # -------------------------------------------------------------------------
-
-    def generate_all(self):
-        """Generates all 16 evaluation artefacts (T0-T12, F1-F3)."""
-        self.generate_T0_correctness()
-        self.generate_T1_headline_encoding()
-        self.generate_T2_simd_spielman()
-        self.generate_T3_steps_breakdown()
-        self.generate_T4_slice_sweep()
-        self.generate_T5_field_comparison()
-        self.generate_T6_pcs_breakdown()
-        self.generate_T7_verifier_encoding()
-        self.generate_T8_setup_memory()
-        self.generate_T9_orion_shape()
-        self.generate_T10_brakedown_vs_rs()
-        self.generate_T11_codegen_evidence()
-        self.generate_T12_arm_portability()
-
-        if HAS_MATPLOTLIB:
-            self.generate_F1_steps_breakdown()
-            self.generate_F2_llc_scaling()
-            self.generate_F3_thread_scaling()
-        else:
-            print("[WARN] Matplotlib not installed; skipping F1-F3 figure generation.")
-
-    # -------------------------------------------------------------------------
-    # T0: Correctness Gates Summary
-    # -------------------------------------------------------------------------
-    def generate_T0_correctness(self):
-        headers = ["Gate / Invariant", "Evaluation Target", "Oracle / Reference", "Commit / Tag", "Status"]
-        rows = [
-            ["Bit-exact prover encoding (mode a)", "SdigCode6 (Mont127)", "Original LCPC (f0e2116)", "step/01..HEAD", "PASS"],
-            ["Bit-exact encoding (mode b)", "Mont127, Mers127, Fp2M61", "SIMD-Spielman tv/ files", "step/02..HEAD", "PASS"],
-            ["Horizontal slice invariance", "s in {1, 2, 4, 8, 16, 32}", "s = 1 non-sliced baseline", "step/07..HEAD", "PASS"],
-            ["Expander thread invariance", "T in {1, 2, 4, 8, 15}", "T = 1 single-threaded baseline", "step/08..HEAD", "PASS"],
-            ["Field differential tests", "Mont127, Mers127, Fp2M61", "BigUint / rug big-integer oracle", "step/02..HEAD", "PASS"],
-            ["Vector-instruction audit", "Hot kernels (inner loops)", "Zero vector arithmetic instructions", "step/09..HEAD", "PASS"],
-            ["PCS end-to-end verification", "Commitment & proof verification", "Upstream Ligero/Brakedown PCS", "step/01..HEAD", "PASS"],
-        ]
-        notes = ["Every measured binary in this campaign passed all 7 correctness gates bit-for-bit before benchmarking."]
-        self._write_artefact("table_T0_correctness",
-                             "Correctness Gates and Verification Summary for Measured Binaries",
-                             "tab:correctness_gates", headers, rows, notes, col_align="lllll")
-
-    # -------------------------------------------------------------------------
-    # T1: Headline Prover Encoding Comparison (E1)
-    # -------------------------------------------------------------------------
-    def generate_T1_headline_encoding(self):
-        headers = [
-            "log2(N)", "N", "k x n", "T",
-            "This Work (ms)", "TW (ns/MAC)",
-            "LCPC Orig (ms)", "Speedup over LCPC", "Significance",
-            "PolyCommit Mont127 (sec=80) (ms)", "Speedup over PolyCommit"
-        ]
-        tw_by_nt = defaultdict(list)
-        for r in self.reports_this_work:
-            if r.get("params") == "lcpc-sdig6" and (r.get("shape") in ["brakedown", None]):
-                tw_by_nt[(int(r.get("log_n", 0)), int(r.get("threads", 1)))].append(r)
-
-        lcpc_by_nt = defaultdict(list)
-        for r in self.reports_lcpc_orig:
-            if r.get("params") == "lcpc-sdig6" and (r.get("shape") in ["brakedown", None]):
-                lcpc_by_nt[(int(r.get("log_n", 0)), int(r.get("threads", 1)))].append(r)
-
-        poly_by_nt = defaultdict(list)
-        for r in self.reports_polycommit:
-            poly_by_nt[(int(r.get("log_n", 0)), int(r.get("threads", 1)))].append(r)
-
-        all_keys = sorted(set(list(tw_by_nt.keys()) + list(lcpc_by_nt.keys()) + list(poly_by_nt.keys())))
-        rows = []
-        for key in all_keys:
-            log_n, threads = key
-            if threads not in (1, 8):
-                continue
-
-            tw_reps = tw_by_nt.get(key, [])
-            lcpc_reps = lcpc_by_nt.get(key, [])
-            poly_reps = poly_by_nt.get(key, [])
-
-            tw_stats = self._compute_stat_across_sessions(tw_reps)
-            lcpc_stats = self._compute_stat_across_sessions(lcpc_reps)
-            poly_stats = self._compute_stat_across_sessions(poly_reps)
-
-            tw_ms_str = format_ns_to_ms(tw_stats["mean_median_ns"])
-            if tw_stats["min_ns"] is not None and tw_stats["max_ns"] is not None:
-                tw_ms_str += f" [{format_ns_to_ms(tw_stats['min_ns'])}-{format_ns_to_ms(tw_stats['max_ns'])}]"
-
-            # ns / MAC
-            tw_ns_mac = None
-            if tw_reps:
-                tw_ns_mac = tw_reps[0].get("ns_per_mac")
-            tw_mac_str = f"{tw_ns_mac:.2f}" if tw_ns_mac is not None else "-"
-
-            # LCPC Orig
-            lcpc_ms_str = format_ns_to_ms(lcpc_stats["mean_median_ns"])
-            if lcpc_stats["min_ns"] is not None and lcpc_stats["max_ns"] is not None:
-                lcpc_ms_str += f" [{format_ns_to_ms(lcpc_stats['min_ns'])}-{format_ns_to_ms(lcpc_stats['max_ns'])}]"
-
-            # Speedup vs LCPC
-            lcpc_spd_str = "-"
-            sig_lcpc = "comparable"
-            if tw_stats["mean_median_ns"] and lcpc_stats["mean_median_ns"]:
-                spd = lcpc_stats["mean_median_ns"] / tw_stats["mean_median_ns"]
-                lcpc_spd_str = f"{spd:.2f}x"
-                sig_lcpc = self._compute_significance(tw_reps, lcpc_reps)
-
-            # PolyCommit
-            poly_ms_str = format_ns_to_ms(poly_stats["mean_median_ns"])
-            poly_spd_str = "-"
-            if (poly_stats["mean_median_ns"] is None and self.profile == "smoke"
-                    and self.skipped_baselines.get("PolyCommit")):
-                poly_ms_str = "SKIPPED"
-            if tw_stats["mean_median_ns"] and poly_stats["mean_median_ns"]:
-                spd = poly_stats["mean_median_ns"] / tw_stats["mean_median_ns"]
-                poly_spd_str = f"{spd:.2f}x"
-
-            k = 1 << (log_n // 2) if log_n > 0 else 0
-            n_per_row = (1 << log_n) // k if k > 0 else 0
-            dim_str = f"{k}x{2 * n_per_row}"
-
-            rows.append([
-                log_n, 1 << log_n, dim_str, threads,
-                tw_ms_str, tw_mac_str,
-                lcpc_ms_str, lcpc_spd_str, sig_lcpc,
-                poly_ms_str, poly_spd_str
-            ])
-
-        notes = [
-            "Mode (a) SdigCode6 parameter set over Mont127 field.",
-            "PolyCommit uses the same Mont127 prime with the pinned default graph constants and an explicit square shape; its patched opening sec_param is 80.",
-            "Reported values are mean of session medians with [min-max] across runs.",
-            "Significance: 'faster' denotes non-overlapping sample ranges (max(TW) < min(Base)); else 'comparable'."
-        ]
-        if self.profile == "smoke" and self.skipped_baselines.get("PolyCommit"):
-            notes.append("PolyCommit cells marked SKIPPED for this local smoke: "
-                         + self.skipped_baselines["PolyCommit"])
-        self._write_artefact("table_T1_headline_encoding",
-                             "Headline Prover Encoding Comparison (This Work vs. LCPC Baseline vs. PolyCommit)",
-                             "tab:headline_encoding", headers, rows, notes)
-
-    # -------------------------------------------------------------------------
-    # T2: Comparison with SIMD-Spielman (E2, E15)
-    # -------------------------------------------------------------------------
-    def generate_T2_simd_spielman(self):
-        headers = [
-            "Field", "T", "log2(N)",
-            "This Work (ms)", "SIMD-Spielman T workers (ms)",
-            "SIMD-Spielman 8 cores: 7 workers + coordinator (ms)", "SIMD Gap Recovered",
-            "[KDHR26] Reported (ms)", "[KDHR26] LCPC Speedup", "E15 Cross-Check"
-        ]
-        tw_grouped = self._group_by_core_config(self.reports_this_work)
-        simd_grouped = self._group_by_core_config(self.reports_simd_spielman)
-
-        kdhr26_table2 = {}
-        for entry in self.kdhr26_data.get("table_2", {}).get("entries", []):
-            kdhr26_table2[entry.get("log_n")] = entry
-
-        rows = []
-        for key in sorted(set(list(tw_grouped.keys()) + list(simd_grouped.keys()))):
-            field, params, shape, log_n, threads = key
-            if params != "simd-spielman" or shape != "brakedown" or threads == 7:
-                continue
-
-            tw_reps = tw_grouped.get(key, [])
-            simd_reps = simd_grouped.get(key, [])
-
-            if self.has_smoke_watermark and not tw_reps:
-                # The smoke profile pairs mode (b) at N=2^20; baseline-only
-                # N=2^16 rows stay in raw JSON but are outside the table subset.
-                continue
-
-            tw_stats = self._compute_stat_across_sessions(tw_reps)
-            simd_stats = self._compute_stat_across_sessions(simd_reps)
-
-            tw_ms_str = format_ns_to_ms(tw_stats["mean_median_ns"])
-            simd_ms_str = format_ns_to_ms(simd_stats["mean_median_ns"])
-            if (simd_stats["mean_median_ns"] is None and self.profile == "smoke"
-                    and self.skipped_baselines.get("SIMD-Spielman")):
-                simd_ms_str = "SKIPPED"
-
-            # Upstream's MT encoder adds a spin-waiting coordinator thread, so on the
-            # 8-core host T=8 over-subscribes a core; 7 workers + coordinator is the
-            # other 8-core configuration. The gap uses the faster of the two.
-            simd7_ms_str = "-"
-            simd_best_ns = simd_stats["mean_median_ns"]
-            if threads == 8:
-                simd7_stats = self._compute_stat_across_sessions(
-                    simd_grouped.get((field, params, shape, log_n, 7), []))
-                simd7_ms_str = format_ns_to_ms(simd7_stats["mean_median_ns"])
-                if simd7_stats["mean_median_ns"] and (
-                        simd_best_ns is None or simd7_stats["mean_median_ns"] < simd_best_ns):
-                    simd_best_ns = simd7_stats["mean_median_ns"]
-
-            gap_recovered = "-"
-            if tw_stats["mean_median_ns"] and simd_best_ns:
-                ratio = simd_best_ns / tw_stats["mean_median_ns"]
-                gap_recovered = f"{ratio:.2f}x"
-
-            # KDHR26 Reported values
-            reported_ms = "N/A (KDHR26 Table 2 reports Mont127 only)"
-            reported_spd = "N/A (KDHR26 Table 2 reports Mont127 only)"
-            e15_check = "N/A (KDHR26 cross-check reports Mont127 only)"
-            kd_entry = kdhr26_table2.get(log_n)
-            if kd_entry and field == "Mont127":
-                if threads == 1:
-                    reported_ms = f"{kd_entry.get('simd_spielman_1t_ms', '-')}"
-                    reported_spd = f"{kd_entry.get('lcpc_1t_speedup', '-')}"
-                    e15_check = "17.2x (1T EPYC 9754)"
-                elif threads == 8:
-                    reported_ms = f"{kd_entry.get('simd_spielman_8t_ms', '-')}"
-                    reported_spd = f"{kd_entry.get('lcpc_8t_speedup', '-')}"
-                    e15_check = "10.9x (8T EPYC 9754)"
-
-            rows.append([
-                field, threads, log_n,
-                tw_ms_str, simd_ms_str, simd7_ms_str, gap_recovered,
-                reported_ms, reported_spd, e15_check
-            ])
-
-        notes = [
-            "Mode (b) parameters matching [KDHR26]. All runtimes in milliseconds.",
-            "SIMD Gap Recovered = T_SIMD / T_ThisWork. Values >= 1.0x indicate This Work matches or exceeds AVX-512.",
-            "At T=8 the 8-core host cannot give upstream's spin-waiting coordinator thread its own core; "
-            "the gap uses the faster of T=8 (coordinator shares a worker core) and 7 workers + coordinator.",
-            "[KDHR26] reported numbers quoted verbatim from SIMD-Spielman paper Table 2 (page 11) on AMD EPYC 9754."
-        ]
-        if self.has_smoke_watermark:
-            notes.append("Local smoke shows paired mode (b) rows at N=2^20; baseline-only N=2^16 records remain in raw JSON.")
-        if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
-            notes.append("SIMD-Spielman cells marked SKIPPED for this local smoke: "
-                         + self.skipped_baselines["SIMD-Spielman"])
-        self._write_artefact("table_T2_simd_spielman",
-                             "Comparison with SIMD-Spielman (AVX-512 IFMA) and Prior Reported Results",
-                             "tab:simd_spielman_comparison", headers, rows, notes)
-
-    # -------------------------------------------------------------------------
-    # T3: Per-Technique Cumulative Breakdown (E3)
-    # -------------------------------------------------------------------------
-    def generate_T3_steps_breakdown(self):
-        headers = ["Step Tag", "Optimization Technique", "N=2^16 (ms)", "N=2^20 (ms)", "N=2^24 (ms)", "Step Speedup", "Cumulative Speedup"]
-        technique_descriptions = {
-            "step/01-modernize": "Upstream modernize & workspace harness",
-            "step/02-fields": "Custom field trait & fast Montgomery/Mersenne",
-            "step/03-column-major": "Batched column-major matrix representation",
-            "step/04-r2l": "R2L evaluation order (no transposed graphs)",
-            "step/05-lazy": "Expander-level lazy reduction",
-            "step/06-blocking": "Multi-edge memory cache blocking",
-            "step/07-slicing": "Matrix horizontal LLC slicing",
-            "step/08-threads": "Expander-level multithreading",
-            "step/09-codegen": "Scalar codegen & compiler vectorization verify",
-        }
-
-        # Sort tags by step index
-        sorted_tags = sorted(self.reports_steps.keys(), key=lambda tag: (tag == "HEAD", tag))
-        prev_ms_by_size: Dict[int, float] = {}
-        step01_ms_by_size: Dict[int, float] = {}
-        rows = []
-
-        for tag in sorted_tags:
-            reps = [r for r in self.reports_steps[tag] if r.get("mode", "a") == "a"]
-            # Group by log_n
-            by_log_n = defaultdict(list)
-            for r in reps:
-                by_log_n[int(r.get("log_n", 0))].append(r)
-
-            val_16 = self._compute_stat_across_sessions(by_log_n[16])["mean_median_ns"]
-            val_20 = self._compute_stat_across_sessions(by_log_n[20])["mean_median_ns"]
-            val_24 = self._compute_stat_across_sessions(by_log_n[24])["mean_median_ns"]
-
-            # Use 20 as primary for step speedup
-            primary_val = val_20 or val_16 or val_24
-            step_spd_str = "baseline" if tag == "step/01-modernize" else "-"
-            cum_spd_str = "-"
-            if primary_val:
-                ref_size = 20 if val_20 else (16 if val_16 else 24)
-                if ref_size in prev_ms_by_size and prev_ms_by_size[ref_size] > 0:
-                    step_spd_str = f"{prev_ms_by_size[ref_size] / primary_val:.2f}x"
-                if ref_size not in step01_ms_by_size:
-                    step01_ms_by_size[ref_size] = primary_val
-                if step01_ms_by_size[ref_size] > 0:
-                    cum_spd_str = f"{step01_ms_by_size[ref_size] / primary_val:.2f}x"
-                prev_ms_by_size[ref_size] = primary_val
-
-            desc = technique_descriptions.get(tag, "Incremental optimization")
-            rows.append([
-                tag, desc,
-                format_ns_to_ms(val_16), format_ns_to_ms(val_20), format_ns_to_ms(val_24),
-                step_spd_str, cum_spd_str
-            ])
-
-        notes = [
-            "Evaluated at single thread (T=1), Mont127 field, mode (a).",
-            "Note: the per-step breakdown is order-dependent; optimizations interact non-linearly."
-        ]
-        self._write_artefact("table_T3_steps_breakdown",
-                             "Cumulative Technique Breakdown Across Tagged Commits",
-                             "tab:steps_breakdown", headers, rows, notes)
-
-    # -------------------------------------------------------------------------
-    # T4: Slice Sweep and Tuning Validation (E5)
-    # -------------------------------------------------------------------------
-    def generate_T4_slice_sweep(self):
-        headers = [
-            "log2(N)", "T", "s=1 Non-sliced (ms)",
-            "Best s*", "Best Latency (ms)",
-            "Adaptive s", "Adaptive Latency (ms)",
-            "Adaptive Gap (%)", "Slicing Speedup"
-        ]
-        # Find slice sweep records (same logN and threads across multiple slice counts)
-        by_n_t = defaultdict(lambda: defaultdict(list))
-        for r in self.reports_this_work:
-            if r.get("shape") == "brakedown" and r.get("params") == "lcpc-sdig6":
-                log_n = int(r.get("log_n", 0))
-                threads = int(r.get("threads", 1))
-                slices = int(r.get("slices", 1))
-                by_n_t[(log_n, threads)][slices].append(r)
-
-        rows = []
-        for (log_n, threads) in sorted(by_n_t.keys()):
-            slice_map = by_n_t[(log_n, threads)]
-            if len(slice_map) < 2 and 1 not in slice_map:
-                continue
-
-            s1_stats = self._compute_stat_across_sessions(slice_map.get(1, []))
-            s1_ms = s1_stats["mean_median_ns"]
-
-            # Find best s
-            best_s = 1
-            best_ms = s1_ms
-            for s, reps in slice_map.items():
-                st = self._compute_stat_across_sessions(reps)["mean_median_ns"]
-                if st is not None and (best_ms is None or st < best_ms):
-                    best_s = s
-                    best_ms = st
-
-            # Find adaptive s (from report adaptive_slices metadata)
-            adapt_s = 1
-            adapt_ms = s1_ms
-            for reps in slice_map.values():
-                if reps and reps[0].get("adaptive_slices"):
-                    adapt_s = reps[0].get("adaptive_slices")
-                    if adapt_s in slice_map:
-                        adapt_ms = self._compute_stat_across_sessions(slice_map[adapt_s])["mean_median_ns"]
-                    break
-
-            gap_pct = "-"
-            if best_ms and adapt_ms and best_ms > 0:
-                gap = ((adapt_ms - best_ms) / best_ms) * 100.0
-                gap_pct = f"{gap:.1f}%"
-
-            spd_str = "-"
-            if s1_ms and best_ms and best_ms > 0:
-                spd_str = f"{s1_ms / best_ms:.2f}x"
-
-            rows.append([
-                log_n, threads, format_ns_to_ms(s1_ms),
-                best_s, format_ns_to_ms(best_ms),
-                adapt_s, format_ns_to_ms(adapt_ms),
-                gap_pct, spd_str
-            ])
-
-        notes = [
-            "Evaluates matrix horizontal cache slicing across slice counts s in {1, 2, 4, ..., 256}.",
-            "Adaptive Gap = (T(s_adapt) - T(s*)) / T(s*). Confirms adaptive model achieves gap <= 10% (M4 criterion)."
-        ]
-        self._write_artefact("table_T4_slice_sweep",
-                             "LLC Slice Sweep and Adaptive Cache Model Validation",
-                             "tab:slice_sweep", headers, rows, notes)
-
-    # -------------------------------------------------------------------------
-    # T5: Field Microbenchmarks and Comparison (E7)
-    # -------------------------------------------------------------------------
-    def generate_T5_field_comparison(self):
-        headers = ["Field", "Security (bits)", "Mul (ns)", "MAC (ns)", "Reduce (ns)", "Encode N=2^20 (ms)", "Encode N=2^24 (ms)", "Cost (ns/MAC)"]
-        field_micro_map = {}
-        for fb in self.field_benchmarks:
-            field = fb.get("field", "")
-            field_micro_map[field] = fb
-
-        tw_grouped = self._group_by_config(self.reports_this_work)
-        rows = []
-        fields = ["Mont127", "Mers127", "Fp2M61", "Ft127"]
-
-        def encoding_stat(field_name: str, log_n: int) -> Optional[float]:
-            for params in ("lcpc-sdig6", "simd-spielman"):
-                matching = [
-                    report for report in self.reports_this_work
-                    if report.get("field") == field_name
-                    and report.get("params") == params
-                    and report.get("shape", "brakedown") == "brakedown"
-                    and int(report.get("log_n", -1)) == log_n
-                    and int(report.get("threads", 1)) == 1
-                ]
-                value = self._compute_stat_across_sessions(matching)["mean_median_ns"]
-                if value is not None:
-                    return value
-            return None
-
-        for f in fields:
-            fb = field_micro_map.get(f, {})
-            mul_ns = fb.get("mul", {}).get("ns_per_op")
-            mac_ns = fb.get("mac", {}).get("ns_per_op")
-            red_ns = fb.get("reduce", {}).get("ns_per_op")
-            sec_bits = 122 if f == "Fp2M61" else 127
-
-            # Look for N=20 and N=24 encodings
-            enc_20 = encoding_stat(f, 20)
-            enc_24 = encoding_stat(f, 24)
-
-            ns_mac = None
-            for key, reps in tw_grouped.items():
-                if key[0] == f and reps and reps[0].get("ns_per_mac") is not None:
-                    ns_mac = reps[0].get("ns_per_mac")
-                    break
-
-            if f == "Ft127":
-                enc_20_text = "N/A (test-only oracle field)"
-                enc_24_text = "N/A (test-only oracle field)"
-                cost_text = "N/A (no production encode)"
-            else:
-                enc_20_text = format_ns_to_ms(enc_20)
-                enc_24_text = format_ns_to_ms(enc_24)
-                cost_text = f"{ns_mac:.2f}" if ns_mac else "-"
-            if self.has_smoke_watermark:
-                enc_24_text = "N/A (N=2^24 omitted from local smoke)"
-
-            rows.append([
-                f, sec_bits,
-                f"{mul_ns:.2f}" if mul_ns else "-",
-                f"{mac_ns:.2f}" if mac_ns else "-",
-                f"{red_ns:.2f}" if red_ns else "-",
-                enc_20_text, enc_24_text, cost_text
-            ])
-
-        notes = [
-            "Field microbenchmarks report isolated arithmetic operation latencies in nanoseconds.",
-            "Security caveat: Fp2M61 operates over F_{(2^61-1)^2}, providing 122 bits of security rather than 127 bits.",
-            "Ft127 is retained as a test-only oracle field, not a production fork field."
-        ]
-        if self.has_smoke_watermark:
-            notes.append("Local smoke omits N=2^24 field encodings; N/A cells are explicitly permitted by the smoke check allow-list.")
-        self._write_artefact("table_T5_field_comparison",
-                             "Field Arithmetic Microbenchmarks and Encoding Comparison",
-                             "tab:field_comparison", headers, rows, notes)
-
-    # -------------------------------------------------------------------------
-    # T6: End-to-End PCS Breakdown (E8)
-    # -------------------------------------------------------------------------
-    def generate_T6_pcs_breakdown(self):
-        headers = [
-            "Implementation", "T", "log2(N)",
-            "Commit (ms)", "Encode (ms)", "Hash (ms)",
-            "Enc/Hash (%)", "Prove (ms)", "Verify (ms)", "Proof Size (B)"
-        ]
-        rows = []
-        for group, label in [(self.reports_this_work, "This Work"), (self.reports_lcpc_orig, "Original LCPC")]:
-            for r in sorted(group, key=lambda x: (x.get("threads", 1), x.get("log_n", 0))):
-                if r.get("params") != "lcpc-sdig6":
-                    continue
-                if int(r.get("log_n", 0)) not in (20, 24, 28) or int(r.get("threads", 1)) not in (1, 8):
-                    continue
-                m = r.get("measurements", {})
-                comm_ms = self._get_op_summary(r, "commit_total").get("median_ns")
-                enc_ms = self._get_op_summary(r, "encode_matrix").get("median_ns")
-                hash_ms = self._get_op_summary(r, "hash_matrix_decomposition").get("median_ns")
-                prv_ms = self._get_op_summary(r, "prove").get("median_ns")
-                ver_ms = self._get_op_summary(r, "verify").get("median_ns")
-
-                ratio_str = "-"
-                if enc_ms and hash_ms and (enc_ms + hash_ms) > 0:
-                    pct = (enc_ms / (enc_ms + hash_ms)) * 100.0
-                    ratio_str = f"{pct:.1f}% / {100.0 - pct:.1f}%"
-
-                proof_bytes = r.get("proof_size_bytes")
-                proof_str = str(proof_bytes) if proof_bytes else "-"
-
-                rows.append([
-                    label, r.get("threads", 1), r.get("log_n", 0),
-                    format_ns_to_ms(comm_ms), format_ns_to_ms(enc_ms), format_ns_to_ms(hash_ms),
-                    ratio_str, format_ns_to_ms(prv_ms), format_ns_to_ms(ver_ms), proof_str
-                ])
-
-        notes = [
-            "End-to-end PCS commitment times evaluated with portable BLAKE3 hashing.",
-            "Encode and Hash matrix decomposition fractions illustrate shift of bottleneck to hashing."
-        ]
-        self._write_artefact("table_T6_pcs_breakdown",
-                             "End-to-End PCS Breakdown: Commitment, Proving, Verification, and Proof Size",
-                             "tab:pcs_breakdown", headers, rows, notes)
-
-    # -------------------------------------------------------------------------
-    # T7: Verifier Encoding Comparison (E9)
-    # -------------------------------------------------------------------------
-    def generate_T7_verifier_encoding(self):
-        headers = [
-            "Mode", "Field", "log2(N)", "k",
-            "This Work v=1 (us)", "This Work v=2 (us)",
-            "SIMD-Spielman v=2 (us)", "[KDHR26] Table 6 (us)", "Speedup over KDHR26"
-        ]
-        kdhr26_table6 = {}
-        for entry in self.kdhr26_data.get("table_6", {}).get("entries", []):
-            kdhr26_table6[entry.get("log_n")] = entry
-
-        rows = []
-        tw_grouped = self._group_by_config(self.reports_this_work)
-        simd_grouped = self._group_by_config(self.reports_simd_spielman)
-
-        for key in sorted(set(list(tw_grouped.keys()) + list(simd_grouped.keys()))):
-            field, params, shape, log_n, threads, slices = key
-            if threads != 1 or shape != "brakedown" or field != "Mont127":
-                continue
-
-            tw_reps = tw_grouped.get(key, [])
-            simd_reps = [
-                report for report in self.reports_simd_spielman
-                if report.get("field") == field
-                and report.get("shape", "brakedown") == shape
-                and int(report.get("log_n", -1)) == log_n
-                and int(report.get("threads", 1)) == threads
-            ]
-            if self.has_smoke_watermark and not tw_reps:
-                # The mode-(b) baseline also runs N=2^16, but the smoke table
-                # keeps only fork/baseline verifier rows measured at both sides.
-                continue
-
-            v1_stat = self._compute_stat_across_sessions(tw_reps, "verifier_encode_1")
-            v2_stat = self._compute_stat_across_sessions(tw_reps, "verifier_encode_2")
-            if v2_stat["mean_median_ns"] is None:
-                v2_stat = self._compute_stat_across_sessions(tw_reps, "verifier_encode")
-
-            simd_v2_stat = self._compute_stat_across_sessions(simd_reps, "verifier_encode_2")
-            if simd_v2_stat["mean_median_ns"] is None:
-                simd_v2_stat = self._compute_stat_across_sessions(simd_reps, "verifier_encode")
-            simd_v2_us = format_ns_to_us(simd_v2_stat["mean_median_ns"])
-            if (simd_v2_stat["mean_median_ns"] is None and self.profile == "smoke"
-                    and self.skipped_baselines.get("SIMD-Spielman")):
-                simd_v2_us = "SKIPPED"
-
-            k = 1 << (log_n // 2) if log_n > 0 else 0
-            kd_entry = kdhr26_table6.get(log_n, {})
-            kd_reported_us = kd_entry.get("simd_spielman_us")
-            kd_str = f"{kd_reported_us:.1f}" if kd_reported_us is not None else "N/A (no KDHR26 value for this N)"
-
-            spd_str = "-"
-            if kd_reported_us and v2_stat["mean_median_ns"]:
-                v2_us = v2_stat["mean_median_ns"] / 1000.0
-                if v2_us > 0:
-                    spd_str = f"{kd_reported_us / v2_us:.2f}x"
-
-            rows.append([
-                params, field, log_n, k,
-                format_ns_to_us(v1_stat["mean_median_ns"]),
-                format_ns_to_us(v2_stat["mean_median_ns"]),
-                simd_v2_us,
-                kd_str, spd_str
-            ])
-
-        notes = [
-            "Verifier-side encoding latency in microseconds for 1 vector (v=1) and 2 vectors (v=2) of length k.",
-            "[KDHR26] values quoted verbatim from Table 6 (page 14) for Montgomery verifier encoding."
-        ]
-        if self.has_smoke_watermark:
-            notes.append("Local smoke keeps paired verifier rows; the baseline-only mode (b) N=2^16 point remains in raw JSON.")
-        if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
-            notes.append("SIMD-Spielman verifier cells marked SKIPPED for this local smoke: "
-                         + self.skipped_baselines["SIMD-Spielman"])
-        self._write_artefact("table_T7_verifier_encoding",
-                             "Verifier-Side Small-Batch Encoding Latency Comparison",
-                             "tab:verifier_encoding", headers, rows, notes)
-
-    # -------------------------------------------------------------------------
-    # T8: Setup Time and Memory Overhead (E10)
-    # -------------------------------------------------------------------------
-    def generate_T8_setup_memory(self):
-        headers = ["Implementation", "log2(N)", "Setup (ms)", "Encode (ms)", "Setup / Encode", "Peak RSS (MB)"]
-        rows = []
-        for group, label in [(self.reports_this_work, "This Work"),
-                             (self.reports_lcpc_orig, "Original LCPC")]:
-            for r in sorted(group, key=lambda x: (x.get("threads", 1), x.get("log_n", 0))):
-                if (r.get("threads", 1) != 1 or r.get("shape", "brakedown") not in ("brakedown", None)
-                        or int(r.get("log_n", 0)) not in (20, 24, 28)
-                        or r.get("params") != "lcpc-sdig6"):
-                    continue
-                if label == "This Work" and r.get("slice_mode") != "adaptive":
-                    continue
-
-                setup_val = r.get("setup_ns", 0)
-                if isinstance(setup_val, dict):
-                    setup_ns = sum(setup_val.values())
-                else:
-                    setup_ns = float(setup_val)
-
-                enc_ns = self._get_op_summary(r, "encode_matrix").get("median_ns")
-                ratio_str = "-"
-                if setup_ns and enc_ns and enc_ns > 0:
-                    ratio_str = f"{setup_ns / enc_ns:.2f}x"
-
-                rss_bytes = r.get("peak_rss_bytes", 0)
-                if setup_ns <= 0:
-                    setup_ns = None
-                if not rss_bytes or rss_bytes <= 0:
-                    rss_bytes = None
-
-                rows.append([
-                    label, r.get("log_n", 0),
-                    format_ns_to_ms(setup_ns), format_ns_to_ms(enc_ns),
-                    ratio_str, format_bytes_to_mb(rss_bytes)
-                ])
-
-        for r in self.reports_simd_spielman:
-            if (r.get("threads", 1) == 1 and r.get("shape") == "brakedown"
-                    and r.get("field") == "Mont127" and r.get("params") == "simd-spielman"
-                    and int(r.get("log_n", 0)) in (20, 24, 28)):
-                rows.append([
-                    "SIMD-Spielman", r.get("log_n", 0),
-                    "N/A (upstream wrapper exposes encoding only)",
-                    format_ns_to_ms(self._get_op_summary(r, "encode_matrix").get("median_ns")),
-                    "N/A (upstream wrapper exposes encoding only)",
-                    "N/A (upstream wrapper exposes encoding only)"
-                ])
-
-        if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
-            rows.append(["SIMD-Spielman", 20, "SKIPPED", "SKIPPED", "SKIPPED", "SKIPPED"])
-
-        notes = [
-            "Setup includes bipartite expander graph sampling, transposition, prepare_weight, and allocation.",
-            "Peak RSS recorded via VmHWM from /proc/self/status.",
-            "The SIMD-Spielman wrapper reports encoding only; setup and RSS are not exposed by its upstream benchmark interface."
-        ]
-        if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
-            notes.append("SIMD-Spielman row marked SKIPPED for this local smoke: "
-                         + self.skipped_baselines["SIMD-Spielman"])
-        self._write_artefact("table_T8_setup_memory",
-                             "One-Time Setup Cost and Peak Memory Overhead",
-                             "tab:setup_memory", headers, rows, notes)
-
-    # -------------------------------------------------------------------------
-    # T9: Orion Shape Comparison (E11)
-    # -------------------------------------------------------------------------
-    def generate_T9_orion_shape(self):
-        headers = [
-            "Field", "T", "log2(N)",
-            "This Work Orion (ms)", "SIMD-Spielman Orion (ms)",
-            "[KDHR26] Orion Table 3 (ms)", "Orion / Brakedown Ratio"
-        ]
-        kdhr26_table3 = {}
-        for entry in self.kdhr26_data.get("table_3", {}).get("entries", []):
-            kdhr26_table3[entry.get("log_n")] = entry
-
-        tw_grouped = self._group_by_core_config(self.reports_this_work)
-        simd_grouped = self._group_by_core_config(self.reports_simd_spielman)
-
-        rows = []
-        for key in sorted(set(list(tw_grouped.keys()) + list(simd_grouped.keys()))):
-            field, params, shape, log_n, threads = key
-            if shape != "orion":
-                continue
-
-            if self.has_smoke_watermark and not tw_grouped.get(key, []):
-                # Keep smoke Orion rows paired at N=2^20; the external
-                # baseline's extra N=2^16 point remains available in raw JSON.
-                continue
-
-            tw_orion = self._compute_stat_across_sessions(tw_grouped.get(key, []))["mean_median_ns"]
-            simd_orion = self._compute_stat_across_sessions(simd_grouped.get(key, []))["mean_median_ns"]
-            simd_orion_text = format_ns_to_ms(simd_orion)
-            if (simd_orion is None and self.profile == "smoke"
-                    and self.skipped_baselines.get("SIMD-Spielman")):
-                simd_orion_text = "SKIPPED"
-
-            # Ratio vs Brakedown shape
-            tw_brake = self._compute_stat_across_sessions(tw_grouped.get((field, params, "brakedown", log_n, threads), []))["mean_median_ns"]
-            ratio_str = "-"
-            if tw_orion and tw_brake and tw_brake > 0:
-                ratio_str = f"{tw_orion / tw_brake:.2f}x"
-
-            kd_reported = "N/A (KDHR26 Table 3 reports Fp2M61 only)"
-            kd_entry = kdhr26_table3.get(log_n)
-            if kd_entry and field == "Fp2M61":
-                value = kd_entry.get("simd_spielman_i7_ms")
-                if value is not None:
-                    kd_reported = str(value)
-
-            rows.append([
-                field, threads, log_n,
-                format_ns_to_ms(tw_orion), simd_orion_text,
-                kd_reported, ratio_str
-            ])
-
-        notes = [
-            "Orion matrix shape uses fixed 128 rows (k = 128, n_per_row = N / 128).",
-            "[KDHR26] Table 3 reports Orion results for Fp2M61; Mont127 and Mers127 are not reported there."
-        ]
-        if self.has_smoke_watermark:
-            notes.append("Local smoke shows paired Orion rows at N=2^20; the SIMD-Spielman N=2^16 rows remain in raw JSON.")
-        if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
-            notes.append("SIMD-Spielman Orion cells marked SKIPPED for this local smoke: "
-                         + self.skipped_baselines["SIMD-Spielman"])
-        self._write_artefact("table_T9_orion_shape",
-                             "Orion Matrix Shape Encoding Comparison (128 Rows)",
-                             "tab:orion_shape", headers, rows, notes)
-
-    # -------------------------------------------------------------------------
-    # T10: Brakedown vs RS (Ligero) in Same Library (E12)
-    # -------------------------------------------------------------------------
-    def generate_T10_brakedown_vs_rs(self):
-        headers = ["log2(N)", "N", "Brakedown Encoding (ms)", "Reed-Solomon Ligero (ms)", "RS / Brakedown Ratio"]
-        tw_grouped = self._group_by_config(self.reports_this_work)
-        rs_grouped = self._group_by_config(self.reports_ligero_rs)
-
-        rows = []
-        if self.has_smoke_watermark:
-            log_ns = sorted({int(r.get("log_n", 0)) for r in self.reports_ligero_rs
-                             if int(r.get("threads", 1)) == 1})
-        else:
-            log_ns = [12, 14, 16, 18, 20, 22]
-        for log_n in log_ns:
-            tw_reps = tw_grouped.get(("Mont127", "lcpc-sdig6", "brakedown", log_n, 1, 1), [])
-            rs_reps = rs_grouped.get(("Mont127", "ligero-rs", "brakedown", log_n, 1, 1), [])
-            if not rs_reps:
-                rs_reps = [r for r in self.reports_ligero_rs if int(r.get("log_n", 0)) == log_n]
-
-            tw_ms = self._compute_stat_across_sessions(tw_reps)["mean_median_ns"]
-            rs_ms = self._compute_stat_across_sessions(rs_reps)["mean_median_ns"]
-
-            ratio_str = "-"
-            if tw_ms and rs_ms and tw_ms > 0:
-                ratio_str = f"{rs_ms / tw_ms:.2f}x"
-
-            rows.append([
-                log_n, 1 << log_n,
-                format_ns_to_ms(tw_ms), format_ns_to_ms(rs_ms), ratio_str
-            ])
-
-        notes = [
-            "Evaluates Reed-Solomon encoding via fork's lcpc-ligero-pc crate vs Brakedown in the exact same library.",
-            "Replaces [KDHR26] Table 5's scaled-HEXL estimate with direct measurements; FFT path is not scalar-optimized."
-        ]
-        self._write_artefact("table_T10_brakedown_vs_rs",
-                             "Brakedown vs. Reed-Solomon (Ligero) Encoding in the Same Library",
-                             "tab:brakedown_vs_rs", headers, rows, notes)
-
-    # -------------------------------------------------------------------------
-    # T11: Codegen Instruction Breakdown and Scalar Verification (E13)
-    # -------------------------------------------------------------------------
-    def generate_T11_codegen_evidence(self):
-        headers = ["Architecture", "Hot Kernel / Symbol", "Total Insns", "mul / mulx", "adc / adcx", "Vector Insns", "Scalar Status"]
-        rows = []
-        for cr in self.codegen_reports:
-            arch = cr.get("arch", "x86_64")
-            summary = cr.get("summary", {}).get("hot_kernels", {})
-            tot_insns = summary.get("total_instructions", 0)
-            mul_count = summary.get("scalar_mulx_count", 0) + summary.get("scalar_mul_count", 0)
-            adc_count = summary.get("scalar_adc_count", 0)
-            vec_count = summary.get("vector_arithmetic_count", 0)
-            status = cr.get("status", "PASS" if vec_count == 0 else "FAIL")
-
-            rows.append([
-                arch, "hot_kernels (aggregate)", tot_insns, mul_count, adc_count, vec_count, status
-            ])
-
-            for sym in cr.get("symbols", []):
-                if sym.get("is_hot_kernel"):
-                    s_name = sym.get("symbol_demangled", sym.get("symbol_raw", "unknown"))[:45]
-                    stats = sym.get("scalar_stats", {})
-                    rows.append([
-                        arch, s_name, stats.get("total", len(sym.get("disassembly_lines", []))),
-                        stats.get("mul", 0) + stats.get("mulx", 0), stats.get("adc", 0),
-                        len(sym.get("vector_arithmetic", [])), sym.get("status", "PASS")
-                    ])
-
-        notes = [
-            "Disassembly inspection generated by scripts/check_codegen.py.",
-            "Scalar verification: auto-vectorization disabled; confirms zero vector-register arithmetic instructions."
-        ]
-        self._write_artefact("table_T11_codegen_evidence",
-                             "Compiler Codegen Inspection and Scalar Disassembly Verification",
-                             "tab:codegen_evidence", headers, rows, notes, col_align="llrrrrl")
-
-    # -------------------------------------------------------------------------
-    # T12: Arm Portability Benchmark (E14)
-    # -------------------------------------------------------------------------
-    def generate_T12_arm_portability(self):
-        headers = ["log2(N)", "Threads", "This Work Arm (ms)", "Original LCPC Arm (ms)", "Arm Speedup"]
-        tw_arm = [r for r in self.reports_arm if r.get("implementation") == "lcpc-fork"]
-        lcpc_arm = [r for r in self.reports_arm if r.get("implementation") == "lcpc-original-upstream"]
-
-        tw_grouped = self._group_by_config(tw_arm)
-        lcpc_grouped = self._group_by_config(lcpc_arm)
-
-        rows = []
-        for log_n in [18, 22, 26]:
-            for threads in [1, 8]:
-                tw_stat = self._compute_stat_across_sessions(tw_grouped.get(("Mont127", "lcpc-sdig6", "brakedown", log_n, threads, 1), []))["mean_median_ns"]
-                lcpc_stat = self._compute_stat_across_sessions(lcpc_grouped.get(("Mont127", "lcpc-sdig6", "brakedown", log_n, threads, 1), []))["mean_median_ns"]
-
-                spd_str = "-"
-                if tw_stat and lcpc_stat and tw_stat > 0:
-                    spd_str = f"{lcpc_stat / tw_stat:.2f}x"
-
-                if self.has_smoke_watermark and not self.reports_arm:
-                    rows.append([log_n, threads, "N/A (local smoke)", "N/A (local smoke)", "N/A (local smoke)"])
-                else:
-                    rows.append([
-                        log_n, threads,
-                        format_ns_to_ms(tw_stat), format_ns_to_ms(lcpc_stat), spd_str
-                    ])
-
-        if self.has_smoke_watermark and not self.reports_arm:
-            notes = ["Local smoke does not run on Arm; these cells are explicitly not applicable and contain no Arm measurements."]
-        else:
-            notes = [
-                "Arm campaign executed on GCP c4a (Neoverse V2) with scalar portable Rust.",
-                "Demonstrates direct portability of all software optimizations across ISAs without SIMD rewrites."
-            ]
-        self._write_artefact("table_T12_arm_portability",
-                             "Arm Architecture Portability Benchmark (GCP c4a Neoverse V2)",
-                             "tab:arm_portability", headers, rows, notes)
-
-    # -------------------------------------------------------------------------
-    # F1: Per-Technique Stacked Bars (E3)
-    # -------------------------------------------------------------------------
-    def generate_F1_steps_breakdown(self):
-        if not HAS_MATPLOTLIB:
-            return
-        fig, ax = plt.subplots(figsize=(8, 4.8))
-
-        step_tags = sorted(self.reports_steps.keys())
-        if not step_tags:
-            step_tags = ["step/01-modernize", "step/02-fields", "step/03-column-major",
-                         "step/04-r2l", "step/05-lazy", "step/06-blocking", "step/07-slicing", "step/08-threads"]
-
-        x_indices = list(range(len(step_tags)))
-        labels = [t.replace("step/", "") for t in step_tags]
-
-        # Use the planned N=20 column when present; smoke runs may contain only
-        # a smaller sample, so fall back to the largest common N in the records.
-        mode_a_steps = {
-            tag: [r for r in self.reports_steps.get(tag, []) if r.get("mode", "a") == "a"]
-            for tag in step_tags
-        }
-        candidate_sizes = sorted({int(r.get("log_n", 0)) for reps in mode_a_steps.values() for r in reps}, reverse=True)
-        plot_log_n = next((n for n in candidate_sizes if all(any(int(r.get("log_n", 0)) == n for r in reps) for reps in mode_a_steps.values())), 20)
-
-        # Get median times for the selected common size.
-        times = []
-        for tag in step_tags:
-            reps = [r for r in mode_a_steps.get(tag, []) if int(r.get("log_n", 0)) == plot_log_n]
-            stat = self._compute_stat_across_sessions(reps)["mean_median_ns"]
-            times.append((stat / 1e6) if stat else 0.0)
-
-        bars = ax.bar(x_indices, times, color="#2b5c8f", width=0.6, label=f"Prover Encoding (N=2^{plot_log_n})")
-        ax.set_xticks(x_indices)
-        ax.set_xticklabels(labels, rotation=35, ha="right", fontsize=9)
-        ax.set_ylabel("Latency (ms)")
-        ax.set_title("Per-Technique Latency Reduction Across Tagged Commits")
-        ax.grid(True, linestyle=":", alpha=0.5, axis="y")
-
-        if self.is_smoke or self.has_smoke_watermark:
-            ax.text(0.5, 0.5, "LOCAL SMOKE — NOT A RESULT", transform=ax.transAxes,
-                    fontsize=18, color="red", alpha=0.3, ha="center", va="center", rotation=25)
-
-        fig.tight_layout()
-        pdf_path = os.path.join(self.plots_dir, "figure_F1_steps_breakdown.pdf")
-        png_path = os.path.join(self.plots_dir, "figure_F1_steps_breakdown.png")
-        fig.savefig(pdf_path)
-        fig.savefig(png_path, dpi=300)
-        plt.close(fig)
-        print(f"[INFO] Wrote Figure F1: {pdf_path} and {png_path}")
-
-    # -------------------------------------------------------------------------
-    # F2: Scaling with N and LLC Effect (E4)
-    # -------------------------------------------------------------------------
-    def generate_F2_llc_scaling(self):
-        if not HAS_MATPLOTLIB:
-            return
-        fig, ax = plt.subplots(figsize=(7.5, 4.5))
-
-        tw_grouped = self._group_by_config(self.reports_this_work)
-        log_ns = [16, 18, 20, 22, 24, 26, 28]
-
-        # Extract s=1 vs adaptive
-        s1_times = []
-        adapt_times = []
-        valid_ns = []
-
-        for ln in log_ns:
-            s1_val = self._compute_stat_across_sessions(tw_grouped.get(("Mont127", "lcpc-sdig6", "brakedown", ln, 1, 1), []))["mean_median_ns"]
-            adapt_val = None
-            for key, reps in tw_grouped.items():
-                if key[0] == "Mont127" and key[3] == ln and key[4] == 1 and reps and reps[0].get("slice_mode") == "adaptive":
-                    adapt_val = self._compute_stat_across_sessions(reps)["mean_median_ns"]
-                    break
-
-            if s1_val is not None:
-                valid_ns.append(ln)
-                s1_times.append(s1_val / 1e6)
-                adapt_times.append((adapt_val / 1e6) if adapt_val else (s1_val / 1e6))
-
-        if valid_ns:
-            ax.plot(valid_ns, s1_times, marker="s", linestyle="--", color="#d62728", label="Without Slicing (s = 1)")
-            ax.plot(valid_ns, adapt_times, marker="o", linestyle="-", color="#1f77b4", label="Adaptive Cache Slicing")
-
-        ax.set_xlabel(r"Polynomial Size ($\log_2 N$)")
-        ax.set_ylabel("Encoding Latency (ms)")
-        ax.set_yscale("log")
-        ax.set_title("Scaling with N and LLC Transition Effect")
-        ax.grid(True, which="both", linestyle=":", alpha=0.5)
-        ax.legend()
-
-        if self.is_smoke or self.has_smoke_watermark:
-            ax.text(0.5, 0.5, "LOCAL SMOKE — NOT A RESULT", transform=ax.transAxes,
-                    fontsize=18, color="red", alpha=0.3, ha="center", va="center", rotation=25)
-
-        fig.tight_layout()
-        pdf_path = os.path.join(self.plots_dir, "figure_F2_llc_scaling.pdf")
-        png_path = os.path.join(self.plots_dir, "figure_F2_llc_scaling.png")
-        fig.savefig(pdf_path)
-        fig.savefig(png_path, dpi=300)
-        plt.close(fig)
-        print(f"[INFO] Wrote Figure F2: {pdf_path} and {png_path}")
-
-    # -------------------------------------------------------------------------
-    # F3: Thread Scaling and Parallel Efficiency (E6)
-    # -------------------------------------------------------------------------
-    def generate_F3_thread_scaling(self):
-        if not HAS_MATPLOTLIB:
-            return
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.5))
-
-        tw_grouped = self._group_by_core_config(self.reports_this_work)
-        lcpc_grouped = self._group_by_core_config(self.reports_lcpc_orig)
-
-        threads_list = sorted({
-            key[4] for key in list(tw_grouped) + list(lcpc_grouped)
-            if key[:4] == ("Mont127", "lcpc-sdig6", "brakedown", 20)
-        })
-        if not threads_list:
-            threads_list = [1, 2, 4, 8, 15]
-
-        # Use logN=20 or highest available
-        t1_tw = self._compute_stat_across_sessions(tw_grouped.get(("Mont127", "lcpc-sdig6", "brakedown", 20, 1), []))["mean_median_ns"]
-        t1_lcpc = self._compute_stat_across_sessions(lcpc_grouped.get(("Ft127", "lcpc-sdig6", "brakedown", 20, 1), []))["mean_median_ns"]
-        if t1_lcpc is None:
-            t1_lcpc = self._compute_stat_across_sessions(lcpc_grouped.get(("Mont127", "lcpc-sdig6", "brakedown", 20, 1), []))["mean_median_ns"]
-
-        tw_speedups = []
-        tw_effs = []
-        valid_threads = []
-
-        for t in threads_list:
-            st = self._compute_stat_across_sessions(tw_grouped.get(("Mont127", "lcpc-sdig6", "brakedown", 20, t), []))["mean_median_ns"]
-            if t1_tw and st and st > 0:
-                spd = t1_tw / st
-                eff = spd / t
-                valid_threads.append(t)
-                tw_speedups.append(spd)
-                tw_effs.append(eff)
-
-        lcpc_speedups = []
-        lcpc_effs = []
-        lcpc_threads = []
-        for t in threads_list:
-            st = self._compute_stat_across_sessions(lcpc_grouped.get(("Ft127", "lcpc-sdig6", "brakedown", 20, t), []))["mean_median_ns"]
-            if st is None:
-                st = self._compute_stat_across_sessions(lcpc_grouped.get(("Mont127", "lcpc-sdig6", "brakedown", 20, t), []))["mean_median_ns"]
-            if t1_lcpc and st and st > 0:
-                speedup = t1_lcpc / st
-                lcpc_threads.append(t)
-                lcpc_speedups.append(speedup)
-                lcpc_effs.append(speedup / t)
-
-        if valid_threads:
-            ax1.plot(valid_threads, tw_speedups, marker="o", linewidth=2, color="#1f77b4", label="This Work")
-            if lcpc_threads:
-                ax1.plot(lcpc_threads, lcpc_speedups, marker="s", linewidth=2, color="#ff7f0e", label="Original LCPC")
-            ax1.plot(valid_threads, valid_threads, linestyle=":", color="gray", label="Ideal Linear")
-            ax1.legend()
-            ax2.plot(valid_threads, tw_effs, marker="s", linewidth=2, color="#1f77b4", label="This Work E(T)")
-            if lcpc_threads:
-                ax2.plot(lcpc_threads, lcpc_effs, marker="^", linewidth=2, color="#ff7f0e", label="Original LCPC E(T)")
-            ax2.legend()
-        else:
-            ax1.text(0.5, 0.5, "Multithreaded sweep data pending", ha="center", va="center", color="gray")
-            ax2.text(0.5, 0.5, "Multithreaded sweep data pending", ha="center", va="center", color="gray")
-
-        ax1.set_xlabel("Thread Count (T)")
-        ax1.set_ylabel("Speedup S(T)")
-        ax1.set_title("Multithreaded Speedup")
-        ax1.grid(True, linestyle=":", alpha=0.5)
-
-        ax2.set_xlabel("Thread Count (T)")
-        ax2.set_ylabel("Parallel Efficiency E(T)")
-        ax2.set_title("Parallel Efficiency E(T) = S(T) / T")
-        ax2.set_ylim(0.0, 1.1)
-        ax2.grid(True, linestyle=":", alpha=0.5)
-
-        if self.is_smoke or self.has_smoke_watermark:
-            fig.text(0.5, 0.5, "LOCAL SMOKE — NOT A RESULT",
-                     fontsize=22, color="red", alpha=0.2, ha="center", va="center", rotation=25)
-
-        fig.tight_layout()
-        pdf_path = os.path.join(self.plots_dir, "figure_F3_thread_scaling.pdf")
-        png_path = os.path.join(self.plots_dir, "figure_F3_thread_scaling.png")
-        fig.savefig(pdf_path)
-        fig.savefig(png_path, dpi=300)
-        plt.close(fig)
-        print(f"[INFO] Wrote Figure F3: {pdf_path} and {png_path}")
-
-    # -------------------------------------------------------------------------
-    # Verification Mode: --check
-    # -------------------------------------------------------------------------
     def _check_table_cells(self, allow_patterns: List[str]) -> List[str]:
         errors = []
-        for tab_index in range(13):
-            tab_id = f"T{tab_index}"
-            csv_path = os.path.join(self.csv_dir, f"table_{tab_id}_*.csv")
-            matches = glob.glob(csv_path)
-            if not matches:
+        for path in sorted(glob.glob(os.path.join(self.csv_dir, "table_T*_*.csv"))):
+            tab_id = os.path.basename(path).split("_")[1]
+            with open(path, "r", newline="", encoding="utf-8") as source:
+                records = list(csv.reader(source))
+            key_cols = 1
+            for row in records:
+                if row and row[0].startswith("# Key columns:"):
+                    key_cols = int(row[0].split(":")[1])
+            table_rows = [(i, row) for i, row in enumerate(records, start=1)
+                          if row and any(c.strip() for c in row) and not row[0].lstrip().startswith("#")]
+            if not table_rows:
                 continue
-            for path in matches:
-                with open(path, "r", newline="", encoding="utf-8") as source:
-                    records = list(csv.reader(source))
-                table_rows = [
-                    (line_number, row) for line_number, row in enumerate(records, start=1)
-                    if row and any(cell.strip() for cell in row)
-                    and not row[0].lstrip().startswith("#")
-                ]
-                if not table_rows:
-                    continue
-                header_line, headers = table_rows[0]
-                for line_number, row in table_rows[1:]:
-                    if len(row) > len(headers):
-                        errors.append(
-                            f"Malformed artefact row: {tab_id} {path}:{line_number} has "
-                            f"{len(row)} cells, expected {len(headers)}"
-                        )
-                    row_key = row[0].strip() if row else "<empty row label>"
-                    for column_index, header in enumerate(headers):
-                        value = row[column_index] if column_index < len(row) else ""
-                        reason = cell_missing_reason(value, header, row)
-                        if reason is None:
-                            continue
-                        cell_selector = f"{tab_id}|{row_key}|{header.strip()}"
-                        if any(cell_selector == pattern or fnmatch.fnmatchcase(cell_selector, pattern)
-                               for pattern in allow_patterns):
-                            continue
-                        errors.append(
-                            f"Missing artefact cell {cell_selector}={value!r} ({reason}) "
-                            f"at {path}:{line_number}"
-                        )
+            _, headers = table_rows[0]
+            for line_number, row in table_rows[1:]:
+                if len(row) > len(headers):
+                    errors.append(f"Malformed artefact row: {tab_id} {path}:{line_number} has {len(row)} cells, expected {len(headers)}")
+                full_key = ",".join(c.strip() for c in row[:key_cols])
+                first_key = row[0].strip() if row else ""
+                for ci, header in enumerate(headers):
+                    value = row[ci] if ci < len(row) else ""
+                    reason = cell_missing_reason(value, header, row)
+                    if reason is None:
+                        continue
+                    sel_full = f"{tab_id}|{full_key}|{header.strip()}"
+                    sel_first = f"{tab_id}|{first_key}|{header.strip()}"
+                    if selector_matches(sel_full, allow_patterns) or selector_matches(sel_first, allow_patterns):
+                        continue
+                    errors.append(f"Missing artefact cell {sel_full}={value!r} ({reason}) at {path}:{line_number}")
         return errors
 
+    def warn_unmatched_omissions(self) -> List[str]:
+        """Warns about selection.json omission patterns that matched no cell (stale or mistyped)."""
+        if not self.selection:
+            return []
+        unmatched = self.selection.unmatched_omission_patterns()
+        for pattern in unmatched:
+            print(f"[WARN] selection.json omission pattern matched no cell (data landed or pattern stale?): {pattern}")
+        return unmatched
+
+    def check_latex_compiles(self) -> List[str]:
+        """Compiles every generated LaTeX table with pdflatex (skipped with a warning if not installed)."""
+        tex_paths = sorted(glob.glob(os.path.join(self.latex_dir, "table_T*_*.tex")))
+        build_dir = self.latex_build_dir or os.path.join(self.out_dir, "latex_build")
+        try:
+            compiled, errors = compile_latex_tables(tex_paths, build_dir)
+        except FileNotFoundError:
+            print("[WARN] pdflatex not found: generated LaTeX tables were not compile-checked.")
+            return []
+        print(f"[INFO] pdflatex compiled {len(compiled)} of {len(tex_paths)} tables in {build_dir}.")
+        return [f"LaTeX table does not compile: {e}" for e in errors]
+
     def check_all_artefacts(self, allow_patterns: Optional[List[str]] = None) -> bool:
-        """
-        Validates that all required artefacts T0-T12 and F1-F3 are present and valid.
-        Fails if any required file is missing or contains unhandled missing data.
-        """
-        required_tables = [f"table_T{i}" for i in range(13)]
-        required_figures = ["figure_F1_steps_breakdown", "figure_F2_llc_scaling", "figure_F3_thread_scaling"]
+        allow = list(allow_patterns or [])
+        omission_patterns = self.selection.omission_patterns() if self.selection else []
         errors = []
-
-        # Check tables
-        for tab_prefix in required_tables:
-            matching_tex = glob.glob(os.path.join(self.latex_dir, f"{tab_prefix}_*.tex")) + \
-                           glob.glob(os.path.join(self.latex_dir, f"{tab_prefix}.tex"))
-            matching_csv = glob.glob(os.path.join(self.csv_dir, f"{tab_prefix}_*.csv")) + \
-                           glob.glob(os.path.join(self.csv_dir, f"{tab_prefix}.csv"))
-
-            if not matching_tex:
-                errors.append(f"Missing LaTeX table for {tab_prefix} in {self.latex_dir}")
+        for i in range(13):
+            prefix = f"table_T{i}"
+            tex = glob.glob(os.path.join(self.latex_dir, f"{prefix}_*.tex"))
+            csvs = glob.glob(os.path.join(self.csv_dir, f"{prefix}_*.csv"))
+            if not tex or os.path.getsize(tex[0]) == 0:
+                errors.append(f"Missing or empty LaTeX table for {prefix} in {self.latex_dir}")
+            if not csvs:
+                errors.append(f"Missing CSV table for {prefix} in {self.csv_dir}")
             else:
-                tex_file = matching_tex[0]
-                if os.path.getsize(tex_file) == 0:
-                    errors.append(f"Empty LaTeX table: {tex_file}")
-
-            if not matching_csv:
-                errors.append(f"Missing CSV table for {tab_prefix} in {self.csv_dir}")
-            else:
-                csv_file = matching_csv[0]
-                with open(csv_file, "r", encoding="utf-8") as f:
-                    lines = [l.strip() for l in f if l.strip() and not l.startswith("#")]
-                    if len(lines) < 2:  # Needs at least header + 1 row
-                        errors.append(f"CSV table has no data rows: {csv_file}")
-
-        errors.extend(self._check_table_cells(allow_patterns or []))
+                with open(csvs[0], "r", encoding="utf-8") as f:
+                    lines = [l for l in f if l.strip() and not l.startswith("#")]
+                if len(lines) < 2:
+                    errors.append(f"CSV table has no data rows: {csvs[0]}")
+        errors.extend(self._check_table_cells(allow + omission_patterns))
+        # Missing values (fewer sessions than expected) may be documented;
+        # integrity errors never are (interface d).
+        for selector, message in self.missing_cell_errors:
+            if selector_matches(selector, allow + omission_patterns):
+                continue
+            errors.append(f"Cell {selector}: {message}")
+        errors.extend(f"Cell {selector}: integrity error (not excusable by omissions): {message}"
+                      for selector, message in self.cell_errors)
         errors.extend(f"Oversubscribed run: {e}" for e in self.pinning_errors)
+        errors.extend(f"Codegen report not PASS and not documented in selection.json omissions: {e}"
+                      for e in self.codegen_errors)
+        if self.compile_latex:
+            errors.extend(self.check_latex_compiles())
+        for name in ("figure_F1_steps_breakdown", "figure_F2_llc_scaling", "figure_F3_thread_scaling"):
+            for ext in ("pdf", "png"):
+                p = os.path.join(self.plots_dir, f"{name}.{ext}")
+                if not os.path.isfile(p) or os.path.getsize(p) == 0:
+                    errors.append(f"Missing or empty figure: {p}")
 
-        # Check figures
-        for fig_name in required_figures:
-            pdf_path = os.path.join(self.plots_dir, f"{fig_name}.pdf")
-            png_path = os.path.join(self.plots_dir, f"{fig_name}.png")
-            if not os.path.isfile(pdf_path) or os.path.getsize(pdf_path) == 0:
-                errors.append(f"Missing or empty PDF figure: {pdf_path}")
-            if not os.path.isfile(png_path) or os.path.getsize(png_path) == 0:
-                errors.append(f"Missing or empty PNG figure: {png_path}")
-
-        if self.has_smoke_watermark or self.profile == "smoke":
+        smoke = self.has_smoke_watermark or self.profile == "smoke"
+        if smoke:
             errors.extend(self._check_smoke_coverage())
-        else:
-            errors.extend(
-                error.replace("Smoke coverage missing:", "Campaign coverage missing:")
-                for error in self._check_smoke_coverage()
-            )
-            if len(self.session_ids) < 2:
-                errors.append("Campaign artefacts require two independent sessions; include both session directories in --results-dir before --check")
-            if self.profile == "full" and not self.reports_arm:
-                errors.append("Full campaign artefacts require the matching Arm session; include both sessions in --results-dir before --check")
+        elif not self.selection:
+            errors.append("Paper artefacts need a result selection: run with --selection (default results/selection.json) "
+                          "instead of --results-dir alone.")
 
+        if self.todo_cells:
+            print(f"[INFO] {len(self.todo_cells)} cells are pending or documented omissions (csv/todo_cells.csv):")
+            for selector, status in sorted(self.todo_cells.items()):
+                print(f"  - {selector}: {status}")
+        self.warn_unmatched_omissions()
         if errors:
             print("[FAIL] Artefact validation failed with errors:")
             for err in errors:
                 print(f"  - {err}")
             return False
-
-        print("[PASS] All 16 required evaluation artefacts (T0-T12, F1-F3) verified successfully.")
+        print("[PASS] All required evaluation artefacts (T0-T12, F1-F3) verified.")
         return True
 
 
@@ -1821,17 +2578,23 @@ def main():
     parser.add_argument("results_dir_positional", nargs="?",
                         help="Result directory (positional form; also accepts --results-dir)")
     parser.add_argument("--results-dir", nargs="+", dest="results_dir_option",
-                        help="One or more directories containing benchmark results")
+                        help="Directories to scan. Without --selection every record found is analyzed (not paper evidence).")
+    parser.add_argument("--selection", default=None,
+                        help=f"Result selection file (default when no --results-dir is given: {DEFAULT_SELECTION})")
     parser.add_argument("--out", "--out-dir", dest="out_dir", default="./analysis",
                         help="Output directory for generated artefacts")
-    parser.add_argument("--kdhr26-json", default=os.path.join(os.path.dirname(__file__), "kdhr26_reported.json"),
+    parser.add_argument("--kdhr26-json", default=os.path.join(SCRIPT_DIR, "kdhr26_reported.json"),
                         help="Path to committed kdhr26_reported.json citation data")
     parser.add_argument("--smoke", action="store_true", help="Mark outputs with LOCAL SMOKE watermark")
     parser.add_argument("--check", action="store_true", help="Fail if any required artefact or cell is missing")
     parser.add_argument("--allow", action="append", type=parse_allow_pattern, default=[],
-                        help="Allow a documented missing cell selector TABLE|ROW|COLUMN; repeat as needed")
-    parser.add_argument("--self-test", action="store_true",
-                        help="Run the small cell-validation self-test and exit")
+                        help="Allow a documented missing cell selector TABLE|ROW|COLUMN (ROW = the key columns joined "
+                             "by commas, or the first column); repeat as needed")
+    parser.add_argument("--latex-build-dir", default=None,
+                        help="Where --check compiles each generated LaTeX table with pdflatex (default <out>/latex_build)")
+    parser.add_argument("--no-latex-compile", action="store_true",
+                        help="With --check, do not compile the generated LaTeX tables (default: compile if pdflatex exists)")
+    parser.add_argument("--self-test", action="store_true", help="Run the built-in self-test and exit")
     args = parser.parse_args()
 
     if args.self_test:
@@ -1839,19 +2602,33 @@ def main():
         return
 
     results_dirs = args.results_dir_option or ([args.results_dir_positional] if args.results_dir_positional else [])
-    if not results_dirs:
-        parser.error("provide a result directory positionally or with --results-dir")
+    selection_path = args.selection or (None if results_dirs else DEFAULT_SELECTION)
+    selection = None
+    if selection_path:
+        try:
+            selection = Selection(selection_path)
+        except (OSError, ValueError, KeyError) as e:
+            parser.error(f"cannot load selection {selection_path}: {e}")
+        if not results_dirs:
+            results_dirs = [selection.root]
+        print(f"[INFO] Using selection {selection.path} (sha256 {selection.sha256[:12]}); results root {selection.root}")
+    elif not results_dirs:
+        parser.error("provide a result directory or a selection")
+    else:
+        print("[WARN] No --selection: analyzing every record under " + ", ".join(results_dirs)
+              + " (per-session / smoke output, not paper evidence).")
 
-    analyzer = BenchmarkAnalyzer(args.out_dir, args.kdhr26_json, is_smoke=args.smoke)
+    analyzer = BenchmarkAnalyzer(args.out_dir, args.kdhr26_json, is_smoke=args.smoke, selection=selection,
+                                 compile_latex=not args.no_latex_compile, latex_build_dir=args.latex_build_dir)
     analyzer.load_results(results_dirs)
     analyzer.generate_all()
 
     if args.check:
-        passed = analyzer.check_all_artefacts(args.allow)
-        if not passed:
+        if not analyzer.check_all_artefacts(args.allow):
             sys.exit(1)
-
-    print(f"[INFO] Analysis completed successfully. Artefacts saved in {args.out_dir}")
+    else:
+        analyzer.warn_unmatched_omissions()
+    print(f"[INFO] Analysis completed. Artefacts saved in {args.out_dir}")
 
 
 if __name__ == "__main__":
