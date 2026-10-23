@@ -157,9 +157,9 @@ The published GCP data was collected in stages, not by one `all.sh --profile ful
 
 `reproduce/gcp/run_stages.sh --preset x86` runs stages A, S, C, D and B with the current block ids, and `--machine c4a --preset arm` runs the Arm stage. Which run directories and blocks count is fixed in `results/selection.json`; `docs/STATUS.md` §7 records the stage → commit → run-dir map, all deviations from the plan, and every incident that invalidated data.
 
-### Planned re-measurement
+### Re-measurement (2026-10-23)
 
-Several cells of the campaign are invalid or missing (`docs/STATUS.md` §7.4, §7.6). `run_stages.sh --preset remeasure` re-measures them: with `--machine c3d` (run it once per x86-64 session, `s1` and `s2`) it appends the stages below; with `--machine c4a` (session `arm1`) the Arm stage. Each stage is planned to take at most about 2 h. `--print-stages` prints the expanded list without touching a VM, for checking with `all.sh --dry-run`.
+Several cells of the campaign are invalid or missing (`docs/STATUS.md` §7.4, §7.6). `run_stages.sh --preset remeasure` re-measures them: with `--machine c3d` it appends the stages below; with `--machine c4a` (session `arm1`) the Arm stage. Each stage is planned to take at most about 2 h. `--print-stages` prints the expanded list without touching a VM, for checking with `all.sh --dry-run`. Give the dry run its own `--out` directory outside `results/` (for example under `$TMPDIR`): it creates the session and `stages/` directories before it exits, and `analyze.py --selection … --check` refuses records under `results/` that the selection does not cover. Loading a GCP host profile also writes `results/<host>/host-profile-<instance>.json` (the GCE instance name, or the hostname off GCP) on whatever machine runs the dry run; delete that file if it was written on a workstation.
 
 | Stage | `--blocks` | log2 N | LCPC variants | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
@@ -168,17 +168,39 @@ Several cells of the campaign are invalid or missing (`docs/STATUS.md` §7.4, §
 | RH | same | 20, 24 | `as-published-portable`, `fork-flags-as-is` | the two other variants, so that T6 (E8) can separate the BLAKE3 backend from the compiler flags |
 | RT | `^full_(this_work\|lcpc_orig)_threads_t[0-9]+$` | 20, 24, 26 | `as-published-as-is`, `fork-flags-portable` | thread scaling (E6), This Work and original LCPC, T = 1, 2, 4, 8 on the first T cores |
 | RT28A, RT28B | the thread-scaling blocks, split in two stages | 28 | same | thread scaling at 2^28 |
-| RS | `^full_simd_spielman_mont127_t1$` | 28 | — | SIMD-Spielman Mont127 T = 1, Brakedown shape (missing in s1, I5) |
+| RS | `^full_simd_spielman_mont127_t1$` | 28 | — | SIMD-Spielman Mont127 T = 1, Brakedown shape (missing in s1, I5). **Run it for `s1` only**: s2 already has this cell, and a second s2 record would be a duplicate. The preset adds RS for every `c3d` session, so for `s2` pass the other six stages explicitly (as below). |
 | ARM (`--machine c4a`) | `^arm_` | 18, 22, 26 | `as-published-as-is`, `fork-flags-portable` | This Work on Arm after the AArch64 codegen-checker fix (I7), and original LCPC as published on Arm |
 
+As launched (2026-10-23, 18:06 UTC+8 = 10:06 UTC, fork HEAD `375a6e1`; `--run-date` was left at its default, the UTC start date 2026-10-23):
+
 ```sh
-./reproduce/gcp/run_stages.sh --instance "$INSTANCE" --zone "$ZONE" --session s1 --preset remeasure
-./reproduce/gcp/run_stages.sh --instance "$INSTANCE" --zone "$ZONE" --session arm1 --machine c4a --preset remeasure
+# s1 on rbd-bench-c3d-3 (us-east4-c): all seven x86-64 stages
+./reproduce/gcp/run_stages.sh --instance rbd-bench-c3d-3 --zone us-east4-c --session s1 --preset remeasure
+# s2 on rbd-bench-c3d-2 (us-east1-d): the same stages without RS
+# (LCPC variants default to as-published-as-is,fork-flags-portable)
+./reproduce/gcp/run_stages.sh --instance rbd-bench-c3d-2 --zone us-east1-d --session s2 \
+  'RL|^full_lcpc_orig_mode_a_t[18]$|16,18,20,22,24,26' \
+  'RL28|^full_lcpc_orig_mode_a_t[18]$|28' \
+  'RH|^full_lcpc_orig_mode_a_t[18]$|20,24|lcpc=as-published-portable,fork-flags-as-is' \
+  'RT|^full_(this_work|lcpc_orig)_threads_t[0-9]+$|20,24,26' \
+  'RT28A|^full_lcpc_orig_threads_t[12]$|28' \
+  'RT28B|^full_(this_work_threads_t[0-9]+|lcpc_orig_threads_t[48])$|28'
+# Arm (launched 15:17 UTC after both c3d VMs had stopped; quota): session arm1 on rbd-bench-c4a (us-central1-a);
+# --run-date keeps the run directory inside selection.json's 2026-10-23-375a6e1* pattern if it starts after 00:00 UTC
+./reproduce/gcp/run_stages.sh --instance rbd-bench-c4a --zone us-central1-a --session arm1 --machine c4a --preset remeasure \
+  --run-date 2026-10-23
 ```
 
-(`GCLOUD` selects the `gcloud` binary if it is not on `PATH`.)
+(`GCLOUD` selects the `gcloud` binary if it is not on `PATH`.) The x86-64 stages write the new run directories `results/gcp-c3d-highmem-16/2026-10-23-375a6e18355a/{s1,s2}`; the Arm stage writes `results/gcp-c4a-highmem-16/<UTC date>-<commit>/arm1`. At most two of the 16-vCPU VMs can run at the same time (`CPUS_ALL_REGIONS` quota, "Benchmark machines"), so the Arm stage starts only after one x86-64 VM has stopped.
 
-At most two of the 16-vCPU VMs can run at the same time (`CPUS_ALL_REGIONS` quota, "Benchmark machines").
+**Supersede policy and `results/selection.json`.** A re-measured cell replaces every older record of the same cell, so that each pair compared in a table (original LCPC `as-published-as-is` vs `fork-flags-portable`, This Work vs original LCPC thread scaling) comes from one boot. `results/selection.json` is already wired for this, so copying the new run directories back needs no selection edit for steps 1 and 2:
+
+1. **Run directories (automatic).** `machines.<host>.runs` lists `run_dir` `2026-10-23-375a6e1*` with sessions `s1`, `s2` on `gcp-c3d-highmem-16` and `arm1` on `gcp-c4a-highmem-16`. A glob `run_dir` matches the run directories once they exist; until then it is inert (`analyze.py` prints `[INFO] Selected run pattern … matches no run directory yet`). The x86-64 directory is `2026-10-23-375a6e18355a`. The Arm directory's date is the UTC date of the Arm launch (`run_stages.sh --run-date`, default today in UTC): pass `--run-date 2026-10-23` to keep the pattern matching, or else change the c4a `run_dir` and the c4a `supersede.by` pattern to the actual name. Records in a run directory that no `run_dir` matches are refused as uncovered.
+2. **Superseding (automatic, per cell).** The `supersede` rules exclude, among the included records, every older record of a cell that a run matching `by` re-measured in a block matching `blocks`: `full_lcpc_orig_mode_a_*`, `full_lcpc_orig_threads_*` and `full_this_work_threads_*` on `gcp-c3d-highmem-16` (stages A, B, R and C), and `arm_lcpc_orig_*` and `arm_this_work_*` on `gcp-c4a-highmem-16` (including those blocks' codegen reports, superseded per machine and block family). The cell is the full configuration (implementation, LCPC build variant, field, parameters, shape, slices, log2 N, threads), and superseding applies across all sessions, so an old s2 record is dropped when s1 or s2 re-measured its cell. It is **not** per block: a cell that the new run did not produce (for example because a new block failed) keeps its old records. For the This Work vs original-LCPC thread-scaling pair and the Arm This Work vs Arm original-LCPC pair, `analyze.py` then prints `[WARN] Same-boot pair split across runs …`; the LCPC variant pair (`as-published-as-is` vs `fork-flags-portable`) gets no such warning. `analyze.py` prints `[INFO] Superseded N records of <block>` (with `(whole block)` when nothing of it is left); check those lines against the stages that completed. Everything else in the older run directories stays selected (This Work headline, steps, slice sweep, PolyCommit, Ligero, SIMD-Spielman including s2's Mont127 T = 1 2^28 cell).
+3. **Omissions (by hand).** Delete the `pending` omissions that the new data fills (original LCPC `as-published-as-is`, the T6 rows `Original LCPC as-published-portable` and `Original LCPC fork-flags-as-is` from stage RH, s1 SIMD-Spielman Mont127 T = 1 2^28, Arm This Work); the `omitted` entry for the SIMD-Spielman 2^28 setup/RSS cells stays, because s2 has no such record; `analyze.py` warns about every omission pattern that no longer matches a cell (`[WARN] selection.json omission pattern matched no cell`). Keep, or narrow, any that still match a missing cell.
+4. Run `python3 scripts/analyze.py --selection results/selection.json --check`; it must exit 0 (§5 lists what it rejects: duplicates, uncovered records, interrupted blocks, missing `expected_rows`, …).
+
+This Work's headline ≤ 2^26 still comes from stage A, so its comparison with the re-measured original LCPC remains a cross-boot comparison (`docs/STATUS.md` §7.2).
 
 ---
 
@@ -195,11 +217,13 @@ python3 scripts/analyze.py --results-dir results/ --selection results/selection.
 
 The strict check (`--check`) fails on
 
-- integrity errors: duplicate or mixed configurations in one cell, oversubscribed runs (threads > pinned cores), and records not covered by the selection;
-- any selected codegen report with status `FAIL` (vector arithmetic in a hot kernel), unless `results/selection.json` documents it as an omission; T0 and T11 take their PASS/FAIL from these reports;
-- empty cells, `-`, NaN and `SKIPPED` values in every table.
+- integrity errors: duplicate or mixed configurations in one cell, oversubscribed runs (threads > pinned cores), records not covered by the selection, and records of an **interrupted block** (untagged partial output of a block whose latest run never completed: its earlier output was moved aside, or its stage was killed before `all.sh` finalized it); re-run such a block or exclude it. Records of a block that completed with a failure only produce a warning;
+- any selected codegen report with status `FAIL` (vector arithmetic in a hot kernel), unless `results/selection.json` documents it as an omission with the selector `T11|<arch> @ <fork>,hot_kernels (aggregate)|Scalar Status` (campaign reports) or `T3|codegen,<tag>|Scalar Status` (the per-step reports, `<tag>` = `step/01-modernize` … `HEAD`); T0, T3 and T11 take their PASS/FAIL from these reports;
+- rows that `results/selection.json` `expected_rows` requires but a table lacks (`{TABLE: {key column header: [values]}}`, the cartesian product of the listed values, e.g. T6 `Implementation` × `T` × `log2(N)`; a table's entry may also be a list of such specs, whose required rows are the union of their products, as T6 uses for the stage-RH variants), reported as `TABLE|v1,v2,…|(row)`;
+- empty cells, `-`, NaN and `SKIPPED` values in every table;
+- generated LaTeX tables that do not compile: with `--check`, each table under `latex/` is compiled standalone with `pdflatex` (booktabs, threeparttable) in `--latex-build-dir` (default `<out-dir>/latex_build`). If `pdflatex` is not installed, the compile step is skipped with a warning; `--no-latex-compile` skips it on purpose.
 
-The `omissions` of `results/selection.json` (`kind` `pending` or `omitted`, with a reason) apply only to missing or N/A cells, such as Orion-shape SIMD-Spielman at 2^28 ("omitted (documented)") or cells pending re-measurement; they never excuse an integrity error, and an omission that matches no cell produces a warning. Repeatable `--allow 'TABLE|ROW|COLUMN'` globs select further documented exceptions; smoke runs pass the known local limits in
+`results/selection.json` also defines which records count: `machines.<host>.runs` (a `run_dir` may be a glob, inert until a matching directory exists), `exclude` (path globs with a reason and an optional `match` on record fields), and `supersede` (newer runs replace older records of the cells they re-measured, per cell; see "Re-measurement" in §4). The `omissions` (`kind` `pending` or `omitted`, with a reason) apply only to missing or N/A cells (and to absent `expected_rows` rows and documented `FAIL` codegen reports, through the selectors above), such as Orion-shape SIMD-Spielman at 2^28 ("omitted (documented)") or cells pending re-measurement; they never excuse an integrity error, and an omission that matches no cell produces a warning. Repeatable `--allow 'TABLE|ROW|COLUMN'` globs select further documented exceptions; smoke runs pass the known local limits in
 `reproduce/all.sh` (Arm is not run locally, and the smoke subset omits the campaign's larger field measurements).
 Run `python3 scripts/analyze.py --self-test` to check the missing-cell rules.
 
@@ -207,7 +231,7 @@ Outputs (under `--out-dir`):
 - **CSV** (`csv/`) and **LaTeX** (`latex/`): `table_T0_correctness`, `table_T1_headline_encoding`, `table_T2_simd_spielman`, `table_T3_steps_breakdown`, `table_T4_slice_sweep`, `table_T5_field_comparison`, `table_T6_pcs_breakdown`, `table_T7_verifier_encoding`, `table_T8_setup_memory`, `table_T9_orion_shape`, `table_T10_brakedown_vs_rs`, `table_T11_codegen_evidence`, `table_T12_arm_portability` (`.csv` / `.tex`).
 - **Figures** (`plots/`): `figure_F1_steps_breakdown`, `figure_F2_llc_scaling`, `figure_F3_thread_scaling` (`.pdf` and `.png`).
 
-The paper's tables are to be copied from these outputs into `paper/` (for example `paper/generated/`, not yet created); no number is entered by hand.
+The paper's tables and figures are copied from these outputs into the paper repository's `paper/generated/` (`csv/`, `latex/`, `plots/`); no number is entered by hand.
 
 ## Benchmark machines (Google Cloud)
 
@@ -315,9 +339,12 @@ T + 1 cores for its coordinator thread, at most 8); on `c3d-highmem-16`, T = 8 u
 (`reproduce/hosts/<host>.sh`) are now written per instance
 (`results/<host>/first-boot-manifest-<instance>.json`, `results/<host>/host-profile-<instance>.json`),
 and `all.sh` copies them into each stage directory. In the
-campaign it wrote one path per machine family (`results/gcp-c3d-highmem-16/first-boot-manifest.json`),
-so that file holds only the last VM's record (`rbd-bench-c3d-3`); `s2`'s machine type, zone, CPU
-model and cache topology are in its session and block manifests.
+2026-10-22/23 campaign `setup_vm.sh` wrote one path per machine family
+(`results/gcp-c3d-highmem-16/first-boot-manifest.json`), so that file holds the record of whichever
+VM's results were copied back last (on 2026-10-23 at 17:14 UTC+8, `rbd-bench-c3d-2` in
+`us-east1-d`; the `rbd-bench-c3d-3` record it held before is lost). Each session's machine type,
+zone, CPU model and cache topology are also in its session and block manifests. The re-measurement
+(2026-10-23) writes the per-instance files.
 
 ### Stop or delete the VMs
 

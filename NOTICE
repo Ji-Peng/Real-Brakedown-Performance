@@ -6,10 +6,13 @@ This product is a modified version of LCPC
   Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 The fork was imported with its full git history at upstream commit
-f0e2116001af5a1bbf39481535f837d6a25772e8 (tag step/00-import). Every change
-since then is a commit in this repository; `git log step/00-import..HEAD`
-lists them, and the tags step/01-modernize ... step/09-codegen mark one
-technique per tag.
+f0e2116001af5a1bbf39481535f837d6a25772e8. The tag step/00-import is the
+import merge commit 2badf67, whose second parent is f0e2116; that merge
+itself replaced README.md with the fork's README and added README-lcpc.md, a
+byte-identical copy of upstream's README.md (`git diff f0e2116 step/00-import`
+shows exactly these two files). Every later change is a commit in this
+repository; `git log step/00-import..HEAD` lists them, and the tags
+step/01-modernize ... step/09-codegen mark one technique per tag.
 
 Changes made by the RealBrakedownPerf authors (2026), Apache-2.0:
 
@@ -21,8 +24,9 @@ Changes made by the RealBrakedownPerf authors (2026), Apache-2.0:
     lcpc-brakedown-pc/src/{codespec,encode,lib,matgen,tests}.rs,
     lcpc-ligero-pc/Cargo.toml, lcpc-ligero-pc/src/{lib,tests}.rs,
     lcpc-test-fields/Cargo.toml, lcpc-test-fields/src/lib.rs.
-  README.md was replaced by the fork's README; the upstream README is kept
-  unchanged as README-lcpc.md.
+  README.md was replaced by the fork's README (in the import merge
+  step/00-import, and edited since); the upstream README is kept unchanged
+  as README-lcpc.md.
   Summary: current dependencies and stable Rust; column-major batched
   encoding; R2L evaluation with transposed graphs and runtime code
   parameters; lazy reduction through the LazyField trait; multi-edge
