@@ -1,0 +1,65 @@
+Real Brakedown Performance (LCPC fork)
+
+This product is a modified version of LCPC
+  https://github.com/conroi/lcpc
+  Copyright 2021 Riad S. Wahby <rsw@cs.stanford.edu>
+  Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The fork was imported with its full git history at upstream commit
+f0e2116001af5a1bbf39481535f837d6a25772e8 (tag step/00-import). Every change
+since then is a commit in this repository; `git log step/00-import..HEAD`
+lists them, and the tags step/01-modernize ... step/09-codegen mark one
+technique per tag.
+
+Changes made by the RealBrakedownPerf authors (2026), Apache-2.0:
+
+- Modified upstream files. Each carries a "Modified 2026 by the
+  RealBrakedownPerf authors" comment after its upstream header:
+    Cargo.toml (workspace), .gitignore,
+    lcpc-2d/Cargo.toml, lcpc-2d/src/{lib,tests}.rs,
+    lcpc-brakedown-pc/Cargo.toml,
+    lcpc-brakedown-pc/src/{codespec,encode,lib,matgen,tests}.rs,
+    lcpc-ligero-pc/Cargo.toml, lcpc-ligero-pc/src/{lib,tests}.rs,
+    lcpc-test-fields/Cargo.toml, lcpc-test-fields/src/lib.rs.
+  README.md was replaced by the fork's README; the upstream README is kept
+  unchanged as README-lcpc.md.
+  Summary: current dependencies and stable Rust; column-major batched
+  encoding; R2L evaluation with transposed graphs and runtime code
+  parameters; lazy reduction through the LazyField trait; multi-edge
+  blocking; LLC slicing; an expander-level worker pool; portable codegen
+  tuning.
+- Removed upstream files: upstream's nightly #[bench] harnesses
+  lcpc-brakedown-pc/src/bench.rs and lcpc-ligero-pc/src/bench.rs (replaced
+  by the stable benchmark crate bench/).
+- New files in upstream crates: lcpc-brakedown-pc/src/{cache,graph,
+  thread_pool}.rs and lcpc-test-fields/src/fft.rs (see below).
+- New crates and files: lcpc-fields/, lcpc-oracle-tests/,
+  lcpc-spielman-oracle/, bench/, reproduce/, external/, docs/, tests/golden/,
+  tools/, results/, NOTICE, rust-toolchain.toml, .cargo/config.toml,
+  Cargo.lock, and every file under scripts/ except upstream's
+  scripts/microbench.sh and scripts/print_bench.sh (unchanged).
+
+Code derived from fffft:
+
+- lcpc-test-fields/src/fft.rs is a modified copy of src/lib.rs of fffft
+  0.4.2 (https://crates.io/crates/fffft, upstream LCPC's FFT dependency of
+  lcpc-ligero-pc), Copyright 2020 Riad S. Wahby <rsw@cs.stanford.edu>,
+  licensed under the Apache License, Version 2.0 (the same license text as
+  LICENSE). It was embedded because fffft 0.4.2 requires ff 0.12; the
+  changes port it to ff 0.14, remove its nightly benchmark code, and keep
+  adapted versions of two of fffft's tests (roundtrip, roots_of_unity) as
+  an inline test module. The file keeps its original copyright
+  notice and states the change.
+
+Third-party baselines used only for comparison are not part of this product's
+source and keep their own licenses:
+
+- SIMD-Spielman-for-ZKPs (upstream commit 7b399db), Copyright 2026 Florian
+  Krieger, Christian Dobrouschek, Florian Hirner, and Sujoy Sinha Roy, MIT
+  license. It is fetched at build time; external/simd_spielman/params.patch
+  (ours, Apache-2.0) is applied to an out-of-tree copy.
+- arkworks poly-commit (commit 1eaec50), dual-licensed MIT/Apache-2.0. It
+  is fetched by Cargo; external/polycommit/polycommit.patch (ours) is
+  applied to a temporary copy.
+- Unmodified upstream LCPC f0e2116, used through external/lcpc-orig as the
+  original-LCPC baseline (same copyright and license as above).

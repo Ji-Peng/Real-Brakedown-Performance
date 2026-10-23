@@ -209,7 +209,16 @@ The disassembly listings record vector move instructions (`vmovaps`, `vmovups`, 
   and slice resets (`acc.fill(F::Acc::default())`).
 - **Codegen:** LLVM synthesizes AVX/NEON vector moves (`vmovaps %ymm0, (%rcx)` on x86, `movi v0.2d, #0` on AArch64) to zero 256 bits or 128 bits per instruction when initializing scratch buffers.
 - **Also:** `vmovups` pairs copy 32-byte accumulators (`Mont127Acc`, `Mers127Acc`) and `vxorps %xmm0, %xmm0, %xmm0` creates the zero register for the stores. The checker classifies this zeroing idiom as a move.
-- **Classification:** These instructions perform bulk memory initialization (`memset`) and copies, not mathematical computation. They do not alter arithmetic results and are classified separately as `VEC_MOVE`.
+- **AArch64:** the same zeroing and copies appear as `movi v0.2d, #0` followed by `stp q0, q0, [x8]` (and `str`/`ldr`/`ldp q` copies of accumulators).
+- **Classification:** These instructions perform bulk memory initialization (`memset`) and copies, not mathematical computation. They do not alter arithmetic results and are classified separately as `VEC_MOVE` (`vector_moves` in the JSON report).
+
+**Classification rules (`check_codegen.py`, classifier `rbd-codegen-classifier-v2`).** The report gives two counts per symbol and for the hot kernels: `vector_arithmetic` and `vector_moves`. Only vector arithmetic in a hot kernel makes the status `FAIL`; a run that matches no hot kernel is `NO_HOT_KERNELS`, not `PASS`. Every report records `classifier_version`; reports without it (all reports of the 2026-10-22/23 campaign) come from the earlier classifier, which misread AArch64 branch targets (§4.5).
+
+| Class | x86-64 | AArch64 | Effect |
+| :--- | :--- | :--- | :--- |
+| Scalar | general-purpose-register instructions (`mulx`, `adc`, …), `jmp`/`jcc`/`call` | general-purpose-register instructions; branches and PC-relative forms (`b`, `b.cond`, `bl`, `br`, `blr`, `ret`, `cbz`, `cbnz`, `tbz`, `tbnz`, `adr`, `adrp`), whose target addresses and `<symbol>` annotations are never parsed as registers | none |
+| Vector move | loads, stores and register copies of `xmm`/`ymm`/`zmm` (`vmovups`, `vmovaps`, `vmovdqu`, …) and the zero idiom with identical operands (`vxorps %xmm0,%xmm0,%xmm0`) | `movi`, `mvni`, `dup`, `mov`, `ins`, `umov`, `smov`, `fmov`, `ld1`/`st1`, and `ldr`/`str`/`ldp`/`stp`/`ldur`/`stur`/`ldnp`/`stnp` with a SIMD&FP register (`q`/`d`/`s` views) | counted as `vector_moves`, does not fail |
+| Vector arithmetic | `vpadd*`, `vpmul*`, `vpmadd52*`, shifts, logic with distinct operands, shuffles/inserts, and any unlisted SIMD instruction | `add`, `sub`, `mul`, `mla`, `umull`, `pmull`, `shl`, `ushr`, `and`, `orr`, `eor`, … on `vN.<arrangement>`, scalar SIMD&FP arithmetic, permutes, conversions, and anything unrecognized on SIMD&FP registers | `FAIL` in a hot kernel |
 
 ### 4.3 Precompiled Standard Library & Runtime `memcpy`
 
@@ -223,6 +232,16 @@ features = ["pure", "no_sse2", "no_sse41", "no_avx2", "no_avx512"]
 ```
 - **Investigation:** Inspection of the binary shows vector-register arithmetic outside the hot kernels. Most of it is in `blake3::sse2::compress_in_place` and `blake3::sse41::compress_in_place` (316 and 307 instructions). Those modules are compiled but never selected at run time. The rest is scalar SSE floating point (`addsd`, `cvtsi2sd`, and so on) in the benchmark harness and in `matgen::get_dims`, which the conservative classifier also counts.
 - **Run-time Verification:** When built with `no_sse2`, `no_sse41`, `no_avx2`, and `no_avx512`, BLAKE3's dynamic platform detection (`blake3::platform::Platform::detect()`) is hardwired to always select the portable scalar implementation. The compiled SIMD code blocks are dead code paths and are never executed at run time.
+
+### 4.5 Wording of the scalar claim (campaign audit, 2026-10-23)
+
+The evidence supports **"no vector arithmetic in the hot kernels; the compiler emits vector registers only for zeroing and copy stores"**. It does not support "the binary contains no SIMD" or "the hot kernels contain no vector instructions". Known gaps, to state with T11 and in the paper:
+
+- **Vector stores in hot kernels, on both architectures.** With `target-cpu=native`, the GCP x86-64 codegen reports show `vector_arithmetic = 0` but about 99 vector moves in the hot kernels, e.g. `vmovups %ymm0,(%rcx)` and `vmovups %zmm0,0x40(%rcx)` in `encode_column_block::<Mont127>` (zeroing and 32-byte accumulator copies, §4.2). The Arm hot kernels on the `c4a` VM contain 26 vector moves, e.g. `movi v0.2d, #0` and `stp q0, q0, [x8]`. So the claim is "zeroing and copy stores only" on x86-64 **and** Arm.
+- **BLAKE3 SIMD code is linked.** The `pure` feature still compiles BLAKE3's Rust SSE2/SSE4.1 modules on x86-64; they are dead code because `no_sse2`/`no_sse41` make `Platform::detect()` return the portable backend (§4.4). BLAKE3 documents those features as a testing-only short-circuit; the run-time platform is not asserted by the driver.
+- **Layout conversion is not a hot pattern.** `transpose_into` (row-major to column-major) runs inside This Work's timed `encode_matrix` but is not in `check_codegen.py`'s hot-pattern list, so its instruction mix is not checked. SIMD-Spielman's timed region contains no layout conversion at all (its benchmark generates input in the reordered layout), which slightly favours SIMD-Spielman.
+- **x86-64 and Arm use different target flags.** `.cargo/config.toml` sets `target-cpu=native` only for `x86_64-unknown-linux-gnu`; the Arm build is generic `aarch64` with only the no-vectorize flags.
+- **Arm checker false positive.** On the `c4a` VM, the campaign's `check_codegen.py --strict` failed This Work's Arm blocks with 56 "vector arithmetic" instructions in hot kernels. All 56 are scalar branches (`b.eq`, `b.ne`, `cbz`, `b.cs`, `b.cc`, `b.hi`, `b.ls`, `cbnz`) whose GNU `objdump` branch-target addresses (e.g. `b3334`) the AArch64 classifier misread as `b` registers. The cross-compiled object listings in §3.1 (from `llvm-objdump`) were unaffected. The classifier now follows the rules in §4.2 (branches scalar, zeroing/copy moves reported as `vector_moves`, vector arithmetic fails). The Arm This Work blocks still have to be re-run with it (`docs/STATUS.md` §7.6); until then there is no Arm This Work timing, and the campaign's Arm codegen reports (status `FAIL`) are not evidence of vector arithmetic.
 
 ---
 

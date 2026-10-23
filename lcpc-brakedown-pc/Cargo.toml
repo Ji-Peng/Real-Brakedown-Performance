@@ -1,3 +1,8 @@
+# Modified 2026 by the RealBrakedownPerf authors (Apache-2.0, see NOTICE):
+# edition 2021, current dependencies, lcpc-fields and libc, portable-only BLAKE3.
+# The per-commit changes are in the git history since step/00-import
+# (upstream conroi/lcpc f0e2116).
+
 [package]
 name = "lcpc-brakedown-pc"
 version = "0.1.1"

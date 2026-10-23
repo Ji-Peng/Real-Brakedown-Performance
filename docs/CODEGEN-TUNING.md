@@ -11,7 +11,7 @@ All optimizations adhere strictly to the portable Rust rule ([CLAUDE.md](../../.
 - Stable compiler `rustc 1.99.1`.
 
 > [!NOTE]
-> All local execution timings reported in this document were measured on a local test workstation (Intel Core i7-11700K) pinned under `taskset -c 3` with CPU 2 strictly excluded. These timings are for directional validation only and are labelled **unpublishable**. Canonical benchmark results are produced on GCP `c3d-highmem-30` virtual machines per Plan 05.
+> All local execution timings reported in this document were measured on a local test workstation (Intel Core i7-11700K) pinned under `taskset -c 3` with CPU 2 strictly excluded. These timings are for directional validation only and are labelled **unpublishable**. Canonical benchmark results are produced on GCP `c3d-highmem-16` virtual machines (planned `c3d-highmem-30`, unavailable; see `README.md`, "Benchmark machines").
 
 ---
 

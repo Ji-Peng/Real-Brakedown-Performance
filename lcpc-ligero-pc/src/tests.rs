@@ -6,6 +6,11 @@
 // LICENSE or https://www.apache.org/licenses/LICENSE-2.0).
 // This file may not be copied, modified, or distributed
 // except according to those terms.
+//
+// Modified 2026 by the RealBrakedownPerf authors (Apache-2.0, see NOTICE):
+// tests updated for current dependencies and stable Rust.
+// The per-commit changes are in the git history since step/00-import
+// (upstream conroi/lcpc f0e2116).
 
 use super::{LigeroCommit, LigeroEncoding, LigeroEncodingRho};
 
