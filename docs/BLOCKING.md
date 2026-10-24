@@ -75,7 +75,7 @@ Let us evaluate the register footprint for `Mont127` and `Fp2M61`:
 - **Accumulator (`Mont127Acc`):** 5 limbs of `u64` (`a0..a4`) $= 5$ GPRs.
 - **Weights:** Each Montgomery weight fits in 2 `u64` limbs (since $p < 2^{127}$, limb 1 is $\le 2^{63}-1$).
   - For $B = 2$: $2 \times 2 = 4$ GPRs for weights. Total $= 5 + 4 = 9$ GPRs.
-  - For $B = 4$: LLVM holds weights in registers or uses single-limb constants where applicable. Total active registers $\approx 12\text{--}13$ GPRs, fitting comfortably within the 14 available GPRs without stack spilling.
+  - For $B = 4$: LLVM holds weights in registers or uses single-limb constants where applicable. Total active registers $\approx 12\text{--}13$ GPRs, which this estimate placed within the 14 available GPRs. **Corrected (see `docs/CODEGEN.md` §5.2):** the generated code does spill: in the x86-64 `B = 4` inner row loop of `encode_column_block::<Mont127>`, 22 of 113 instructions access the stack (reloaded weights and source pointers, a spilled partial accumulator); `Mers127` has 20 and `Fp2M61` 34. The choice of `B = 4` rests on measured timings, not on spill-free code.
   - For $B = 8$: Requires $\ge 8 \times 2 = 16$ GPRs for weights alone! This causes severe register spills to the stack on every iteration, destroying performance.
 
 ### Fp2M61:

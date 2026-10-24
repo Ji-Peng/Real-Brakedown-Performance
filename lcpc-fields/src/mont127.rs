@@ -12,7 +12,7 @@
 //! with `lcpc_test_fields::ft127::Ft127` (`ff_derive`).
 //!
 //! For batched R2L lazy evaluation ([`LazyField`]), edge weights are pre-scaled to
-//! $w \cdot 2^{192} \bmod q$ during graph setup ([`LazyField::prepare_weight`]),
+//! $w \cdot 2^{192} \bmod q$ once per edge during evaluation, outside the row loop ([`LazyField::prepare_weight`]),
 //! unreduced 256-bit schoolbook products are accumulated into the 5-limb (320-bit)
 //! [`Mont127Acc`] accumulator ([`LazyField::mac`]), and a single 3-word CIOS
 //! Montgomery reduction ($R = 2^{192}$) per right node ([`LazyField::reduce`]) returns

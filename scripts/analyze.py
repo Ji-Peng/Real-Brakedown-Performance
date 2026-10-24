@@ -1703,9 +1703,9 @@ class BenchmarkAnalyzer:
         gated = [
             ("Bit-exact prover encoding (mode a)", "SdigCode6 (Mont127)", "Original LCPC (f0e2116)", "step/01..HEAD", "step/01"),
             ("Bit-exact encoding (mode b)", "Mont127, Mers127, Fp2M61", "SIMD-Spielman tv/ files", "step/02..HEAD", "step/02"),
-            ("Horizontal slice invariance", "s in {1, 2, 4, 8, 16, 32}", "s = 1 non-sliced baseline", "step/07..HEAD", "step/07"),
-            ("Expander thread invariance", "T in {1, 2, 4, 8, 15}", "T = 1 single-threaded baseline", "step/08..HEAD", "step/08"),
-            ("Field differential tests", "Mont127, Mers127, Fp2M61", "BigUint / rug big-integer oracle", "step/02..HEAD", "step/02"),
+            ("Horizontal slice invariance", "s in {0 (adaptive), 2, 4, 8, 16}", "s = 1 non-sliced baseline", "step/07..HEAD", "step/07"),
+            ("Expander thread invariance", "T in {1, 2, 4, 7, 8} x s in {1, 4}", "T = 1 single-threaded baseline", "step/08..HEAD", "step/08"),
+            ("Field differential tests", "Mont127, Mers127, Fp2M61", "num-bigint big-integer oracle", "step/02..HEAD", "step/02"),
         ]
         rows = [[name, target, oracle, scope, gate_status(name, since)] for name, target, oracle, scope, since in gated]
         lcpc_recs = self.reports_lcpc_orig + [r for r in self.reports_arm if r["_meta"]["impl"] == "lcpc_orig"]

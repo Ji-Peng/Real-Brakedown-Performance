@@ -36,8 +36,9 @@ pub use mont127::{mac_column_mont127, reduce_column_mont127, Mont127, Mont127Acc
 /// Decouples batched right-to-left (R2L) expander graph traversal from field-specific
 /// modular reduction math:
 ///
-/// - During graph setup, each sampled weight $w$ is transformed once via
-///   [`LazyField::prepare_weight`].
+/// - During R2L evaluation, the encoder transforms each edge weight $w$ via
+///   [`LazyField::prepare_weight`] once per edge, outside the loop over rows, so the
+///   cost is amortized over every row of the batch (`encode.rs`, blocked edge loop).
 /// - During batched R2L evaluation of right node $r$, unreduced products $w \cdot x$ are
 ///   accumulated into [`LazyField::Acc`] via [`LazyField::mac`].
 /// - If a right node's in-degree exceeds [`LazyField::MAX_ACCUMULATIONS`], the encoder
@@ -65,7 +66,8 @@ pub trait LazyField:
     /// chunking is needed).
     const MAX_ACCUMULATIONS: usize;
 
-    /// Graph-setup transform of an edge weight into the form [`LazyField::mac`] expects
+    /// Per-edge transform of a weight into the form [`LazyField::mac`] expects, applied once
+    /// per edge outside the row loop
     /// (e.g. $w \cdot 2^{192} \bmod q$ for [`Mont127`]; identity for [`Mers127`]).
     #[inline(always)]
     fn prepare_weight(w: &Self) -> Self {
