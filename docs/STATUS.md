@@ -126,7 +126,7 @@ Residuals that remain open:
 - **M7, GCP campaign.** Run on 2026-10-22/23 with the user's go-ahead, on `c3d-highmem-16` (not the planned `c3d-highmem-30`) and `c4a-highmem-16`, using a staged method. §7 is the record. Still open:
   - *Done 2026-10-23:* the re-measurement of §7.6 (`reproduce/gcp/run_stages.sh --preset remeasure`; every stage exited 0): original LCPC `as-published-as-is` everywhere (I4), the two other LCPC variants at 2^20/2^24 (E8), thread scaling at 2^20–2^28, s1 SIMD-Spielman Mont127 T = 1 at 2^28 (I5), and the Arm This Work blocks after the AArch64 codegen-checker fix (I7).
   - Optional: a SIMD-Spielman slice sweep at 2^24/26/28 before any 2^28 SIMD claim (§7.3).
-  - Delete the four VMs after the user confirms (§7.1).
+  - *Done 2026-10-24:* all four VMs were deleted at the user's request (§7.1).
 - **M8 measurements.** Measured in the campaign (T6 inputs, stages A and B). The original-LCPC "as published" PCS numbers are invalid until re-measured (I4). The M5 "no regression" evidence comes from the T = 1 / T = 8 `hash_matrix_decomposition` and commit breakdown of This Work.
 - **M9.** `scripts/analyze.py --selection results/selection.json --check` regenerates every table and figure (T0–T12, F1–F3 of plan 06) from `code/results/` and exits 0 on the final data (2026-10-23; all 13 tables compile). The cells still open are documented omissions (`kind` `omitted`) only; the generated artefacts are copied to `paper/generated/`.
 - **Open decisions.**
@@ -152,7 +152,7 @@ This section records the campaign **as it was actually run**. It overrides the p
 | `rbd-bench-c3d-2` | `c3d-highmem-16` | `us-east1-d` | Session **s2** | AMD EPYC 9B14 (same topology) |
 | `rbd-bench-c4a` | `c4a-highmem-16` | `us-central1-a` | Arm session **arm1** | Neoverse-V2 (Google Axion) |
 
-All x86-64 VMs were created with the same flags (`--threads-per-core=1`, Debian 12, 100 GB `pd-balanced`, on-demand, `--maintenance-policy=TERMINATE`); `code/README.md` ("Benchmark machines") has the commands. s1 and s2 ran **concurrently** on two VMs in different zones (the project's 32-vCPU `CPUS_ALL_REGIONS` quota allows two 16-vCPU VMs), not on separate days on one VM; the Arm VM ran while s2's stage R was still running. Every VM was stopped when its stages finished. The four VMs still exist (disks are billed) and must be deleted once the user confirms.
+All x86-64 VMs were created with the same flags (`--threads-per-core=1`, Debian 12, 100 GB `pd-balanced`, on-demand, `--maintenance-policy=TERMINATE`); `code/README.md` ("Benchmark machines") has the commands. s1 and s2 ran **concurrently** on two VMs in different zones (the project's 32-vCPU `CPUS_ALL_REGIONS` quota allows two 16-vCPU VMs), not on separate days on one VM; the Arm VM ran while s2's stage R was still running. Every VM was stopped when its stages finished. All four VMs were deleted on 2026-10-24 at the user's request.
 
 ### 7.2 Method: staged sessions
 

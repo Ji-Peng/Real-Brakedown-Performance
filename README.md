@@ -255,7 +255,7 @@ ever disagree, the commands in this section are the reference configuration.
 | Provisioning | on-demand (`STANDARD`), `--maintenance-policy=TERMINATE` (no live migration) | same |
 | Used for | All implementations (This Work, original LCPC, PolyCommit, SIMD-Spielman), 2 independent sessions on 2 VMs | This Work and original LCPC only (SIMD-Spielman needs AVX-512), 1 short session, log2 N in {18, 22, 26} |
 
-Instances of the 2026-10-22/23 campaign (all four still exist until the user deletes them):
+Instances of the 2026-10-22/23 campaign (all four were deleted on 2026-10-24):
 
 | Instance | Type | Zone | Role |
 | :--- | :--- | :--- | :--- |
