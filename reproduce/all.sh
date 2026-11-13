@@ -365,6 +365,11 @@ if profile == "smoke":
         "description": "This Work mode (b) tiny smoke T=1",
         "cmd": f"'{script_dir}/this_work.sh' --params simd-spielman --field mont127 --logN 20 --threads 1 --runs 2 --warmup 1 --slices adaptive --shape both --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_mode_b_mont127_t1'"
     })
+    blocks.append({
+        "id": "smoke_this_work_mode_a_ft127_t1",
+        "description": "This Work mode (a) Ft127 tiny smoke T=1",
+        "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field ft127 --logN 16,20 --threads 1 --runs 2 --warmup 1 --slices adaptive --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_mode_a_ft127_t1'"
+    })
     for smoke_field in ["mers127", "fp2m61"]:
         blocks.append({
             "id": f"smoke_this_work_mode_b_{smoke_field}_t1",
@@ -454,6 +459,15 @@ else:
         "description": "E1: Original LCPC mode (a) Ft127 T=8 (logN 16..28)",
             "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26,28 --threads 8 --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_lcpc_orig_mode_a_t8'"
     })
+    # This Work over LCPC's own field Ft127 with the headline parameters, for a
+    # same-node commit/prove/verify comparison with Mont127 and original LCPC.
+    for t_count in [1, 8]:
+        blocks.append({
+            "id": f"full_this_work_mode_a_ft127_t{t_count}",
+            "description": f"E8: This Work mode (a) Ft127 T={t_count} (logN 20,24)",
+            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field ft127 --logN 20,24 --threads {t_count} --runs 5 --warmup 2 --slices adaptive --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_this_work_mode_a_ft127_t{t_count}'"
+        })
+
     # E2: Comparison with SIMD-Spielman (mode b, Mont127, Mers127, Fp2M61)
     for field_name in ["mont127", "mers127", "fp2m61"]:
         blocks.append({
