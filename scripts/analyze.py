@@ -41,7 +41,9 @@ Cells and statistics
     slowest This Work sample is faster than the fastest baseline sample
     (non-overlapping ranges); otherwise "comparable" (or "slower").
   - Provenance footer on every table: the run directories and sessions that
-    contributed, with their fork commit, Slurm job, node and baseline/patch hashes.
+    contributed, with their fork commit, Slurm job and node (or cloud VM type and
+    zone) and baseline/patch hashes; a fork checkout with uncommitted changes
+    ("+dirty") gets a note listing the changed paths.
   - Published [KDHR26] values load only from scripts/kdhr26_reported.json and
     are looked up by (reference CPU of the machine, log2 N).
   - --check fails on missing artefacts or cells, duplicates, missing sessions,
@@ -588,7 +590,7 @@ def run_self_test() -> None:
     assert cell_missing_reason("N/A (KDHR26 reports Mont127 only)", "Latency", ["20"]) is None
     assert cell_missing_reason("TODO (pending)", "Latency", ["20"]) == "TODO (pending)"
     assert cell_missing_reason("12.30 [12.1-12.5]", "Latency", ["20"]) is None
-    assert fnmatch.fnmatchcase("T12|18,1|This Work Arm (ms)", "T12|*|This Work Arm (ms)")
+    assert fnmatch.fnmatchcase("T12|soc-xcng,18,1|This Work Arm (ms)", "T12|*|This Work Arm (ms)")
     assert block_family("full_this_work_mode_a_t1_n16-18-20-22-24-26") == "tw_a"
     assert block_family("full_slice_sweep_s4_t8_n20-24-26") == "slice_sweep"
     assert block_family("smoke_lcpc_orig_a_t1") == "lcpc_a"
@@ -665,6 +667,7 @@ class BenchmarkAnalyzer:
         self.session_ids: Set[str] = set()
         self.pinning_errors: List[str] = []
         self.hosts: Set[str] = set()
+        self.machine_cpu: Dict[str, Set[str]] = defaultdict(set)   # machine -> CPU model names of its manifests
         self.has_smoke_watermark = False
         self.profiles: Set[str] = set()
         self.profile: Optional[str] = None
@@ -1128,6 +1131,8 @@ class BenchmarkAnalyzer:
         git = data.get("git") if isinstance(data.get("git"), dict) else {}
         if git.get("code_repo_sha"):
             info["fork"].add(str(git["code_repo_sha"])[:7] + ("+dirty" if git.get("code_repo_dirty") else ""))
+            if git.get("code_repo_dirty"):
+                info["dirty_paths"].update(str(p) for p in git.get("code_repo_changed_paths") or [])
         elif data.get("source_checkout_head"):
             info["fork"].add(str(data["source_checkout_head"])[:7])
         if git.get("simd_params_patch_sha256") and block_family(meta["block"]) == "simd":
@@ -1138,7 +1143,18 @@ class BenchmarkAnalyzer:
             info["zone"].add("job " + str(ident["slurm_job_id"]))
         if ident.get("hostname"):
             info["vm"].add(str(ident["hostname"]))
-        node = ((data.get("machine") or {}).get("uname") or {}).get("node") if isinstance(data.get("machine"), dict) else None
+        # Cloud virtual machines record their machine type and zone instead of a Slurm job.
+        if ident.get("gcp_zone"):
+            info["zone"].add(str(ident["gcp_zone"]))
+        if ident.get("gcp_machine_type"):
+            info["vm_type"].add(str(ident["gcp_machine_type"]))
+        cpu = data.get("cpu") if isinstance(data.get("cpu"), dict) else {}
+        model = cpu.get("model_name") or next(
+            (line.split(":", 1)[1].strip() for line in str(cpu.get("lscpu") or "").splitlines()
+             if line.startswith("Model name:")), None)
+        if model:
+            self.machine_cpu[meta["machine"]].add(str(model))
+        node =((data.get("machine") or {}).get("uname") or {}).get("node") if isinstance(data.get("machine"), dict) else None
         if node:
             info["vm"].add(str(node))
         host = data.get("host_profile") or data.get("host")
@@ -1531,7 +1547,9 @@ class BenchmarkAnalyzer:
                 desc.append("/".join(sorted(info["zone"])))
             if info.get("vm"):
                 desc.append("node " + "/".join(sorted(info["vm"])))
-            label = "/".join(p for p in (machine, run, sess) if p) or "local"
+            if info.get("vm_type"):
+                desc.append("VM " + "/".join(sorted(info["vm_type"])))
+            label ="/".join(p for p in (machine, run, sess) if p) or "local"
             parts.append(label + (f" ({', '.join(desc)})" if desc else ""))
         recs = self._used_records
         lcpc = sorted({str(r.get("upstream_commit"))[:7] for r in recs if r["_meta"]["impl"] == "lcpc_orig" and r.get("upstream_commit")})
@@ -1554,6 +1572,26 @@ class BenchmarkAnalyzer:
         return (f"Provenance: {sel}; data: {data}"
                 + (f"; baselines: {'; '.join(base)}" if base else "") + f".{watermark}")
 
+    # A changed path outside documentation and tooling: Rust sources, Cargo
+    # manifests and lock file, the Cargo configuration, the toolchain file.
+    _BUILD_PATH_RE = re.compile(r"(\.rs$|(^|/)Cargo\.(toml|lock)$|(^|/)\.cargo/|(^|/)rust-toolchain(\.toml)?$|(^|/)build\.rs$)")
+
+    def dirty_notes(self) -> List[str]:
+        """One note per used session whose fork checkout had uncommitted changes (+dirty)."""
+        notes = []
+        for machine, run, sess in sorted(self._used):
+            paths = sorted(self.session_info.get((machine, run, sess), {}).get("dirty_paths", set()))
+            if not paths:
+                continue
+            build = [p for p in paths if self._BUILD_PATH_RE.search(p)]
+            forks = "/".join(sorted(self.session_info[(machine, run, sess)].get("fork", set())))
+            notes.append(f"{machine}/{run}/{sess} (fork {forks}): the manifests list uncommitted changes in "
+                         + ", ".join(paths) + "; "
+                         + ("none of them is a Rust source, Cargo manifest, Cargo.lock, Cargo configuration "
+                            "or toolchain file." if not build else
+                            "build-relevant: " + ", ".join(build) + "."))
+        return notes
+
     # ------------------------------------------------------------------
     # Writers
     # ------------------------------------------------------------------
@@ -1568,7 +1606,7 @@ class BenchmarkAnalyzer:
                         col_align: Optional[str] = None, key_cols: int = 1):
         """Writes a LaTeX booktabs table and a CSV with provenance footers."""
         provenance = self._get_provenance_text()
-        notes = list(notes or [])
+        notes = list(notes or []) + self.dirty_notes()
         if any("D" in str(c) and re.search(r" D\d+\.\d%", str(c)) for row in rows for c in row):
             notes.append("D<x>%: the two session medians differ by more than 5%; see csv/session_divergence.csv.")
         if any(re.search(r"\[[^\]]+ only\]", str(c)) for row in rows for c in row):
@@ -2601,19 +2639,26 @@ class BenchmarkAnalyzer:
                 continue
             fork = "/".join(sorted(self.session_info.get((m["machine"], m["run"], m["session_dir"]), {}).get("fork", set()))) or "?"
             summary = (cr.get("summary") or {}).get("hot_kernels") or {}
-            groups[(str(cr.get("arch", "x86_64")), fork, json.dumps(summary, sort_keys=True))].append(cr)
+            groups[(str(cr.get("arch", "x86_64")), m["machine"], fork, json.dumps(summary, sort_keys=True))].append(cr)
+        # The machine is named in the label only when one architecture has several machines.
+        arch_machines: Dict[str, Set[str]] = defaultdict(set)
+        for arch, machine, _, _ in groups:
+            arch_machines[arch].add(machine)
         out = []
-        seen_keys: Dict[Tuple[str, str], int] = defaultdict(int)
-        for (arch, fork, _), reports in sorted(groups.items()):
+        seen_keys: Dict[Tuple[str, str, str], int] = defaultdict(int)
+        for (arch, machine, fork, _), reports in sorted(groups.items(), key=lambda kv: (
+                kv[0][0], self.machine_order(arch_machines[kv[0][0]]).index(kv[0][1]), kv[0][2], kv[0][3])):
             s = (reports[0].get("summary") or {}).get("hot_kernels") or {}
             vec = int(s.get("vector_arithmetic_count", 0) or 0)
             per = [self.effective_codegen_status(r) for r in reports]
             statuses = sorted({own for own, _, _ in per})
             effective = sorted({eff for _, eff, _ in per})
-            seen_keys[(arch, fork)] += 1
-            label = f"{arch} @ {fork}" + (f" #{seen_keys[(arch, fork)]}" if seen_keys[(arch, fork)] > 1 else "")
+            seen_keys[(arch, machine, fork)] += 1
+            n = seen_keys[(arch, machine, fork)]
+            label = (f"{arch}" + (f" {machine}" if len(arch_machines[arch]) > 1 else "") + f" @ {fork}"
+                     + (f" #{n}" if n > 1 else ""))
             key = f"{label},hot_kernels (aggregate)"
-            out.append({"arch": arch, "fork": fork, "label": label, "reports": reports, "summary": s, "vec_arith": vec,
+            out.append({"arch": arch, "machine": machine, "fork": fork, "label": label, "reports": reports, "summary": s, "vec_arith": vec,
                         "vec_moves": int(s.get("vector_moves_count", 0) or 0), "statuses": statuses,
                         "effective": effective, "recheck": next((rc for _, _, rc in per if rc), None),
                         "selector": f"T11|{key}|Scalar Status",
@@ -2748,46 +2793,75 @@ class BenchmarkAnalyzer:
                              "tab:codegen_evidence", headers, rows, notes, col_align="llrrrrrrll", key_cols=2)
 
     # ---- T12 --------------------------------------------------------------
+    def machine_order(self, machines: Iterable[str]) -> List[str]:
+        """Machines in selection.json order (sorted names without a selection)."""
+        order = list(self.selection.machines) if self.selection else []
+        return sorted(set(machines), key=lambda m: (order.index(m) if m in order else len(order), m))
+
     def generate_T12_arm_portability(self):
-        """Arm (SoC xcng) This Work vs original LCPC per build variant."""
+        """Arm hosts: This Work vs original LCPC per build variant, one row group per host."""
         self._begin("T12")
         T = "T12"
-        headers = ["log2(N)", "Threads", "This Work Arm (ms)"]
+        headers = ["Host", "log2(N)", "Threads", "This Work Arm (ms)"]
         for v in PRIMARY_LCPC_VARIANTS:
             headers += [f"Original LCPC {v} Arm (ms)", f"Arm Speedup vs {v}"]
         tw_pool = self.select(self.reports_arm, impl="this_work", params="lcpc-sdig6", shape="brakedown", slice_mode="adaptive")
         lcpc_pool = self.select(self.reports_arm, impl="lcpc_orig", params="lcpc-sdig6")
-        arm_sizes = sorted({int(r["log_n"]) for r in tw_pool + lcpc_pool}) or [18, 22, 26]
+        hosts = self.machine_order(r["_meta"]["machine"] for r in tw_pool + lcpc_pool)
         no_arm = self.has_smoke_watermark and not self.reports_arm
         rows = []
-        for log_n in arm_sizes:
-            for threads in (1, 8):
-                rk = f"{log_n},{threads}"
-                if no_arm:
-                    rows.append([log_n, threads] + ["N/A (local smoke)"] * (len(headers) - 2))
-                    continue
-                tw = self.stat(self.select(tw_pool, log_n=log_n, threads=threads), label=f"{T}|{rk}|TW")
-                row = [log_n, threads, self.value_cell(T, rk, "This Work Arm (ms)", tw)]
-                for v in PRIMARY_LCPC_VARIANTS:
-                    st = self.stat(self.select(lcpc_pool, variant=v, log_n=log_n, threads=threads), label=f"{T}|{rk}|LCPC {v}")
-                    row += [self.value_cell(T, rk, f"Original LCPC {v} Arm (ms)", st),
-                            self.speedup_cell(T, rk, f"Arm Speedup vs {v}", st, tw)]
-                rows.append(row)
+        for host in hosts or ["-"]:
+            host_tw = self.select(tw_pool, machine=host)
+            host_lcpc = self.select(lcpc_pool, machine=host)
+            sizes = sorted({int(r["log_n"]) for r in host_tw + host_lcpc}) or [18, 22, 26]
+            for log_n in sizes:
+                for threads in (1, 8):
+                    rk = f"{host},{log_n},{threads}"
+                    if no_arm:
+                        rows.append([host, log_n, threads] + ["N/A (local smoke)"] * (len(headers) - 3))
+                        continue
+                    tw = self.stat(self.select(host_tw, log_n=log_n, threads=threads), label=f"{T}|{rk}|TW")
+                    row = [host, log_n, threads, self.value_cell(T, rk, "This Work Arm (ms)", tw)]
+                    for v in PRIMARY_LCPC_VARIANTS:
+                        st = self.stat(self.select(host_lcpc, variant=v, log_n=log_n, threads=threads),
+                                       label=f"{T}|{rk}|LCPC {v}")
+                        row += [self.value_cell(T, rk, f"Original LCPC {v} Arm (ms)", st),
+                                self.speedup_cell(T, rk, f"Arm Speedup vs {v}", st, tw)]
+                    rows.append(row)
         if no_arm:
             notes = ["Local smoke does not run on Arm; these cells are explicitly not applicable and contain no Arm measurements."]
         else:
             notes = [
-                "SoC cluster xcng (Neoverse-N1), mode (a); This Work: arm_this_work_* (adaptive slices); original LCPC: arm_lcpc_orig_* "
-                "over Ft127, one column group per build variant.",
+                "Mode (a); This Work: arm_this_work_* (adaptive slices); original LCPC: arm_lcpc_orig_* "
+                "over Ft127, one column group per build variant; one row group per host.",
             ]
+            if hosts:
+                notes.append("Hosts: " + "; ".join(self.host_description(h) for h in hosts) + ".")
             notes += self.rustflags_notes(self._used_records)
             notes += self.arm_flags_notes(self._used_records)
             pending = sorted({sel for sel in self.todo_cells if sel.startswith(f"{T}|")})
             if pending:
                 reasons = sorted({self.todo_cells[sel] for sel in pending})
                 notes.append("TODO (pending) cells: " + " | ".join(reasons))
-        self._write_artefact("table_T12_arm_portability", "Arm Architecture Portability Benchmark (SoC xcng, Neoverse-N1)",
-                             "tab:arm_portability", headers, rows, notes, key_cols=2)
+        cpus = [c for h in hosts for c in sorted(self.machine_cpu.get(h, set()))]
+        caption = "Arm Architecture Portability Benchmark" + (f" ({', '.join(cpus)})" if cpus else "")
+        self._write_artefact("table_T12_arm_portability", caption,
+                             "tab:arm_portability", headers, rows, notes, key_cols=3)
+
+    def host_description(self, machine: str) -> str:
+        """'<machine> = <CPU>, fork <sha>, sessions <ids>' from the manifests of the used sessions."""
+        used = sorted(k for k in self._used if k[0] == machine)
+        forks = sorted({f for k in used for f in self.session_info.get(k, {}).get("fork", set())})
+        vm = sorted({t for k in used for t in self.session_info.get(k, {}).get("vm_type", set())})
+        nodes = sorted({t for k in used for t in self.session_info.get(k, {}).get("vm", set())})
+        parts = ["/".join(sorted(self.machine_cpu.get(machine, set()))) or "CPU not recorded"]
+        if vm:
+            parts.append("cloud VM " + "/".join(vm))
+        if nodes:
+            parts.append("node " + "/".join(nodes))
+        parts.append("fork " + ("/".join(forks) or "?"))
+        parts.append("sessions " + "/".join(sorted({k[2] for k in used})))
+        return f"{machine} = " + ", ".join(parts)
 
     # ---- Figures -------------------------------------------------------------
     def _save_figure(self, fig, name: str, data_headers: List[str], data_rows: List[List[Any]]):

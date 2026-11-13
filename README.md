@@ -139,7 +139,7 @@ One session is `results/<host>/<UTC-date>-<gitsha>/<session>/`. Staged campaigns
 
 ### Campaign on the SoC cluster
 
-All published numbers come from the NUS SoC Slurm cluster (machines in "Benchmark machines" below). One session is one Slurm job on one node; its stages run one after another inside that job. The x86-64 campaign has two sessions, `s1` and `s2`, on two different `xcnh` nodes; the Arm portability campaign has one session, `arm1`, on an `xcng` node.
+All published numbers except the second Arm platform come from the NUS SoC Slurm cluster (machines in "Benchmark machines" below). One session is one Slurm job on one node; its stages run one after another inside that job. The x86-64 campaign has two sessions, `s1` and `s2`, on two different `xcnh` nodes; the Arm portability campaign has one session, `arm1`, on an `xcng` node.
 
 The workstation reaches the login node through `ssh`; `RBD_LOGIN` (default `xlogin.comp.nus.edu.sg`, e.g. `user@xlogin.comp.nus.edu.sg`) and `RBD_SSH` (default `ssh`; for password login e.g. `sshpass -f ~/.soc.pass ssh -o PubkeyAuthentication=no`) select it, and `RBD_REMOTE_ROOT` (default `rbd`) is the working directory below the cluster home. The cluster home is shared by all nodes, x86-64 and aarch64, so everything lives under `~/rbd/`: the clone `code/`, the pinned upstream checkout `SIMD-Spielman-for-ZKPs/` (the fork's tests read its test vectors), one rustup/Cargo home per architecture in `toolchain/<arch>/`, the Boost headers in `deps/`, one Cargo target directory per session in `target/<class>-<session>/`, and the job files and logs in `jobs/`.
 
@@ -194,7 +194,7 @@ python3 scripts/analyze.py --results-dir results/ --selection results/selection.
 
 Before submitting, `run_stages.sh --preset x86 --print-stages` lists the stages, and `all.sh --dry-run` inside a short job prints the block schedule with the derived cores (give it its own `--out` directory outside `results/`, because `analyze.py --selection … --check` refuses records that the selection does not cover). A stage that failed can be repeated alone by submitting the same session on the same node (`--nodelist`) with that stage spec and the original `--run-date`: `all.sh` moves the earlier output of each re-run block aside to `<block>.prev-<UTC>`, which analysis skips.
 
-`results/selection.json` selects sessions `s1`, `s2` on `soc-xcnh` and `arm1` on `soc-xcng`, each through the run-directory glob `20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*`, so the new run directories count as soon as they are fetched. If more than one run directory of a host is fetched, the same cells appear twice and `analyze.py --check` reports duplicates; keep one run per host, or narrow the glob.
+`results/selection.json` selects sessions `s1`, `s2` (and `s3`, a further x86-64 session with a subset of the blocks, once fetched) on `soc-xcnh` and `arm1` on `soc-xcng`, each through the run-directory glob `20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*`, so the new run directories count as soon as they are fetched. It also selects the one archived run `2026-10-23-375a6e18355a` (session `arm1`) on `gcp-c4a-highmem-16`, the second Arm platform (see below). If more than one run directory of a host is fetched, the same cells appear twice and `analyze.py --check` reports duplicates; keep one run per host, or narrow the glob.
 
 ---
 
@@ -212,7 +212,7 @@ python3 scripts/analyze.py --results-dir results/ --selection results/selection.
 The strict check (`--check`) fails on
 
 - integrity errors: duplicate or mixed configurations in one cell, oversubscribed runs (threads > pinned cores), records not covered by the selection, and records of an **interrupted block** (untagged partial output of a block whose latest run never completed: its earlier output was moved aside, or its stage was killed before `all.sh` finalized it); re-run such a block or exclude it. Records of a block that completed with a failure only produce a warning;
-- any selected codegen report with status `FAIL` (vector arithmetic in a hot kernel), unless `results/selection.json` documents it as an omission with the selector `T11|<arch> @ <fork>,hot_kernels (aggregate)|Scalar Status` (campaign reports) or `T3|codegen,<tag>|Scalar Status` (the per-step reports, `<tag>` = `step/01-modernize` … `HEAD`); T0, T3 and T11 take their PASS/FAIL from these reports;
+- any selected codegen report with status `FAIL` (vector arithmetic in a hot kernel), unless `results/selection.json` documents it as an omission with the selector `T11|<arch>[ <host>] @ <fork>,hot_kernels (aggregate)|Scalar Status` (campaign reports; the host is named when one architecture has several hosts) or `T3|codegen,<tag>|Scalar Status` (the per-step reports, `<tag>` = `step/01-modernize` … `HEAD`); T0, T3 and T11 take their PASS/FAIL from these reports;
 - rows that `results/selection.json` `expected_rows` requires but a table lacks (`{TABLE: {key column header: [values]}}`, the cartesian product of the listed values, e.g. T6 `Implementation` × `T` × `log2(N)`; a table's entry may also be a list of such specs, whose required rows are the union of their products, as T6 uses for the stage-RH variants), reported as `TABLE|v1,v2,…|(row)`;
 - empty cells, `-`, NaN and `SKIPPED` values in every table;
 - generated LaTeX tables that do not compile: with `--check`, each table under `latex/` is compiled standalone with `pdflatex` (booktabs, threeparttable) in `--latex-build-dir` (default `<out-dir>/latex_build`). If `pdflatex` is not installed, the compile step is skipped with a warning; `--no-latex-compile` skips it on purpose.
@@ -231,7 +231,7 @@ The paper's tables and figures are copied from these outputs into the paper repo
 
 ## Benchmark machines (SoC cluster)
 
-All published numbers come from two node classes of the NUS School of Computing Slurm cluster. The local workstation is used only for building and testing; no published number comes from it. The scripts in `reproduce/soc/` run the commands of "Campaign on the SoC cluster" (§4); each run records the node it actually used.
+The published numbers come from two node classes of the NUS School of Computing Slurm cluster and, for the second Arm platform, from one archived session on a Google Cloud virtual machine. The local workstation is used only for building and testing; no published number comes from it. The scripts in `reproduce/soc/` run the commands of "Campaign on the SoC cluster" (§4); each run records the node it actually used.
 
 | Setting | x86-64 sessions `s1`, `s2` | Arm session `arm1` |
 | :--- | :--- | :--- |
@@ -247,6 +247,8 @@ All published numbers come from two node classes of the NUS School of Computing 
 | OS, kernel | Ubuntu 26.04 LTS, Linux 7.0.0-28-generic | Ubuntu 24.04.5 LTS, Linux 6.8.0-139-generic |
 | Compilers | Rust 1.99.1 (`rust-toolchain.toml`), g++ 15.2.0, CMake 4.2.3, Boost 1.86.0 headers (`setup.sh`), GNU objdump | Rust 1.99.1, g++ 13.3.0, CMake 3.28 |
 | Used for | All implementations (This Work, original LCPC, PolyCommit, SIMD-Spielman), two sessions on two different nodes | This Work and original LCPC only (SIMD-Spielman needs AVX-512), one session, log2 N in {18, 22, 26} |
+
+**Second Arm platform (archived, not re-measured).** `results/gcp-c4a-highmem-16/2026-10-23-375a6e18355a/arm1/` holds one Arm session on a Google Cloud `c4a-highmem-16` virtual machine (Arm Neoverse-V2, 16 vCPUs, one thread per core, Debian 12, Linux 6.1.0-53-cloud-arm64, Rust 1.99.1): the four `arm_*` blocks at log2 N in {18, 22, 26}, T in {1, 8}, cores 0–7 (T = 1 on core 1), measured at fork commit `375a6e1` with uncommitted changes in documentation and the analysis scripts only (`git.code_repo_changed_paths` in the manifests). Between `375a6e1` and `9685076` the Rust sources differ only in comments and one test name, and `cargo tree -p lcpc-bench` resolves the same dependencies and features; `.cargo/config.toml` and the toolchain are unchanged. `analyze.py` reports it in T12 next to `soc-xcng` (one row group per host) and in T0/T11; the paper prints it as `\vmach`. No further measurement on this platform is planned.
 
 The table lists the state of the cluster when the tooling was set up; the first-run record of each node (`results/<host>/first-run-<node>.json`, also copied into every stage directory) records the versions a run actually used.
 

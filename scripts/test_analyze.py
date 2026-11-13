@@ -778,7 +778,12 @@ class SupersedeTests(unittest.TestCase):
         self.assertEqual(real.supersede, [])
         self.assertFalse(any(om["kind"] == "pending" for om in real.omissions))
         self.assertEqual(real.expected_sessions("soc-xcnh"), ["s1", "s2"])
+        self.assertIn("s3", real.run_entry("soc-xcnh", "2026-11-14-0123456789ab")["sessions"])
         self.assertEqual(real.expected_sessions("soc-xcng"), ["arm1"])
+        # The second Arm host is one archived run: no other run directory of that host is selected.
+        self.assertEqual(real.expected_sessions("gcp-c4a-highmem-16"), ["arm1"])
+        self.assertIn("arm1", real.run_entry("gcp-c4a-highmem-16", "2026-10-23-375a6e18355a")["sessions"])
+        self.assertIsNone(real.run_entry("gcp-c4a-highmem-16", "2026-10-23-acfac2349c11"))
         status, _ = real.classify("soc-xcnh/2026-11-14-0123456789ab/s1/full_this_work_mode_a_t1_n28.prev-20261114T000000Z",
                                   "x.json", {})
         self.assertEqual(status, "exclude")
@@ -993,6 +998,73 @@ class TableNoteTests(unittest.TestCase):
         generic = tree("-C no-vectorize-loops -C no-vectorize-slp")
         self.assertNotIn("target-cpu=native", generic)
         self.assertIn("do not record their build flags", tree(None))
+
+
+class ArmHostsTests(unittest.TestCase):
+    """T12 with two Arm hosts: one row group per host, per-host provenance, dirty-checkout notes, T11 labels."""
+
+    HOSTS = (("arm-host-a", "2026-02-01-aaaaaaaaaaaa", "Neoverse-A", {"hostname": "nodea", "slurm_job_id": "7"}, False),
+             ("arm-host-b", "2026-01-01-bbbbbbbbbbbb", "Neoverse-B",
+              {"gcp_machine_type": "vm-type-16", "gcp_zone": "zone-1"}, True))
+
+    def setUp(self):
+        self.fx = Fixture()
+        machines = {}
+        for machine, run, cpu, ident, dirty in self.HOSTS:
+            for threads in (1, 8):
+                tw_blk, lc_blk = f"arm_this_work_t{threads}_n18", f"arm_lcpc_orig_t{threads}_n18"
+                lc = lcpc_record("arm1", (300,) * 5, log_n=18, threads=threads)
+                lc["build_variant"] = "as-published-as-is"
+                self.fx.write("arm1", tw_blk, "this_work/x.json",
+                              [tw_record("arm1", log_n=18, threads=threads)], machine=machine, run=run)
+                self.fx.write("arm1", lc_blk, "lcpc_orig/x.json", [lc], machine=machine, run=run)
+                git = {"code_repo_sha": run[-12:] + "0" * 28, "code_repo_dirty": dirty,
+                       "code_repo_changed_paths": ["README.md", "scripts/analyze.py"] if dirty else []}
+                for blk in (tw_blk, lc_blk):
+                    self.fx.write("arm1", blk, "manifest.json",
+                                  {"git": git, "machine_identity": ident, "cpu": {"model_name": cpu}},
+                                  machine=machine, run=run)
+            self.fx.write("arm1", "arm_this_work_t1_n18", "this_work/codegen/codegen_report.json",
+                          codegen_report("PASS", "aarch64"), machine=machine, run=run)
+            machines[machine] = {"expected_sessions": ["arm1"], "runs": [{"run_dir": run, "sessions": ["arm1"]}]}
+        path = os.path.join(self.fx.root, "selection.json")
+        with open(path, "w") as f:
+            json.dump({"schema_version": "rbd-selection-v1", "machines": machines}, f)
+        self.a = self.fx.analyzer(analyze.Selection(path))
+
+    def tearDown(self):
+        self.fx.cleanup()
+
+    def _t12(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.a.generate_T12_arm_portability()
+        with open(os.path.join(self.fx.out, "csv", "table_T12_arm_portability.csv")) as f:
+            return f.read()
+
+    def test_t12_has_one_row_group_per_host_in_selection_order(self):
+        text = self._t12()
+        headers, rows = TableTests._rows(self, "table_T12_arm_portability.csv")
+        self.assertEqual(headers[:3], ["Host", "log2(N)", "Threads"])
+        self.assertEqual([(r[0], r[2]) for r in rows],
+                         [("arm-host-a", "1"), ("arm-host-a", "8"), ("arm-host-b", "1"), ("arm-host-b", "8")])
+        self.assertEqual(self.a.cell_errors, [])
+        self.assertIn("# Key columns: 3", text)
+        self.assertIn("arm-host-a = Neoverse-A, node nodea, fork aaaaaaa, sessions arm1", text)
+        self.assertIn("arm-host-b = Neoverse-B, cloud VM vm-type-16, fork bbbbbbb+dirty, sessions arm1", text)
+        self.assertIn("(fork bbbbbbb+dirty, zone-1, VM vm-type-16)", text)
+        self.assertIn("Arm Architecture Portability Benchmark (Neoverse-A, Neoverse-B)", text)
+
+    def test_dirty_checkout_note_names_the_changed_paths(self):
+        text = self._t12()
+        self.assertIn("uncommitted changes in README.md, scripts/analyze.py; none of them is a Rust source", text)
+        self.assertNotIn("arm-host-a/2026-02-01-aaaaaaaaaaaa/arm1 (fork aaaaaaa): the manifests", text)
+        key = ("arm-host-b", "2026-01-01-bbbbbbbbbbbb", "arm1")
+        self.a.session_info[key]["dirty_paths"].add("lcpc-fields/src/mont127.rs")
+        self.assertIn("build-relevant: lcpc-fields/src/mont127.rs", self._t12())
+
+    def test_t11_labels_name_the_machine_when_an_architecture_has_several(self):
+        labels = [g["label"] for g in self.a.codegen_groups()]
+        self.assertEqual(labels, ["aarch64 arm-host-a @ aaaaaaa", "aarch64 arm-host-b @ bbbbbbb+dirty"])
 
 
 class Review3Tests(unittest.TestCase):

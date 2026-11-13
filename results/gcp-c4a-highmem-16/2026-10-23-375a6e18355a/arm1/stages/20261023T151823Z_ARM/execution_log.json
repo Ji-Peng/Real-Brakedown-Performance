@@ -1,0 +1,62 @@
+[
+  {
+    "block_id": "arm_this_work_t1_n18-22-26",
+    "out": "/home/jipeng/RealBrakedownPerf/code/results/gcp-c4a-highmem-16/2026-10-23-375a6e18355a/arm1/arm_this_work_t1_n18-22-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-10-23T15:18:23Z",
+    "end_utc": "2026-10-23T15:24:02Z",
+    "duration_s": 339,
+    "core_for_frequency": "1",
+    "freq_before_mhz": "",
+    "freq_after_mhz": "",
+    "freq_source": "nominal: /proc/cpuinfo cpu MHz of CPU 1 (no cpufreq; not an observed clock)",
+    "moved_previous_to": null,
+    "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 1 --runs 5 --warmup 1 --slices adaptive --cores '1' --host 'gcp-c4a-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c4a-highmem-16/2026-10-23-375a6e18355a/arm1/arm_this_work_t1_n18-22-26'"
+  },
+  {
+    "block_id": "arm_lcpc_orig_t8_n18-22-26",
+    "out": "/home/jipeng/RealBrakedownPerf/code/results/gcp-c4a-highmem-16/2026-10-23-375a6e18355a/arm1/arm_lcpc_orig_t8_n18-22-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-10-23T15:24:02Z",
+    "end_utc": "2026-10-23T15:26:50Z",
+    "duration_s": 168,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "",
+    "freq_after_mhz": "",
+    "freq_source": "nominal: /proc/cpuinfo cpu MHz of CPU 0 (no cpufreq; not an observed clock)",
+    "moved_previous_to": null,
+    "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 8 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'gcp-c4a-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c4a-highmem-16/2026-10-23-375a6e18355a/arm1/arm_lcpc_orig_t8_n18-22-26'"
+  },
+  {
+    "block_id": "arm_this_work_t8_n18-22-26",
+    "out": "/home/jipeng/RealBrakedownPerf/code/results/gcp-c4a-highmem-16/2026-10-23-375a6e18355a/arm1/arm_this_work_t8_n18-22-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-10-23T15:26:50Z",
+    "end_utc": "2026-10-23T15:27:22Z",
+    "duration_s": 32,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "",
+    "freq_after_mhz": "",
+    "freq_source": "nominal: /proc/cpuinfo cpu MHz of CPU 0 (no cpufreq; not an observed clock)",
+    "moved_previous_to": null,
+    "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 8 --runs 5 --warmup 1 --slices adaptive --cores '0,1,2,3,4,5,6,7' --host 'gcp-c4a-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c4a-highmem-16/2026-10-23-375a6e18355a/arm1/arm_this_work_t8_n18-22-26'"
+  },
+  {
+    "block_id": "arm_lcpc_orig_t1_n18-22-26",
+    "out": "/home/jipeng/RealBrakedownPerf/code/results/gcp-c4a-highmem-16/2026-10-23-375a6e18355a/arm1/arm_lcpc_orig_t1_n18-22-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-10-23T15:27:22Z",
+    "end_utc": "2026-10-23T15:41:13Z",
+    "duration_s": 831,
+    "core_for_frequency": "1",
+    "freq_before_mhz": "",
+    "freq_after_mhz": "",
+    "freq_source": "nominal: /proc/cpuinfo cpu MHz of CPU 1 (no cpufreq; not an observed clock)",
+    "moved_previous_to": null,
+    "cmd": "'/home/jipeng/RealBrakedownPerf/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 1 --runs 5 --warmup 1 --cores '1' --host 'gcp-c4a-highmem-16' --out '/home/jipeng/RealBrakedownPerf/code/results/gcp-c4a-highmem-16/2026-10-23-375a6e18355a/arm1/arm_lcpc_orig_t1_n18-22-26'"
+  }
+]

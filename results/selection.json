@@ -11,7 +11,7 @@
       "runs": [
         {
           "run_dir": "20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*",
-          "sessions": ["s1", "s2"],
+          "sessions": ["s1", "s2", "s3"],
           "stage": "reproduce/soc/run_stages.sh --preset x86 (stages A, H, S, C, T, T28, D, B); s1 and s2 on two different xcnh nodes"
         }
       ]
@@ -24,6 +24,17 @@
           "run_dir": "20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*",
           "sessions": ["arm1"],
           "stage": "reproduce/soc/run_stages.sh --preset arm (stage ARM)"
+        }
+      ]
+    },
+    "gcp-c4a-highmem-16": {
+      "role": "Second Arm portability platform: archived Google Cloud c4a-highmem-16 virtual machine (Arm Neoverse V2, 16 vCPUs, one thread per core), cores 0-7 of the VM, fork commit 375a6e1, one session; not re-measured",
+      "expected_sessions": ["arm1"],
+      "runs": [
+        {
+          "run_dir": "2026-10-23-375a6e18355a",
+          "sessions": ["arm1"],
+          "stage": "reproduce/all.sh --profile arm --blocks ^arm_ (logN 18,22,26) at fork commit 375a6e1"
         }
       ]
     }
@@ -56,6 +67,6 @@
     "T8": {"Implementation": ["This Work", "Original LCPC as-published-as-is", "Original LCPC fork-flags-portable", "SIMD-Spielman"], "log2(N)": [20, 24, 28]},
     "T9": {"Field": ["Fp2M61", "Mers127", "Mont127"], "T": [1, 8], "log2(N)": [16, 18, 20, 22, 24, 26, 28]},
     "T10": {"log2(N)": [20, 22, 24]},
-    "T12": {"log2(N)": [18, 22, 26], "Threads": [1, 8]}
+    "T12": {"Host": ["soc-xcng", "gcp-c4a-highmem-16"], "log2(N)": [18, 22, 26], "Threads": [1, 8]}
   }
 }

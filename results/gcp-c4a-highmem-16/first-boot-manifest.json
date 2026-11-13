@@ -1,0 +1,744 @@
+{
+  "schema_version": "1.0.0",
+  "created_at_utc": "2026-10-23T08:19:07.300294+00:00",
+  "instance": "rbd-bench-c4a",
+  "zone": "us-central1-a",
+  "machine_family": "c4a",
+  "host_profile": "gcp-c4a-highmem-16",
+  "gcp_metadata": {
+    "instance_name": "rbd-bench-c4a",
+    "machine_type": "c4a-highmem-16",
+    "machine_type_resource": "projects/1037236179973/machineTypes/c4a-highmem-16",
+    "zone": "us-central1-a",
+    "zone_resource": "projects/1037236179973/zones/us-central1-a"
+  },
+  "expected_machine_type": "c4a-highmem-16",
+  "expected_provisioning_model": "STANDARD",
+  "expected_on_host_maintenance": "TERMINATE",
+  "expected_threads_per_core": 1,
+  "expected_boot_disk": {
+    "size": "100GB",
+    "type": "hyperdisk-balanced"
+  },
+  "lscpu": "Architecture:                            aarch64\nCPU op-mode(s):                          64-bit\nByte Order:                              Little Endian\nCPU(s):                                  16\nOn-line CPU(s) list:                     0-15\nVendor ID:                               ARM\nModel name:                              Neoverse-V2\nModel:                                   1\nThread(s) per core:                      1\nCore(s) per socket:                      16\nSocket(s):                               1\nStepping:                                r0p1\nBogoMIPS:                                2000.00\nFlags:                                   fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 sm3 sm4 asimddp sha512 sve asimdfhm dit uscat ilrcpc flagm sb paca pacg dcpodp sve2 sveaes svepmull svebitperm svesha3 svesm4 flagm2 frint svei8mm svebf16 i8mm bf16 dgh rng bti\nL1d cache:                               1 MiB (16 instances)\nL1i cache:                               1 MiB (16 instances)\nL2 cache:                                32 MiB (16 instances)\nL3 cache:                                80 MiB (1 instance)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-15\nVulnerability Gather data sampling:      Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Not affected\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; CSV2, BHB\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Not affected\n",
+  "cpu": {
+    "model_name": "Neoverse-V2",
+    "logical_cpu_count_lscpu": 16,
+    "online_cpus": "0-15",
+    "physical_core_count_sysfs": 16,
+    "physical_core_count_lscpu": 16,
+    "sockets": 1,
+    "threads_per_core": 1,
+    "topology": [
+      {
+        "cpu": 0,
+        "physical_package_id": "148",
+        "core_id": "0",
+        "thread_siblings_list": "0"
+      },
+      {
+        "cpu": 1,
+        "physical_package_id": "148",
+        "core_id": "1",
+        "thread_siblings_list": "1"
+      },
+      {
+        "cpu": 2,
+        "physical_package_id": "148",
+        "core_id": "2",
+        "thread_siblings_list": "2"
+      },
+      {
+        "cpu": 3,
+        "physical_package_id": "148",
+        "core_id": "3",
+        "thread_siblings_list": "3"
+      },
+      {
+        "cpu": 4,
+        "physical_package_id": "148",
+        "core_id": "4",
+        "thread_siblings_list": "4"
+      },
+      {
+        "cpu": 5,
+        "physical_package_id": "148",
+        "core_id": "5",
+        "thread_siblings_list": "5"
+      },
+      {
+        "cpu": 6,
+        "physical_package_id": "148",
+        "core_id": "6",
+        "thread_siblings_list": "6"
+      },
+      {
+        "cpu": 7,
+        "physical_package_id": "148",
+        "core_id": "7",
+        "thread_siblings_list": "7"
+      },
+      {
+        "cpu": 8,
+        "physical_package_id": "148",
+        "core_id": "8",
+        "thread_siblings_list": "8"
+      },
+      {
+        "cpu": 9,
+        "physical_package_id": "148",
+        "core_id": "9",
+        "thread_siblings_list": "9"
+      },
+      {
+        "cpu": 10,
+        "physical_package_id": "148",
+        "core_id": "10",
+        "thread_siblings_list": "10"
+      },
+      {
+        "cpu": 11,
+        "physical_package_id": "148",
+        "core_id": "11",
+        "thread_siblings_list": "11"
+      },
+      {
+        "cpu": 12,
+        "physical_package_id": "148",
+        "core_id": "12",
+        "thread_siblings_list": "12"
+      },
+      {
+        "cpu": 13,
+        "physical_package_id": "148",
+        "core_id": "13",
+        "thread_siblings_list": "13"
+      },
+      {
+        "cpu": 14,
+        "physical_package_id": "148",
+        "core_id": "14",
+        "thread_siblings_list": "14"
+      },
+      {
+        "cpu": 15,
+        "physical_package_id": "148",
+        "core_id": "15",
+        "thread_siblings_list": "15"
+      }
+    ]
+  },
+  "avx512ifma": {
+    "present": false,
+    "cpu_count_with_flag": 0,
+    "grep_o_output": ""
+  },
+  "cache_topology": [
+    {
+      "cpu": 0,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "0",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 0,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "0",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 0,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "2048K",
+      "shared_cpu_list": "0",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 0,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "81920K",
+      "shared_cpu_list": "0-15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 1,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "1",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 1,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "1",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 1,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "2048K",
+      "shared_cpu_list": "1",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 1,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "81920K",
+      "shared_cpu_list": "0-15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 2,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "2",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 2,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "2",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 2,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "2048K",
+      "shared_cpu_list": "2",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 2,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "81920K",
+      "shared_cpu_list": "0-15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 3,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "3",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 3,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "3",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 3,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "2048K",
+      "shared_cpu_list": "3",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 3,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "81920K",
+      "shared_cpu_list": "0-15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 4,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 4,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 4,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "2048K",
+      "shared_cpu_list": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 4,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "81920K",
+      "shared_cpu_list": "0-15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 5,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "5",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 5,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "5",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 5,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "2048K",
+      "shared_cpu_list": "5",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 5,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "81920K",
+      "shared_cpu_list": "0-15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 6,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "6",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 6,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "6",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 6,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "2048K",
+      "shared_cpu_list": "6",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 6,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "81920K",
+      "shared_cpu_list": "0-15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 7,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "7",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 7,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "7",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 7,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "2048K",
+      "shared_cpu_list": "7",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 7,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "81920K",
+      "shared_cpu_list": "0-15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 8,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 8,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 8,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "2048K",
+      "shared_cpu_list": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 8,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "81920K",
+      "shared_cpu_list": "0-15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 9,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "9",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 9,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "9",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 9,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "2048K",
+      "shared_cpu_list": "9",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 9,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "81920K",
+      "shared_cpu_list": "0-15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 10,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "10",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 10,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "10",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 10,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "2048K",
+      "shared_cpu_list": "10",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 10,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "81920K",
+      "shared_cpu_list": "0-15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 11,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "11",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 11,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "11",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 11,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "2048K",
+      "shared_cpu_list": "11",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 11,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "81920K",
+      "shared_cpu_list": "0-15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 12,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "12",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 12,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "12",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 12,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "2048K",
+      "shared_cpu_list": "12",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 12,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "81920K",
+      "shared_cpu_list": "0-15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 13,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "13",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 13,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "13",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 13,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "2048K",
+      "shared_cpu_list": "13",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 13,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "81920K",
+      "shared_cpu_list": "0-15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 14,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "14",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 14,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "14",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 14,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "2048K",
+      "shared_cpu_list": "14",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 14,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "81920K",
+      "shared_cpu_list": "0-15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 15,
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 15,
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 15,
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "2048K",
+      "shared_cpu_list": "15",
+      "coherency_line_size": "64"
+    },
+    {
+      "cpu": 15,
+      "index": "index3",
+      "level": "3",
+      "type": "Unified",
+      "size": "81920K",
+      "shared_cpu_list": "0-15",
+      "coherency_line_size": "64"
+    }
+  ],
+  "l3_domains": [
+    {
+      "shared_cpu_list": "0-15",
+      "size": "81920K",
+      "online_cpus": "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15",
+      "physical_core_count": 16
+    }
+  ],
+  "rust_toolchain": {
+    "pinned_channel": "1.99.1",
+    "rustc_version_verbose": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: aarch64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1",
+    "cargo_version_verbose": "cargo 1.99.1 (5f94df478 2026-08-27)\nrelease: 1.99.1\ncommit-hash: 5f94df4789f005f9a352888e8355ffc645b7ed0e\ncommit-date: 2026-08-27\nhost: aarch64-unknown-linux-gnu\nlibgit2: 1.9.6 (sys:0.21.0 vendored)\nlibcurl: 8.21.0-DEV (sys:0.4.90+curl-8.21.0 vendored ssl:OpenSSL/3.6.3)\nssl: OpenSSL 3.6.3 9 Jun 2026\nos: Debian 12.0.0 (bookworm) [64-bit]"
+  },
+  "os": {
+    "platform": "Linux-6.1.0-53-cloud-arm64-aarch64-with-glibc2.36",
+    "release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian GNU/Linux\"\nVERSION_ID=\"12\"\nVERSION=\"12 (bookworm)\"\nVERSION_CODENAME=bookworm\nID=debian\nHOME_URL=\"https://www.debian.org/\"\nSUPPORT_URL=\"https://www.debian.org/support\"\nBUG_REPORT_URL=\"https://bugs.debian.org/\"",
+    "machine": "aarch64",
+    "kernel": "6.1.0-53-cloud-arm64"
+  },
+  "checks": {
+    "gcp_machine_type_c4a_highmem_16": true,
+    "gcp_zone_matches_selection": true,
+    "gcp_instance_name_matches_selection": true,
+    "debian_12": true,
+    "aarch64_architecture": true,
+    "sixteen_cores": true,
+    "one_thread_per_core": true,
+    "cache_topology_available": true
+  },
+  "status": "passed"
+}
