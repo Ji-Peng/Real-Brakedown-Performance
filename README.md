@@ -97,13 +97,13 @@ The workspace provides stable benchmark binaries adhering to the `lcpc-bench-v1`
 
 ## 4. Reproduction Scripts (`reproduce/`)
 
-POSIX `sh` scripts reproduce all experiments and baseline comparisons. Each runs the relevant correctness tests first, aborts on failure, and writes raw JSON plus a manifest under `results/<host>/<UTC-date>-<gitsha>/`. Defaults are `--runs 5 --warmup 2`; the GCP campaign used `--runs 5 --warmup 1` everywhere. The examples below are local smoke runs (never publish local numbers; never use CPU 2 on the workstation).
+POSIX `sh` scripts reproduce all experiments and baseline comparisons. Each runs the relevant correctness tests first, aborts on failure, and writes raw JSON plus a manifest under `results/<host>/<UTC-date>-<gitsha>/`. Defaults are `--runs 5 --warmup 2`; the cluster campaign (`reproduce/soc/run_stages.sh`) passes `--warmup 1` to every block. The examples below are local smoke runs (never publish local numbers; never use CPU 2 on the workstation).
 
 - **`reproduce/this_work.sh`**: builds the fork HEAD, runs the tests, runs the strict codegen check, then benchmarks. `--params rs-ligero` measures the same library's Ligero Reed–Solomon encoding (E12/T10).
   ```sh
   ./reproduce/this_work.sh --threads 1 --cores 3 --logN 16,18,20 --runs 5 --warmup 1
   ```
-- **`reproduce/steps.sh`**: builds, tests and benchmarks each tag `step/01-modernize` … `step/09-codegen` in its own worktree with HEAD's harness (cumulative, order-dependent). `--mode a|b|both` selects the code-parameter mode (default `both`); the full profile's two steps blocks pass `--mode a` and `--mode b`. In the campaign both steps blocks still measured both modes (`docs/STATUS.md` §7.3).
+- **`reproduce/steps.sh`**: builds, tests and benchmarks each tag `step/01-modernize` … `step/09-codegen` in its own worktree with HEAD's harness (cumulative, order-dependent). `--mode a|b|both` selects the code-parameter mode (default `both`); the full profile's two steps blocks pass `--mode a` and `--mode b`.
   ```sh
   ./reproduce/steps.sh --mode a --threads 1 --cores 3 --logN 16,20 --runs 5 --warmup 1
   ```
@@ -117,11 +117,11 @@ POSIX `sh` scripts reproduce all experiments and baseline comparisons. Each runs
   ./reproduce/simd_spielman.sh --threads 1 --cores 3 --logN 16,18,20 --runs 5 --warmup 1
   ```
 - **`reproduce/polycommit.sh`**: arkworks PolyCommit Brakedown encoding with `external/polycommit/polycommit.patch` (`external/polycommit/README.md`).
-- **`reproduce/all.sh`**: the experiment catalogue of `agent/plan/06` as a randomized block schedule. `--profile smoke|full|arm` selects the catalogue; `--blocks REGEX`, `--logn LIST`, `--warmup N` and `--lcpc-variants LIST` restrict a run to one stage; `--stage NAME` labels it; `--session` and `--seed` name the session and the block order; `--run-date YYYY-MM-DD` fixes the date part of the run id (`run_stages.sh` passes its start date, so a session that crosses midnight UTC stays in one run directory). A failed block is recorded in `failed_blocks.tsv`, the stage continues, and `all.sh` exits 1 at the end.
+- **`reproduce/all.sh`**: the experiment catalogue as a randomized block schedule. `--profile smoke|full|arm` selects the catalogue; `--blocks REGEX`, `--logn LIST`, `--warmup N` and `--lcpc-variants LIST` restrict a run to one stage; `--stage NAME` labels it; `--session` and `--seed` name the session and the block order; `--run-date YYYY-MM-DD` fixes the date part of the run id (`reproduce/soc/run_stages.sh` passes its submission date, so a session that crosses midnight UTC stays in one run directory). A failed block is recorded in `failed_blocks.tsv`, the stage continues, and `all.sh` exits 1 at the end.
   ```sh
   ./reproduce/all.sh --profile smoke --session local1
   ```
-- **`reproduce/gcp/`**: `create_vm.sh` (`--machine c3d|c4a --instance NAME --zone ZONE`), `setup_vm.sh`, `run_session.sh` (start the VM, sync `code/`, run `all.sh` with the same stage options, copy the session back, stop the VM unless `--keep-running`), `run_stages.sh` (a list of stages of one session on one VM, then stop; `--preset` adds predefined stage lists), and `delete_vm.sh`.
+- **`reproduce/soc/`**: the SoC Slurm cluster campaign (`setup.sh`, `sync.sh`, `run_stages.sh` with `job.sh`, `fetch.sh`); see "Campaign on the SoC cluster" below.
 
 ### Session directory layout
 
@@ -131,76 +131,70 @@ One session is `results/<host>/<UTC-date>-<gitsha>/<session>/`. Staged campaigns
 | :--- | :--- |
 | `<block-id>/` | The block's `--out` directory: raw JSON records and manifests. The block id equals the directory name; with `--logn` it ends in `_n<list>`, the logN values the block actually ran (for example `full_this_work_threads_t4_n20-24-26`). |
 | `<block-id>.prev-<UTC time>/` | Before a block runs, `all.sh` moves an existing output directory of the same block aside under this name, so a re-run never mixes records of two stages. Analysis excludes these directories (`results/selection.json`, path glob `*.prev-*`). |
-| `stages/<UTC time>_<stage>/` | One directory per stage: its `schedule.json`, `blocks.tsv`, `manifest.json`, `execution_log.json`, and copies of the VM's host profile and first-boot record. A stage never overwrites another stage's files. This is not a session; analysis never treats it as one. |
-| `schedule.json` | Session-level and append-only (`rbd-session-schedule-v1`): its `stages` list accumulates every stage (stage tag and directory, the `all.sh` arguments: `--blocks` filter, logN list, warm-up, LCPC variants; seed, commit, instance, block ids with per-block status, exit status). A pre-existing campaign `schedule.json` is kept inside it as `legacy_schedule`. |
+| `stages/<UTC time>_<stage>/` | One directory per stage: its `schedule.json`, `blocks.tsv`, `manifest.json`, `execution_log.json` (per block: duration, exit code, clock of the first pinned core and, on the cluster, a noise snapshot before and after), and copies of the node's host profile and first-run record. A stage never overwrites another stage's files. This is not a session; analysis never treats it as one. |
+| `schedule.json` | Session-level and append-only (`rbd-session-schedule-v1`): its `stages` list accumulates every stage (stage tag and directory, the `all.sh` arguments: `--blocks` filter, logN list, warm-up, LCPC variants; seed, commit, host name, block ids with per-block status, exit status). |
 | `failed_blocks.tsv` | One line per failed block: block id, duration, exit code, stage tag. |
 
 `all.sh` tags every JSON record in a block's own output directory, failed blocks included, with `session_id`, `session_seed`, `stage`, `block_id`, `block_status` and the frequency fields (`docs/bench-json-schema.md`).
 
-### Campaign as run (2026-10-22/23)
+### Campaign on the SoC cluster
 
-The published GCP data was collected in stages, not by one `all.sh --profile full` call, and **before** the stage layout above existed: each stage wrote its blocks next to the earlier ones and overwrote the session's `schedule.json` (`docs/STATUS.md` §7.2). Per x86-64 session (`s1` on `rbd-bench-c3d-3`, `s2` on `rbd-bench-c3d-2`), every stage used `--profile full --warmup 1 --lcpc-variants as-published-as-is,fork-flags-portable`:
+All published numbers come from the NUS SoC Slurm cluster (machines in "Benchmark machines" below). One session is one Slurm job on one node; its stages run one after another inside that job. The x86-64 campaign has two sessions, `s1` and `s2`, on two different `xcnh` nodes; the Arm portability campaign has one session, `arm1`, on an `xcng` node.
 
-| Stage | `--blocks` as run | `--logn` |
+The workstation reaches the login node through `ssh`; `RBD_LOGIN` (default `xlogin.comp.nus.edu.sg`, e.g. `user@xlogin.comp.nus.edu.sg`) and `RBD_SSH` (default `ssh`; for password login e.g. `sshpass -f ~/.soc.pass ssh -o PubkeyAuthentication=no`) select it, and `RBD_REMOTE_ROOT` (default `rbd`) is the working directory below the cluster home. The cluster home is shared by all nodes, x86-64 and aarch64, so everything lives under `~/rbd/`: the clone `code/`, the pinned upstream checkout `SIMD-Spielman-for-ZKPs/` (the fork's tests read its test vectors), one rustup/Cargo home per architecture in `toolchain/<arch>/`, the Boost headers in `deps/`, one Cargo target directory per session in `target/<class>-<session>/`, and the job files and logs in `jobs/`.
+
+| Script | Runs on | What it does |
 | :--- | :--- | :--- |
-| A | `^full_(this_work_mode\|lcpc_orig_mode\|polycommit\|ligero)` | `16,18,20,22,24,26` |
-| S | `^full_simd_spielman` | `16,18,20,22,24,26` |
-| C | `^full_(slice_sweep\|thread_scaling)` (block ids of that time; see below) | `20,24,26`; thread scaling ran only at 20 and 24 |
-| D | `^full_steps` | `16,20,24` |
-| B | `^full_(this_work_mode\|lcpc_orig_mode\|polycommit\|simd_spielman_mont127)` | `28` |
-| R | `^full_(lcpc_orig_mode_a\|simd_spielman_.*_t[78])` | `16,18,20,22,24,26` |
-| ARM (`--machine c4a`, profile `arm`, session `arm1`) | `^arm_` | `18,22,26` |
+| `reproduce/soc/sync.sh` | workstation | Sends HEAD and all tags as a git bundle and checks out the same commit, detached, in `~/rbd/code`. Only committed changes are copied; run directories are named after this commit. Results already in the clone are kept. It refuses to move the clone while an `rbd-*` job is queued or running (`--force` overrides). |
+| `reproduce/soc/setup.sh --node-class xcnh\|xcng` | login node | Re-runs itself through `srun` on a node of that class (the login node never builds). Installs rustup and the toolchain of `rust-toolchain.toml` into `toolchain/<arch>/`, checks out SIMD-Spielman `7b399db`, unpacks Boost 1.86.0 headers (SHA-256 pinned) on `xcnh` when the system has none and points `SIMD_SPIELMAN_EXTRA_INCLUDE` at them (`deps/simd-spielman.env`), and writes `results/soc-<class>/first-run-<node>.json`: CPU, caches and L3 domains, governor, boost, PMU access, OS, kernel, glibc, Python, Rust, g++, CMake, objdump, Boost and a list of checks; it exits 1 if a check fails. |
+| `reproduce/soc/run_stages.sh` | login node | Submits one session as one Slurm job (`sbatch`): `--partition long`, `--constraint=<class>`, `-c 16 --threads-per-core=1`, `--mem=160G`, `--cpu-freq=Performance`, `--no-requeue`, time limit 2 days on `xcnh` and 12 h on `xcng`, and `--nodelist` when given. Stage specs `NAME\|REGEX\|LOGN[\|lcpc=LIST]` select `all.sh --blocks`, `--logn` and `--lcpc-variants` (an empty regex or logN list means no filter); `--preset x86\|arm` appends the campaign stages below; `--print-stages` and `--dry-run` show the stage list and the `sbatch` command without submitting. Every stage gets `--warmup 1` and the submission date as `--run-date`. |
+| `reproduce/soc/job.sh` | compute node | The batch script. It starts the session as a job step (`srun --cpu-freq=Performance`; Slurm applies the frequency request to job steps only), checks that the clone is still at the submitted commit, writes the node's first-run record (`setup.sh --record-only`) and runs each stage as `all.sh --host soc-<class>`. The log `~/rbd/jobs/rbd-<session>-<job id>.out` ends every stage with `STAGE_<NAME>_EXIT=<code>`. |
+| `reproduce/soc/fetch.sh` | workstation | Copies whole session directories (`--host`, `--run`, `--session`; globs allowed) and the host's per-node records into `results/` (or `--dest`); `--list` lists the sessions on the cluster. The codegen disassembly listings stay on the cluster unless `--with-listings`; every `codegen_report.json` is stored as `codegen_report.json.xz` unless `--no-xz`. |
 
-**Stage C and thread scaling.** The thread-scaling blocks were then defined with log2 N 20, 24, 28; intersected with stage C's `--logn 20,24,26` they ran at **2^20 and 2^24 only**, although their directories are named `..._n20-24-26`. The slice-sweep blocks ran at all three sizes.
+The x86-64 sessions run the `full` profile in these stages (`run_stages.sh --preset x86`; LCPC variants `as-published-as-is,fork-flags-portable` unless stated):
 
-**Renamed block ids.** The stage-C regex above matched the block ids of that time (`full_thread_scaling_{this_work,lcpc_orig}_t*`, and `full_polycommit_baseline` for PolyCommit T = 1). The block ids have since been renamed to their output directory names (`full_this_work_threads_t*`, `full_lcpc_orig_threads_t*`, `full_polycommit_t1`). To reproduce stage C with the current `all.sh`, use `--blocks '^full_(slice_sweep|this_work_threads|lcpc_orig_threads)'`; the old regex now selects only the slice sweep. The other regexes still match.
+| Stage | `--blocks` | log2 N | Content |
+| :--- | :--- | :--- | :--- |
+| A | `^full_(this_work_mode\|this_work_ft127\|lcpc_orig_mode\|polycommit\|ligero)` | 16–26 | This Work modes (a) and (b) (three fields, both shapes), This Work over Ft127 (2^20, 2^24), original LCPC, PolyCommit, Ligero |
+| H | `^full_lcpc_orig_mode_a_t[18]$` | 20, 24 | original LCPC `as-published-portable` and `fork-flags-as-is`, which separate the BLAKE3 backend from the compiler flags in T6 |
+| S | `^full_simd_spielman` | 16–26 | SIMD-Spielman, three fields, T = 1, 7 (+ coordinator), 8, Brakedown and Orion shapes |
+| C | `^full_slice_sweep` | 20, 24, 26 | slice sweep s = 1 … 256, T = 1 and 8 |
+| T | `^full_(this_work\|lcpc_orig)_threads_t[0-9]+$` | 20, 24, 26 | thread scaling T = 1, 2, 4, 8, This Work and original LCPC in the same job |
+| T28 | same | 28 | the same at 2^28 |
+| D | `^full_steps` | 16, 20, 24 | per-technique breakdown, modes (a) and (b) |
+| B | `^full_(this_work_mode\|lcpc_orig_mode\|polycommit\|simd_spielman)` | 28 | the headline, SIMD-Spielman (Brakedown shape only; Orion above 2^26 is omitted by `simd_spielman.sh --max-orion-logn 26`) and PolyCommit at 2^28 |
 
-`reproduce/gcp/run_stages.sh --preset x86` runs stages A, S, C, D and B with the current block ids, and `--machine c4a --preset arm` runs the Arm stage. Which run directories and blocks count is fixed in `results/selection.json`; `docs/STATUS.md` §7 records the stage → commit → run-dir map, all deviations from the plan, and every incident that invalidated data.
+The Arm session runs the `arm` profile in one stage, `ARM` (`^arm_`, log2 N 18, 22, 26: This Work and original LCPC, T = 1 and 8). SIMD-Spielman needs AVX-512 IFMA and therefore runs on `xcnh` only.
 
-### Re-measurement (2026-10-23)
+`python3 scripts/estimate_campaign.py` estimates each stage from block durations measured on an 8-core AMD Zen 4 server and an Arm Neoverse-V2 server, scaled by the speed of the cluster nodes measured in smoke runs (`xcnh` about 1.3 times the Zen 4 server, `xcng` about 0.3 times the Neoverse-V2 server): about 10 h for an x86-64 session (most of it the SIMD-Spielman Orion graph generation in stage S and the 2^28 stages T28 and B) and about 1.2 h for `arm1`. The time limits (2 days, 12 h) leave a wide margin.
 
-Several cells of the campaign are invalid or missing (`docs/STATUS.md` §7.4, §7.6). `run_stages.sh --preset remeasure` re-measures them: with `--machine c3d` it appends the stages below; with `--machine c4a` (session `arm1`) the Arm stage. Each stage is planned to take at most about 2 h. `--print-stages` prints the expanded list without touching a VM, for checking with `all.sh --dry-run`. Give the dry run its own `--out` directory outside `results/` (for example under `$TMPDIR`): it creates the session and `stages/` directories before it exits, and `analyze.py --selection … --check` refuses records under `results/` that the selection does not cover. Loading a GCP host profile also writes `results/<host>/host-profile-<instance>.json` (the GCE instance name, or the hostname off GCP) on whatever machine runs the dry run; delete that file if it was written on a workstation.
-
-| Stage | `--blocks` | log2 N | LCPC variants | Purpose |
-| :--- | :--- | :--- | :--- | :--- |
-| RL | `^full_lcpc_orig_mode_a_t[18]$` | 16–26 | `as-published-as-is`, `fork-flags-portable` | original LCPC as published (Cargo defaults, I4), with the fork-flags variant on the same boot |
-| RL28 | same | 28 | same | the same at 2^28 |
-| RH | same | 20, 24 | `as-published-portable`, `fork-flags-as-is` | the two other variants, so that T6 (E8) can separate the BLAKE3 backend from the compiler flags |
-| RT | `^full_(this_work\|lcpc_orig)_threads_t[0-9]+$` | 20, 24, 26 | `as-published-as-is`, `fork-flags-portable` | thread scaling (E6), This Work and original LCPC, T = 1, 2, 4, 8 on the first T cores |
-| RT28A, RT28B | the thread-scaling blocks, split in two stages | 28 | same | thread scaling at 2^28 |
-| RS | `^full_simd_spielman_mont127_t1$` | 28 | — | SIMD-Spielman Mont127 T = 1, Brakedown shape (missing in s1, I5). **Run it for `s1` only**: s2 already has this cell, and a second s2 record would be a duplicate. The preset adds RS for every `c3d` session, so for `s2` pass the other six stages explicitly (as below). |
-| ARM (`--machine c4a`) | `^arm_` | 18, 22, 26 | `as-published-as-is`, `fork-flags-portable` | This Work on Arm after the AArch64 codegen-checker fix (I7), and original LCPC as published on Arm |
-
-As launched (2026-10-23, 18:06 UTC+8 = 10:06 UTC, fork HEAD `375a6e1`; `--run-date` was left at its default, the UTC start date 2026-10-23):
+Commands, in order (`sync.sh` and `fetch.sh` on the workstation, the rest on the login node in `~/rbd/code`):
 
 ```sh
-# s1 on rbd-bench-c3d-3 (us-east4-c): all seven x86-64 stages
-./reproduce/gcp/run_stages.sh --instance rbd-bench-c3d-3 --zone us-east4-c --session s1 --preset remeasure
-# s2 on rbd-bench-c3d-2 (us-east1-d): the same stages without RS
-# (LCPC variants default to as-published-as-is,fork-flags-portable)
-./reproduce/gcp/run_stages.sh --instance rbd-bench-c3d-2 --zone us-east1-d --session s2 \
-  'RL|^full_lcpc_orig_mode_a_t[18]$|16,18,20,22,24,26' \
-  'RL28|^full_lcpc_orig_mode_a_t[18]$|28' \
-  'RH|^full_lcpc_orig_mode_a_t[18]$|20,24|lcpc=as-published-portable,fork-flags-as-is' \
-  'RT|^full_(this_work|lcpc_orig)_threads_t[0-9]+$|20,24,26' \
-  'RT28A|^full_lcpc_orig_threads_t[12]$|28' \
-  'RT28B|^full_(this_work_threads_t[0-9]+|lcpc_orig_threads_t[48])$|28'
-# Arm (launched 15:17 UTC after both c3d VMs had stopped; quota): session arm1 on rbd-bench-c4a (us-central1-a);
-# --run-date keeps the run directory inside selection.json's 2026-10-23-375a6e1* pattern if it starts after 00:00 UTC
-./reproduce/gcp/run_stages.sh --instance rbd-bench-c4a --zone us-central1-a --session arm1 --machine c4a --preset remeasure \
-  --run-date 2026-10-23
+# Workstation: copy the committed HEAD to the cluster
+./reproduce/soc/sync.sh
+
+# Login node, once per node class (and after a toolchain change)
+cd ~/rbd/code
+sh reproduce/soc/setup.sh --node-class xcnh
+sh reproduce/soc/setup.sh --node-class xcng
+
+# Login node: one job per session; s1 and s2 on two different idle xcnh nodes
+sinfo -N -p long -n xcnh1,xcnh2,xcnh3 -o '%N %t %C'
+sh reproduce/soc/run_stages.sh --session s1 --preset x86 --nodelist xcnh1
+sh reproduce/soc/run_stages.sh --session s2 --preset x86 --nodelist xcnh2
+sh reproduce/soc/run_stages.sh --session arm1 --preset arm
+squeue -u "$USER"; tail -f ~/rbd/jobs/rbd-s1-<job id>.out
+
+# Workstation, after the jobs have ended
+./reproduce/soc/fetch.sh --host soc-xcnh --session 's[12]'
+./reproduce/soc/fetch.sh --host soc-xcng --session arm1
+python3 scripts/analyze.py --results-dir results/ --selection results/selection.json --out-dir analysis/ --check
 ```
 
-(`GCLOUD` selects the `gcloud` binary if it is not on `PATH`.) The x86-64 stages write the new run directories `results/gcp-c3d-highmem-16/2026-10-23-375a6e18355a/{s1,s2}`; the Arm stage writes `results/gcp-c4a-highmem-16/<UTC date>-<commit>/arm1`. At most two of the 16-vCPU VMs can run at the same time (`CPUS_ALL_REGIONS` quota, "Benchmark machines"), so the Arm stage starts only after one x86-64 VM has stopped.
+Before submitting, `run_stages.sh --preset x86 --print-stages` lists the stages, and `all.sh --dry-run` inside a short job prints the block schedule with the derived cores (give it its own `--out` directory outside `results/`, because `analyze.py --selection … --check` refuses records that the selection does not cover). A stage that failed can be repeated alone by submitting the same session on the same node (`--nodelist`) with that stage spec and the original `--run-date`: `all.sh` moves the earlier output of each re-run block aside to `<block>.prev-<UTC>`, which analysis skips.
 
-**Supersede policy and `results/selection.json`.** A re-measured cell replaces every older record of the same cell, so that each pair compared in a table (original LCPC `as-published-as-is` vs `fork-flags-portable`, This Work vs original LCPC thread scaling) comes from one boot. `results/selection.json` is already wired for this, so copying the new run directories back needs no selection edit for steps 1 and 2:
-
-1. **Run directories (automatic).** `machines.<host>.runs` lists `run_dir` `2026-10-23-375a6e1*` with sessions `s1`, `s2` on `gcp-c3d-highmem-16` and `arm1` on `gcp-c4a-highmem-16`. A glob `run_dir` matches the run directories once they exist; until then it is inert (`analyze.py` prints `[INFO] Selected run pattern … matches no run directory yet`). The x86-64 directory is `2026-10-23-375a6e18355a`. The Arm directory's date is the UTC date of the Arm launch (`run_stages.sh --run-date`, default today in UTC): pass `--run-date 2026-10-23` to keep the pattern matching, or else change the c4a `run_dir` and the c4a `supersede.by` pattern to the actual name. Records in a run directory that no `run_dir` matches are refused as uncovered.
-2. **Superseding (automatic, per cell).** The `supersede` rules exclude, among the included records, every older record of a cell that a run matching `by` re-measured in a block matching `blocks`: `full_lcpc_orig_mode_a_*`, `full_lcpc_orig_threads_*` and `full_this_work_threads_*` on `gcp-c3d-highmem-16` (stages A, B, R and C), and `arm_lcpc_orig_*` and `arm_this_work_*` on `gcp-c4a-highmem-16` (including those blocks' codegen reports, superseded per machine and block family). The cell is the full configuration (implementation, LCPC build variant, field, parameters, shape, slices, log2 N, threads), and superseding applies across all sessions, so an old s2 record is dropped when s1 or s2 re-measured its cell. It is **not** per block: a cell that the new run did not produce (for example because a new block failed) keeps its old records. For the This Work vs original-LCPC thread-scaling pair and the Arm This Work vs Arm original-LCPC pair, `analyze.py` then prints `[WARN] Same-boot pair split across runs …`; the LCPC variant pair (`as-published-as-is` vs `fork-flags-portable`) gets no such warning. `analyze.py` prints `[INFO] Superseded N records of <block>` (with `(whole block)` when nothing of it is left); check those lines against the stages that completed. Everything else in the older run directories stays selected (This Work headline, steps, slice sweep, PolyCommit, Ligero, SIMD-Spielman including s2's Mont127 T = 1 2^28 cell).
-3. **Omissions (by hand).** Delete the `pending` omissions that the new data fills (original LCPC `as-published-as-is`, the T6 rows `Original LCPC as-published-portable` and `Original LCPC fork-flags-as-is` from stage RH, s1 SIMD-Spielman Mont127 T = 1 2^28, Arm This Work); the `omitted` entry for the SIMD-Spielman 2^28 setup/RSS cells stays, because s2 has no such record; `analyze.py` warns about every omission pattern that no longer matches a cell (`[WARN] selection.json omission pattern matched no cell`). Keep, or narrow, any that still match a missing cell.
-4. Run `python3 scripts/analyze.py --selection results/selection.json --check`; it must exit 0 (§5 lists what it rejects: duplicates, uncovered records, interrupted blocks, missing `expected_rows`, …).
-
-This Work's headline ≤ 2^26 still comes from stage A, so its comparison with the re-measured original LCPC remains a cross-boot comparison (`docs/STATUS.md` §7.2).
+`results/selection.json` selects sessions `s1`, `s2` on `soc-xcnh` and `arm1` on `soc-xcng`, each through the run-directory glob `20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*`, so the new run directories count as soon as they are fetched. If more than one run directory of a host is fetched, the same cells appear twice and `analyze.py --check` reports duplicates; keep one run per host, or narrow the glob.
 
 ---
 
@@ -223,11 +217,11 @@ The strict check (`--check`) fails on
 - empty cells, `-`, NaN and `SKIPPED` values in every table;
 - generated LaTeX tables that do not compile: with `--check`, each table under `latex/` is compiled standalone with `pdflatex` (booktabs, threeparttable) in `--latex-build-dir` (default `<out-dir>/latex_build`). If `pdflatex` is not installed, the compile step is skipped with a warning; `--no-latex-compile` skips it on purpose.
 
-`results/selection.json` also defines which records count: `machines.<host>.runs` (a `run_dir` may be a glob, inert until a matching directory exists), `exclude` (path globs with a reason and an optional `match` on record fields), and `supersede` (newer runs replace older records of the cells they re-measured, per cell; see "Re-measurement" in §4). The `omissions` (`kind` `pending` or `omitted`, with a reason) apply only to missing or N/A cells (and to absent `expected_rows` rows and documented `FAIL` codegen reports, through the selectors above), such as Orion-shape SIMD-Spielman at 2^28 ("omitted (documented)") or cells pending re-measurement; they never excuse an integrity error, and an omission that matches no cell produces a warning. Repeatable `--allow 'TABLE|ROW|COLUMN'` globs select further documented exceptions; smoke runs pass the known local limits in
+`results/selection.json` also defines which records count: `machines.<host>.runs` (a `run_dir` may be a glob, inert until a matching directory exists), `exclude` (path globs with a reason and an optional `match` on record fields), and optionally `supersede` (newer runs replace older records of the cells they re-measured, per cell; the current selection has none). The `omissions` (`kind` `pending` or `omitted`, with a reason) apply only to missing or N/A cells (and to absent `expected_rows` rows and documented `FAIL` codegen reports, through the selectors above), such as Orion-shape SIMD-Spielman at 2^28 ("omitted (documented)"); they never excuse an integrity error, and an omission that matches no cell produces a warning. Repeatable `--allow 'TABLE|ROW|COLUMN'` globs select further documented exceptions; smoke runs pass the known local limits in
 `reproduce/all.sh` (Arm is not run locally, and the smoke subset omits the campaign's larger field measurements).
 Run `python3 scripts/analyze.py --self-test` to check the missing-cell rules.
 
-The committed campaign results store each `codegen_report.json` (about 18 MB of disassembly listings) xz-compressed as `codegen_report.json.xz` (`xz -9`; 2.5 GB down to about 90 MB); `analyze.py` reads `*.json.xz` like `*.json`, and `xz -dk <file>` restores the original byte for byte. New runs still write plain `codegen_report.json`.
+Runs write plain `codegen_report.json` (about 18 MB each, mostly disassembly listings); `reproduce/soc/fetch.sh` stores each one xz-compressed as `codegen_report.json.xz` (`xz -9`) under `results/`. `analyze.py` reads `*.json.xz` like `*.json`, and `xz -dk <file>` restores the original byte for byte.
 
 Outputs (under `--out-dir`):
 - **CSV** (`csv/`) and **LaTeX** (`latex/`): `table_T0_correctness`, `table_T1_headline_encoding`, `table_T2_simd_spielman`, `table_T3_steps_breakdown`, `table_T4_slice_sweep`, `table_T5_field_comparison`, `table_T6_pcs_breakdown`, `table_T7_verifier_encoding`, `table_T8_setup_memory`, `table_T9_orion_shape`, `table_T10_brakedown_vs_rs`, `table_T11_codegen_evidence`, `table_T12_arm_portability` (`.csv` / `.tex`).
@@ -235,131 +229,37 @@ Outputs (under `--out-dir`):
 
 The paper's tables and figures are copied from these outputs into the paper repository's `paper/generated/` (`csv/`, `latex/`, `plots/`); no number is entered by hand.
 
-## Benchmark machines (Google Cloud)
+## Benchmark machines (SoC cluster)
 
-All published numbers come from Google Cloud VMs created with the `gcloud` CLI. A
-local workstation is used only for building and testing; no published number comes
-from it. The scripts in `reproduce/gcp/` wrap exactly the commands below; if the two
-ever disagree, the commands in this section are the reference configuration.
+All published numbers come from two node classes of the NUS School of Computing Slurm cluster. The local workstation is used only for building and testing; no published number comes from it. The scripts in `reproduce/soc/` run the commands of "Campaign on the SoC cluster" (§4); each run records the node it actually used.
 
-### Configuration
-
-| Setting | Primary x86-64 machines | Arm portability machine |
+| Setting | x86-64 sessions `s1`, `s2` | Arm session `arm1` |
 | :--- | :--- | :--- |
-| Machine type | `c3d-highmem-16` (planned `c3d-highmem-30`; see note below) | `c4a-highmem-16` |
-| CPU | AMD EPYC 9004 "Genoa" (Zen 4; guest reports EPYC 9B14), AVX-512 incl. IFMA | Google Axion (Arm Neoverse V2) |
-| vCPUs / cores | 16 vCPUs → 8 physical cores with `--threads-per-core=1` (SMT off); one 32 MB L3 domain (CPUs 0–7) | 16 vCPUs = 16 cores (no SMT) |
-| Memory | 128 GB | 128 GB |
-| Image | `debian-12` from `debian-cloud` (x86-64) | `debian-12-arm64` from `debian-cloud` |
-| Boot disk | 100 GB `pd-balanced` | 100 GB `hyperdisk-balanced` (C4A uses Hyperdisk) |
-| Provisioning | on-demand (`STANDARD`), `--maintenance-policy=TERMINATE` (no live migration) | same |
-| Used for | All implementations (This Work, original LCPC, PolyCommit, SIMD-Spielman), 2 independent sessions on 2 VMs | This Work and original LCPC only (SIMD-Spielman needs AVX-512), 1 short session, log2 N in {18, 22, 26} |
+| Node class (`--constraint`) | `xcnh` (four nodes, `xcnh1`–`xcnh3` in partition `long`) | `xcng` (two nodes, `xcng1` in partition `long`) |
+| Host profile, results directory | `soc-xcnh` | `soc-xcng` |
+| CPU | 2 × AMD EPYC 9755 (Zen 5), 128 cores per socket, SMT 2; AVX-512 including IFMA | Ampere, Arm Neoverse-N1, 128 cores, 1 socket, no SMT, up to 3.0 GHz |
+| Cache topology | L3 of 32 MB shared by 8 physical cores (e.g. CPUs 0–7 and their siblings 256–263) | per-core L1 and L2; sysfs exposes no level-3 cache |
+| Memory | 1 TB per node; the job requests 160 GB | 1 TB per node; the job requests 160 GB |
+| Job shape | 16 physical cores (`-c 16 --threads-per-core=1`), i.e. two whole L3 domains | 16 cores (`-c 16`) |
+| Benchmark cores | the 8 physical cores of one L3 domain that the job owns entirely, one hardware thread each; T = 1 on the first of them that is not CPU 0 | the first 8 cores of the job |
+| Frequency policy | `amd-pstate-epp`, governor `performance` (node default; `--cpu-freq=Performance` requests it); boost on | `cppc_cpufreq`, governor `ondemand` by default, set to `performance` for the job step by `--cpu-freq=Performance`; boost reported off |
+| PMU counters | unavailable (`kernel.perf_event_paranoid` = 4) | available (`kernel.perf_event_paranoid` = -1) |
+| OS, kernel | Ubuntu 26.04 LTS, Linux 7.0.0-28-generic | Ubuntu 24.04.5 LTS, Linux 6.8.0-139-generic |
+| Compilers | Rust 1.99.1 (`rust-toolchain.toml`), g++ 15.2.0, CMake 4.2.3, Boost 1.86.0 headers (`setup.sh`), GNU objdump | Rust 1.99.1, g++ 13.3.0, CMake 3.28 |
+| Used for | All implementations (This Work, original LCPC, PolyCommit, SIMD-Spielman), two sessions on two different nodes | This Work and original LCPC only (SIMD-Spielman needs AVX-512), one session, log2 N in {18, 22, 26} |
 
-Instances of the 2026-10-22/23 campaign (all four were deleted on 2026-10-24):
+The table lists the state of the cluster when the tooling was set up; the first-run record of each node (`results/<host>/first-run-<node>.json`, also copied into every stage directory) records the versions a run actually used.
 
-| Instance | Type | Zone | Role |
-| :--- | :--- | :--- | :--- |
-| `rbd-bench-c3d` | `c3d-highmem-16` | `us-central1-c` | First x86-64 VM: first-boot checks and the early monolithic `s1` attempts (code `2b23858`, `454cb24`, `80ae955`). It was used only for runs whose data was later invalidated or left incomplete (`docs/STATUS.md` §7.4, I1 and I10); after repeated stockouts in `us-central1-c`, `s1` moved to `rbd-bench-c3d-3`. |
-| `rbd-bench-c3d-3` | `c3d-highmem-16` | `us-east4-c` | Session `s1` (all valid `s1` data) |
-| `rbd-bench-c3d-2` | `c3d-highmem-16` | `us-east1-d` | Session `s2` |
-| `rbd-bench-c4a` | `c4a-highmem-16` | `us-central1-a` | Arm session `arm1` |
+### Core selection
 
-Planning check (2026-10-21, Google Cloud SDK 590.0.0): `c3d-highmem-30` (30 vCPUs / 240 GB) and
-`c4a-highmem-16` (16 vCPUs / 128 GB) are listed in `us-central1-a`. The images resolved to
-`debian-12-bookworm-v20261014` (X86_64) and `debian-12-bookworm-arm64-v20261014` (ARM64). The
-manifest of every run records the image, instance, zone, CPU model, and guest cache topology
-that were actually used.
+The host profiles (`reproduce/hosts/soc-xcnh.sh`, `soc-xcng.sh`, both calling `reproduce/soc/host_profile.py`) derive the benchmark cores from what the job may use, never from all online CPUs of the shared node: the usable CPUs are the job step's CPU affinity, and the owned CPUs are its cgroup cpuset, which also lists the SMT siblings of the allocated cores. On `xcnh` the profile selects the first L3 domain whose CPUs, siblings included, all belong to the job, so no other job runs inside that L3; it stops with an error if the job owns no such domain (on a busy node, pick another one with `--nodelist`). On `xcng`, which reports no L3 in sysfs, it takes the first 8 usable cores and records that the choice is not cache-aware. T-thread blocks use the first T benchmark cores for every implementation (SIMD-Spielman gets T + 1 for its coordinator thread, at most 8). The other 8 cores of the job run no benchmark thread (on `xcnh` they are the job's second L3 domain); SIMD-Spielman's upstream test programs use all 16.
 
-Fallback if `c3d` is unavailable: `c4-highmem-32` (Intel Xeon, 16 physical cores with
-`--threads-per-core=1`, `hyperdisk-balanced` boot disk). One machine family is used for
-a whole campaign; results from different families are never mixed in one table.
+Each profile load writes `results/<host>/host-profile-<node>.json`: host name, Slurm job and step, partition, CPU model, sockets, cores and threads per core, the usable and owned CPU lists, all L3 domains with the selected one, the benchmark cores with their NUMA node, governor, driver and current clock of each benchmark core, the boost flag, the node's allocated and total CPUs and CPU load from `scontrol show node`, the number of running jobs on the node, the load average, and whether `perf stat` is available. `all.sh` copies it into each stage directory. The run manifests record the Slurm job (`machine_identity`) and the governor and clock of the pinned cores.
 
-**Why `c3d-highmem-16` (2026-10-22).** The planned `c3d-highmem-30` could not be created: this
-project's `CPUS_PER_VM_FAMILY` quota for `C3D` is 24 vCPUs per region, and all `us-central1`
-zones also reported a `c3d-highmem-30` stockout. `c3d-highmem-16` (same AMD EPYC Genoa / Zen 4
-CPU with AVX-512 IFMA) was used instead. Consequences: 8-thread runs occupy all 8 physical
-cores (none is left for the OS and harness), thread scaling stops at 8 threads, and the guest
-PMU is unavailable (`--performance-monitoring-unit` is rejected for `c3d-highmem-*`). Repeated
-stockouts in `us-central1-c` and `us-east1-d` moved session `s1` to a third VM in `us-east4-c`.
-The project's global quota (`CPUS_ALL_REGIONS` = 32) allows at most two 16-vCPU VMs at the same
-time; the two x86-64 sessions ran concurrently on separate VMs, and the Arm VM ran while one
-x86-64 VM was still busy.
+### Limits and how noise is recorded
 
-### Create the VMs
-
-Authenticate and select the project first (`gcloud auth login`,
-`gcloud config set project <PROJECT>`). Creating a VM starts billing.
-`reproduce/gcp/create_vm.sh --machine c3d|c4a --instance NAME --zone ZONE` prints the same
-command and runs it with `--yes`.
-
-```sh
-# x86-64 benchmark machine: one instance per session; INSTANCE and ZONE as in the table above
-gcloud compute instances create "$INSTANCE" \
-  --zone="$ZONE" \
-  --machine-type=c3d-highmem-16 \
-  --threads-per-core=1 \
-  --image-family=debian-12 --image-project=debian-cloud \
-  --boot-disk-size=100GB --boot-disk-type=pd-balanced \
-  --provisioning-model=STANDARD --maintenance-policy=TERMINATE
-
-# Arm portability machine (campaign: INSTANCE=rbd-bench-c4a, ZONE=us-central1-a)
-gcloud compute instances create "$INSTANCE" \
-  --zone="$ZONE" \
-  --machine-type=c4a-highmem-16 \
-  --image-family=debian-12-arm64 --image-project=debian-cloud \
-  --boot-disk-size=100GB --boot-disk-type=hyperdisk-balanced \
-  --provisioning-model=STANDARD --maintenance-policy=TERMINATE
-```
-
-**Quota.** Each of these VMs has 16 vCPUs, and the project's `CPUS_ALL_REGIONS` quota is 32
-vCPUs, so at most **two** of them can run at the same time (stopped VMs do not count); creating
-or starting a third fails. Create or start a VM only after another one has been stopped. To
-reproduce, one x86-64 VM per session is enough (two sessions can run one after the other
-on the same VM, on separate boots); the campaign used two x86-64 instances concurrently, in
-the zones above, because of stockouts.
-
-Optional hardware performance counters: if the machine type supports a guest PMU, add
-`--performance-monitoring-unit=enhanced` (core/L2 and LLC events) to collect `perf stat`
-counters. If creation fails with that flag, create the VM without it and record that
-counters were unavailable.
-
-### First-boot checks
-
-Run these on each VM; `reproduce/gcp/setup_vm.sh` saves them in the run manifest.
-
-```sh
-lscpu                                    # model; c3d-highmem-16: 8 cores, 1 thread per core
-grep -o -m1 avx512ifma /proc/cpuinfo     # c3d only: required by SIMD-Spielman
-cat /sys/devices/system/cpu/cpu*/cache/index3/shared_cpu_list | sort -u   # L3 domains
-nproc; free -g; uname -a; cat /etc/os-release
-```
-
-1-thread runs use one fixed core (CPU 1 on `c3d`, avoiding CPU 0). T-thread runs use the first T
-cores of the 8-core set, in one reported L3 domain, for every implementation (SIMD-Spielman gets
-T + 1 cores for its coordinator thread, at most 8); on `c3d-highmem-16`, T = 8 uses all 8 cores
-(0–7), so the OS and harness share them. The first-boot record (`setup_vm.sh`) and the host profile
-(`reproduce/hosts/<host>.sh`) are now written per instance
-(`results/<host>/first-boot-manifest-<instance>.json`, `results/<host>/host-profile-<instance>.json`),
-and `all.sh` copies them into each stage directory. In the
-2026-10-22/23 campaign `setup_vm.sh` wrote one path per machine family
-(`results/gcp-c3d-highmem-16/first-boot-manifest.json`), so that file holds the record of whichever
-VM's results were copied back last (on 2026-10-23 at 17:14 UTC+8, `rbd-bench-c3d-2` in
-`us-east1-d`; the `rbd-bench-c3d-3` record it held before is lost). Each session's machine type,
-zone, CPU model and cache topology are also in its session and block manifests. The re-measurement
-(2026-10-23) writes the per-instance files.
-
-### Stop or delete the VMs
-
-Cost rule: a VM runs only while a benchmark task is running on it. Stop it between sessions, while results are reviewed, and after any failure. `reproduce/gcp/run_session.sh` stops it on exit unless `--keep-running` is given (then `run_stages.sh` stops it after its last stage). Delete all VMs once all benchmark sessions are finished.
-
-```sh
-gcloud compute instances stop   "$INSTANCE" --zone="$ZONE"   # keeps the disk
-gcloud compute instances delete "$INSTANCE" --zone="$ZONE"   # removes VM and boot disk
-```
-
-`reproduce/gcp/delete_vm.sh` wraps both. For the campaign the pairs are
-`rbd-bench-c3d` / `us-central1-c`, `rbd-bench-c3d-2` / `us-east1-d`,
-`rbd-bench-c3d-3` / `us-east4-c` and `rbd-bench-c4a` / `us-central1-a`; delete them only after
-the user confirms.
-
-A stopped VM no longer bills for vCPUs and memory, but its disk is still billed.
+- **Shared nodes.** Slurm allocates whole cores (`CR_CORE_MEMORY`), so no other job runs on the benchmark cores or, on `xcnh`, inside their L3 domain. Exclusive node access is refused by the cluster (`--exclusive`), so other jobs can still run on the other cores of the node and share memory bandwidth, the other L3 domains, and the socket's power and boost budget.
+- **Boost cannot be disabled.** The job sets the governor of its cores (`--cpu-freq=Performance`, applied to the job step); turbo/boost is a node setting. Clocks therefore vary with the load of neighbouring jobs.
+- **No PMU counters on `xcnh`.** `kernel.perf_event_paranoid` is 4, so unprivileged `perf stat` fails. The campaign does not use the benchmark binaries' optional `--perf` flag; the host profile and the first-run record state `perf: unavailable` with the reason.
+- **Per-user limits.** The cluster caps one user at 256 CPUs and 16 running jobs; the three sessions use 48 CPUs.
+- **Noise records.** Before and after every block, `all.sh` stores a snapshot in the stage's `execution_log.json` (`noise_before`, `noise_after`: load average, allocated and total CPUs of the node, CPUs held by this job, `scontrol` CPU load, running jobs on the node), next to the clock of the block's first pinned core. Two sessions on two different nodes give the node-to-node spread; within a session, blocks run in a seeded random order, so slow periods do not fall on one implementation only.
