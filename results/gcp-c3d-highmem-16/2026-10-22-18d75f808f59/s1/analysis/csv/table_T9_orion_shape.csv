@@ -1,5 +1,0 @@
-# Orion Matrix Shape Encoding Comparison (128 Rows)
-"# Provenance: Results: s1; Fork commit: f0e2116001af; Baselines: LCPC f0e2116, SIMD-Spielman 7b399db; Sessions: s1; Hosts: gcp-c3d-highmem-16."
-"# Note: Orion matrix shape uses fixed 128 rows (k = 128, n_per_row = N / 128)."
-# Note: [KDHR26] Table 3 reports Orion results for Fp2M61; Mont127 and Mers127 are not reported there.
-Field,T,log2(N),This Work Orion (ms),SIMD-Spielman Orion (ms),[KDHR26] Orion Table 3 (ms),Orion / Brakedown Ratio

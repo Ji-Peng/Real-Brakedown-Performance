@@ -1,104 +1,44 @@
 {
   "schema_version": "rbd-selection-v1",
-  "description": "Which run directories and sessions under code/results/ feed the paper artefacts (scripts/analyze.py --selection, the default). Every measurement record under this directory must be included by 'machines' or excluded by an 'exclude' rule with a reason; analyze.py refuses uncovered records. Exclude 'path' entries are path globs, not block-id globs: each is matched (fnmatch, '*' also matches '/') against machine/run/session/block and each of its prefixes, and against the file path relative to results_root; an optional 'match' restricts the rule to records whose fields match. A session is the directory holding the session-level schedule.json; <session>/stages/<tag>/ holds per-stage metadata and is never a session. 'supersede' rules exclude, among included records, every older record of a cell that a listed newer run re-measured (inert until that run exists; run_dir globs likewise). 'expected_rows' lists the rows each table must have (per table one {key column: [values]} product, or a list of them whose union is required). 'omissions' lists table cells that are pending re-measurement or documented omissions (selector TABLE|ROW|COLUMN, ROW = the table's key columns joined by commas); they apply only to missing or not-applicable cells (and absent expected rows, TABLE|ROW|(row), and FAIL codegen reports via T11|...|Scalar Status and T3|codegen,<tag>|Scalar Status selectors), never to integrity errors, and analyze.py warns about omission patterns that match no cell.",
+  "description": "Which run directories and sessions under code/results/ feed the paper artefacts (scripts/analyze.py --selection). Every measurement record under this directory must be included by 'machines' or excluded by an 'exclude' rule with a reason; analyze.py refuses uncovered records. A 'run_dir' may be a glob; it is inert until a matching directory exists. Exclude 'path' entries are path globs, not block-id globs: each is matched (fnmatch, '*' also matches '/') against machine/run/session/block and each of its prefixes, and against the file path relative to results_root; an optional 'match' restricts the rule to records whose fields match. A session is the directory holding the session-level schedule.json; <session>/stages/<tag>/ holds per-stage metadata and is never a session. 'expected_rows' lists the rows each table must have (per table one {key column: [values]} product, or a list of them whose union is required). 'omissions' lists table cells that are not measured by design (selector TABLE|ROW|COLUMN, ROW = the table's key columns joined by commas); they apply only to missing or not-applicable cells, never to integrity errors, and analyze.py warns about omission patterns that match no cell.",
   "results_root": ".",
   "machines": {
-    "gcp-c3d-highmem-16": {
-      "role": "x86-64 headline campaign (AMD EPYC 9B14, 8 cores, threads-per-core=1)",
+    "soc-xcnh": {
+      "role": "x86-64 headline campaign: SoC cluster node class xcnh (AMD EPYC 9755, Zen 5), 8 physical cores of one L3 domain owned by the job, one thread per core",
       "expected_sessions": ["s1", "s2"],
       "kdhr26_reference_cpu": "EPYC 9754",
-      "kdhr26_reference_note": "Closest [KDHR26] CPU (Zen 4c) to our Zen 4 EPYC 9B14; used for every [KDHR26] lookup on this machine.",
+      "kdhr26_reference_note": "Closest [KDHR26] CPU (AMD EPYC 9754, Zen 4c) to our Zen 5 EPYC 9755; used for every [KDHR26] lookup on this machine.",
       "runs": [
-        {"run_dir": "2026-10-22-2557b5517338", "sessions": ["s1", "s2"], "stage": "A (This Work, LCPC, PolyCommit, Ligero <= 2^26); s1 also S (SIMD-Spielman <= 2^26)"},
-        {"run_dir": "2026-10-22-18d75f808f59", "sessions": ["s1", "s2"], "stage": "C (slice sweep, thread scaling at 2^20/2^24); s2 also S (SIMD-Spielman <= 2^26)"},
-        {"run_dir": "2026-10-22-8dec85493004", "sessions": ["s1", "s2"], "stage": "D (steps at 2^16/2^20/2^24) and B (2^28)"},
-        {"run_dir": "2026-10-23-8dec85493004", "sessions": ["s1"], "stage": "R (LCPC with the parallel driver, SIMD-Spielman T7/T8 with pinned coordinator, <= 2^26)"},
-        {"run_dir": "2026-10-23-acfac2349c11", "sessions": ["s2"], "stage": "R (LCPC with the parallel driver, SIMD-Spielman T7/T8 with pinned coordinator, <= 2^26)"},
         {
-          "run_dir": "2026-10-23-375a6e1*",
+          "run_dir": "20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*",
           "sessions": ["s1", "s2"],
-          "stage": "Re-measurement at 375a6e1 (--preset remeasure): RL/RL28 original LCPC mode (a) T1/T8 2^16-2^28 (as-published-as-is built without the fork's flags, fork-flags-portable), RH (as-published-portable, fork-flags-as-is at 2^20/2^24), RT/RT28A/RT28B This Work + LCPC thread scaling T1/2/4/8 at 2^20-2^28 in the same boot, RS SIMD-Spielman Mont127 T1 2^28 (s1 only, audit A1). Landed 2026-10-23 (all stages exit 0); supersedes older cells via 'supersede'."
+          "stage": "reproduce/soc/run_stages.sh --preset x86 (stages A, H, S, C, T, T28, D, B); s1 and s2 on two different xcnh nodes"
         }
       ]
     },
-    "gcp-c4a-highmem-16": {
-      "role": "Arm portability session (Neoverse V2)",
+    "soc-xcng": {
+      "role": "Arm portability session: SoC cluster node class xcng (Ampere, Arm Neoverse-N1), first 8 physical cores of the job",
       "expected_sessions": ["arm1"],
       "runs": [
-        {"run_dir": "2026-10-23-acfac2349c11", "sessions": ["arm1"], "stage": "ARM (This Work and original LCPC at 2^18/2^22/2^26)"},
         {
-          "run_dir": "2026-10-23-375a6e1*",
+          "run_dir": "20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*",
           "sessions": ["arm1"],
-          "stage": "Arm re-measurement at 375a6e1 (--preset remeasure --machine c4a): This Work (fixed aarch64 classifier) and original LCPC at 2^18/2^22/2^26. Landed 2026-10-23 (stage ARM exit 0); supersedes the acfac23 Arm blocks via 'supersede'."
+          "stage": "reproduce/soc/run_stages.sh --preset arm (stage ARM)"
         }
       ]
     }
   },
   "exclude": [
     {"path": "local-i7-*", "reason": "local workstation output: development only, never published"},
-    {"path": "gcp-c3d-highmem-16/2026-10-22-454cb24d94f9", "reason": "invalid: probe/failed run before the per-block pinning fix (80ae955)"},
-    {"path": "gcp-c3d-highmem-16/2026-10-22-d0726a86d61b", "reason": "invalid: probe/failed run before the per-block pinning fix (80ae955)"},
-    {"path": "gcp-c3d-highmem-16/2026-10-22-f0a2825452f6", "reason": "invalid: probe/failed run before the per-block pinning fix (80ae955)"},
-    {"path": "gcp-c3d-highmem-16/2026-10-22-56e3fde099f6", "reason": "invalid: first staged stage A, killed (slow per-sample SIMD-Spielman graph generation, upstream tests per block)"},
-    {"path": "gcp-c3d-highmem-16/2026-10-22-80ae955f2878", "reason": "invalid: monolithic sessions killed and restarted as the staged campaign"},
-    {"path": "gcp-c3d-highmem-16/2026-10-22-2557b5517338/*/full_lcpc_orig_mode_a_t[18]_n16-18-20-22-24-26", "reason": "superseded: serial-row original-LCPC driver (fixed in 18d75f8); re-measured in stage R"},
-    {"path": "gcp-c3d-highmem-16/2026-10-22-18d75f808f59/*/full_lcpc_orig_mode_a_t[18]_n16-18-20-22-24-26", "reason": "superseded: serial-row original-LCPC driver (fixed in 18d75f8); re-measured in stage R"},
-    {
-      "path": "gcp-c3d-highmem-16/2026-10-22-2557b5517338/*/full_simd_spielman_*_t8_n16-18-20-22-24-26",
-      "reason": "superseded: SIMD-Spielman T=8 with unpinned spin-waiting coordinator (fixed in dd9009a); re-measured in stage R"
-    },
-    {
-      "path": "gcp-c3d-highmem-16/2026-10-22-18d75f808f59/*/full_simd_spielman_*_t8_n16-18-20-22-24-26",
-      "reason": "superseded: SIMD-Spielman T=8 with unpinned spin-waiting coordinator (fixed in dd9009a); re-measured in stage R"
-    },
-    {"path": "*/analysis", "reason": "stale per-session analyze.py output (derived, not raw data)"},
+    {"path": "*/analysis", "reason": "per-session analyze.py output (derived, not raw data)"},
     {"path": "*.prev-*", "reason": "earlier attempt of a re-run block, moved aside by reproduce/all.sh as <block>.prev-<UTC> (never mixed with the re-run)"},
-    {"path": "*", "match": {"implementation": "lcpc-original-upstream", "build_variant": "as-published-*", "build_variant_recorded": "false"}, "reason": "as-published built with fork .cargo/config.toml"},
-    {
-      "path": "gcp-*/2026-10-22-*",
-      "match": {"implementation": "lcpc-original-upstream", "build_variant": "as-published-*"},
-      "reason": "as-published original LCPC from runs before 375a6e1 built with the fork's .cargo/config.toml (flags leaked); re-measured at 375a6e1"
-    },
-    {
-      "path": "gcp-*/2026-10-23-8dec85493004",
-      "match": {"implementation": "lcpc-original-upstream", "build_variant": "as-published-*"},
-      "reason": "as-published original LCPC from runs before 375a6e1 built with the fork's .cargo/config.toml (flags leaked); re-measured at 375a6e1"
-    },
-    {
-      "path": "gcp-*/2026-10-23-acfac2349c11",
-      "match": {"implementation": "lcpc-original-upstream", "build_variant": "as-published-*"},
-      "reason": "as-published original LCPC from runs before 375a6e1 built with the fork's .cargo/config.toml (flags leaked); re-measured at 375a6e1"
-    },
-    {"path": "*/full_steps_mode_a*", "match": {"mode": "b"}, "reason": "steps blocks time both modes (audit A4); mode (b) is taken from full_steps_mode_b"},
-    {"path": "*/full_steps_mode_b*", "match": {"mode": "a"}, "reason": "steps blocks time both modes (audit A4); mode (a) is taken from full_steps_mode_a"}
+    {"path": "*", "match": {"implementation": "lcpc-original-upstream", "build_variant": "as-published-*", "build_variant_recorded": "false"}, "reason": "original-LCPC record without a recorded build variant: its build flags cannot be established"}
   ],
   "omissions": [
     {
       "kind": "omitted",
-      "reason": "SIMD-Spielman 2^28 setup and peak RSS exist in s1 only (stage RS of the 375a6e1 run records them); the s2 2^28 record (stage B, 8dec854) comes from a harness version that recorded encoding only",
-      "cells": ["T8|SIMD-Spielman,28|Setup (ms)", "T8|SIMD-Spielman,28|Setup / Encode", "T8|SIMD-Spielman,28|Peak RSS (MB)"]
-    },
-    {
-      "kind": "omitted",
-      "reason": "SIMD-Spielman Orion-shape 2^28: upstream graph generation exceeds 90 min per process; reported up to 2^26",
+      "reason": "SIMD-Spielman Orion shape at 2^28: upstream generates the Orion graph single-threaded in every benchmark process, which exceeds 90 min per process at 2^28; all.sh runs it up to 2^26 (simd_spielman.sh --max-orion-logn 26)",
       "cells": ["T9|*,*,28|SIMD-Spielman Orion*", "T9|*,*,28|SIMD / This Work", "T9|*,*,28|SIMD best-of-T*", "T9|*,*,28|Gap vs SIMD best-of-T", "T9|*,*,28|SIMD MT slower than its T=1", "T9|*,*,28|SIMD params.patch"]
-    },
-    {
-      "kind": "omitted",
-      "reason": "stage B ran SIMD-Spielman at 2^28 for Mont127 only (VM time); Mers127/Fp2M61 are reported up to 2^26",
-      "cells": ["T2|Mers127,*,28|SIMD*", "T2|Mers127,*,28|Gap*", "T2|Fp2M61,*,28|SIMD*", "T2|Fp2M61,*,28|Gap*"]
-    }
-  ],
-  "supersede": [
-    {
-      "by": ["gcp-c3d-highmem-16/2026-10-23-375a6e1*"],
-      "blocks": ["gcp-c3d-highmem-16/*/*/full_lcpc_orig_mode_a_*", "gcp-c3d-highmem-16/*/*/full_lcpc_orig_threads_*", "gcp-c3d-highmem-16/*/*/full_this_work_threads_*"],
-      "reason": "re-measured at 375a6e1 (original LCPC mode (a) from stages A/B/R; This Work and LCPC thread scaling from stage C, replaced by same-boot pairs)"
-    },
-    {
-      "by": ["gcp-c4a-highmem-16/2026-10-23-375a6e1*"],
-      "blocks": ["gcp-c4a-highmem-16/*/*/arm_lcpc_orig_*", "gcp-c4a-highmem-16/*/*/arm_this_work_*"],
-      "reason": "Arm re-measured at 375a6e1 (This Work and original LCPC in the same boot; replaces the acfac23 Arm blocks and their codegen reports)"
     }
   ],
   "expected_rows": {

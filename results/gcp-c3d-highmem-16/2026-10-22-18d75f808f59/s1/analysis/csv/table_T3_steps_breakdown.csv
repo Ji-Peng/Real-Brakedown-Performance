@@ -1,5 +1,0 @@
-# Cumulative Technique Breakdown Across Tagged Commits
-"# Provenance: Results: s1; Fork commit: f0e2116001af; Baselines: LCPC f0e2116, SIMD-Spielman 7b399db; Sessions: s1; Hosts: gcp-c3d-highmem-16."
-"# Note: Evaluated at single thread (T=1), Mont127 field, mode (a)."
-# Note: Note: the per-step breakdown is order-dependent; optimizations interact non-linearly.
-Step Tag,Optimization Technique,N=2^16 (ms),N=2^20 (ms),N=2^24 (ms),Step Speedup,Cumulative Speedup

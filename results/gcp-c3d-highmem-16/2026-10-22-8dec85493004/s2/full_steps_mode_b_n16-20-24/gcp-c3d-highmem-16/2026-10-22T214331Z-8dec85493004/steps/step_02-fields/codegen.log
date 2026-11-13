@@ -1,4 +1,0 @@
-[INFO] Inspecting /home/jipeng/RealBrakedownPerf/code/target-harness/cargo/workspace-step_02-fields/release/lcpc-bench (detected arch: x86_64)...
-  Result: PASS | Hot kernels checked: 4 | Violations: 0
-[INFO] JSON report written to /home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-8dec85493004/s2/full_steps_mode_b_n16-20-24/gcp-c3d-highmem-16/2026-10-22T214331Z-8dec85493004/steps/step_02-fields/codegen_report.json
-[INFO] Listing written to /home/jipeng/RealBrakedownPerf/code/results/gcp-c3d-highmem-16/2026-10-22-8dec85493004/s2/full_steps_mode_b_n16-20-24/gcp-c3d-highmem-16/2026-10-22T214331Z-8dec85493004/steps/step_02-fields/disassembly.txt

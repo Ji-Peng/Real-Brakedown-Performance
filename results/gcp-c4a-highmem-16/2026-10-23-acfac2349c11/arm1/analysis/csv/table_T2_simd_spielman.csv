@@ -1,7 +1,0 @@
-# Comparison with SIMD-Spielman (AVX-512 IFMA) and Prior Reported Results
-"# Provenance: Results: arm1; Fork commit: HEAD; Baselines: LCPC f0e2116, SIMD-Spielman 7b399db; Sessions: arm1; Hosts: gcp-c4a-highmem-16."
-# Note: Mode (b) parameters matching [KDHR26]. All runtimes in milliseconds.
-# Note: SIMD Gap Recovered = T_SIMD / T_ThisWork. Values >= 1.0x indicate This Work matches or exceeds AVX-512.
-# Note: At T=8 the 8-core host cannot give upstream's spin-waiting coordinator thread its own core; the gap uses the faster of T=8 (coordinator shares a worker core) and 7 workers + coordinator.
-# Note: [KDHR26] reported numbers quoted verbatim from SIMD-Spielman paper Table 2 (page 11) on AMD EPYC 9754.
-Field,T,log2(N),This Work (ms),SIMD-Spielman T workers (ms),SIMD-Spielman 8 cores: 7 workers + coordinator (ms),SIMD Gap Recovered,[KDHR26] Reported (ms),[KDHR26] LCPC Speedup,E15 Cross-Check
