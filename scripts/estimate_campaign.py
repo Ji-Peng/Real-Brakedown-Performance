@@ -69,7 +69,7 @@ X86_RATES: Dict[str, Tuple[float, float]] = {
 SIMD_SECONDS = {16: 20.0, 18: 20.0, 20: 40.0, 22: 60.0, 24: 200.0, 26: 1100.0, 28: 100.0}
 SIMD_FIXED = 60.0
 # Per-technique breakdown (steps.sh, one mode): ten builds plus the timings.
-STEPS_FIXED = 900.0
+STEPS_FIXED = 1500.0  # 2297 s on xcnh for both modes with runs 2 (smoke): mostly the per-tag builds
 STEPS_RATE = 6000.0
 # Arm (Neoverse-V2 reference): This Work mode (a) and original LCPC per variant.
 ARM_RATES = {"tw_a_t1": (1160.0, 30.0), "tw_a_t8": (90.0, 10.0),
