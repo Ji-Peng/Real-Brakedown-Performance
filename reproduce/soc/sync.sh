@@ -74,10 +74,10 @@ if [ "$force" != 1 ] && command -v squeue >/dev/null 2>&1; then
 fi
 bundle=$root/jobs/sync-$sha.bundle
 cat > "$bundle"
-git bundle verify "$bundle" >/dev/null 2>&1 || { echo "[soc] ERROR: bundle damaged in transfer" >&2; exit 1; }
 if [ ! -d "$root/code/.git" ]; then
     git clone --quiet --no-checkout "$bundle" "$root/code"
 fi
+git -C "$root/code" bundle verify "$bundle" >/dev/null 2>&1 || { echo "[soc] ERROR: bundle damaged in transfer" >&2; exit 1; }
 git -C "$root/code" fetch --quiet --tags --force "$bundle" "+HEAD:refs/remotes/sync/head"
 git -C "$root/code" checkout --quiet --force --detach "$sha"
 git -C "$root/code" clean -fdq -e results/ -e "target*/"
