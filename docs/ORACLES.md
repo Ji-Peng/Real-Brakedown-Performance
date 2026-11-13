@@ -1,10 +1,9 @@
 <!-- Copyright 2026 RealBrakedownPerf Authors. Licensed under Apache-2.0. -->
 
-# Correctness Oracles (`M2`)
+# Correctness Oracles
 
 This document describes the test-only correctness oracles used to verify the
-LCPC fork across code-parameter regimes, finite fields, and optimization steps
-(Plan README §3, §6.1).
+LCPC fork across code-parameter regimes, finite fields, and optimization steps.
 
 ---
 
@@ -14,15 +13,11 @@ LCPC fork across code-parameter regimes, finite fields, and optimization steps
 dependencies point directly to the unmodified LCPC crates at
 `f0e2116001af5a1bbf39481535f837d6a25772e8`; no source is copied into the
 fork's library crates. This direct dependency route builds alongside the
-modernized workspace, so the D11 golden-vector fallback is not used for this
-oracle. The old `ff 0.12` / `digest 0.9` types coexist with the fork's `ff
-0.14` / `digest 0.10` types in the test crate.
+modernized workspace. The old `ff 0.12` / `digest 0.9` types coexist with the
+fork's `ff 0.14` / `digest 0.10` types in the test crate.
 
-For local validation in this network-restricted environment, Cargo's canonical
-Git URL was temporarily rewritten through a config under the ignored
-`target-oracle-orig/` directory to use the same `f0e2116` object in the fork's
-full Git history. `Cargo.lock` still records the canonical Git URL and pinned
-revision; normal builds fetch that revision from the upstream URL.
+`Cargo.lock` records the canonical Git URL and pinned `f0e2116` revision;
+normal builds fetch that revision from the upstream URL.
 
 The pinned original `lcpc-brakedown-pc` has an unconditional
 `#![feature(test)]`, although this harness only calls its stable public API.
@@ -187,14 +182,14 @@ All three encoders are verified against all 18 test-vector pairs in
 | Brakedown ($n_{\text{rows}} = 2^{\log_2 N / 2}$) | `bd_spielman` | $64 \times 64 \to 64 \times 128$ | $128 \times 128 \to 128 \times 256$ | $256 \times 256 \to 256 \times 512$ | Bit-exact | Bit-exact | Bit-exact |
 | Orion ($n_{\text{rows}} = 128$) | `spielman` | $128 \times 32 \to 128 \times 64$ | $128 \times 128 \to 128 \times 256$ | $128 \times 512 \to 128 \times 1024$ | Bit-exact | Bit-exact | Bit-exact |
 
-### B.5 Public API for `step/04-r2l` Fork Integration
+### B.5 Public API for Fork Integration
 
 `lcpc-spielman-oracle` exports [`GlibcRandom`], [`SpielmanTvField`], [`MatrixShape`],
 [`SimdSpielmanParams`], [`L2rExpanderGraph`], [`R2lExpanderGraph`],
 [`SpielmanOracleCode`], [`locate_tv_dir`], [`load_tv_input_matrix`],
-[`load_tv_output_matrix`], and [`verify_tv_case`]. Since `step/04-r2l`,
+[`load_tv_output_matrix`], and [`verify_tv_case`].
 `lcpc-oracle-tests/tests/simd_spielman_tv.rs` uses them to check the fork's own
 R2L column-major encoder in mode (b) against all 18 `SIMD-Spielman-for-ZKPs/tv/`
 test-vector pairs: the oracle's L2R graphs are transposed by the fork
 (`R2lGraph::from_left_edges_fixed_degree`) and passed in through
-`ExpanderCode::from_graphs` (see `docs/R2L.md`).
+`ExpanderCode::from_graphs` (see [R2L.md](R2L.md)).

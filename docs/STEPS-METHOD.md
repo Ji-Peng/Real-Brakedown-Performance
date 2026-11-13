@@ -2,7 +2,7 @@
 
 # Per-step evaluation method
 
-`reproduce/steps.sh` evaluates E3 at every tagged step from `step/01-modernize`
+`reproduce/steps.sh` evaluates per-step single-thread encoding performance at every tagged step from `step/01-modernize`
 through the checked-out `HEAD`. It creates detached worktrees and runs each
 worktree's complete release test suite before building the timing adapter or
 collecting timings. The script does not move or rewrite tags or commits.
@@ -43,7 +43,7 @@ or buffer restoration. Caches are not flushed. T is fixed at 1; `RAYON_NUM_THREA
 is set and the entire test/build/check/timing process is constrained to the
 explicit `--cores` list. CPU 2 is rejected.
 
-## E3 configurations and unavailable cells
+## Evaluated configurations and unavailable cells
 
 - Mode (a): `SdigCode6`, `logN ∈ {16, 20, 24, 28}`, T=1. The historical
   `step/01-modernize` checkout has no `lcpc-fields::Mont127`, so its adapter
@@ -75,7 +75,7 @@ manifest lists all records and their harness/adapter versions. Results from
 
 ## Commands
 
-The planned E3 run (on the configured benchmark VM) uses defaults:
+The standard per-step run uses defaults:
 
 ```sh
 ./reproduce/steps.sh --cores <explicit-core-list> --out results

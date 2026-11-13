@@ -1,17 +1,17 @@
 <!-- Copyright 2026 RealBrakedownPerf Authors. Licensed under Apache-2.0. -->
 
-# Portable Codegen Tuning and Optimization Report (Step 09 / Milestone M6)
+# Portable Codegen Tuning and Optimization Report (Step 09)
 
-This document records the microarchitectural analysis, portable Rust source transformations, compiler code generation improvements, and directional local benchmark results for **Step 09 (M6: Compiler Code Generation & Tuning)**.
+This document describes the microarchitectural analysis, portable Rust source transformations, compiler code generation, and directional local benchmark results for **Step 09 (Compiler Code Generation & Tuning)**.
 
-All optimizations adhere strictly to the portable Rust rule ([CLAUDE.md](../../.claude/CLAUDE.md)):
+All optimizations adhere strictly to the portable Rust rule ([AGENTS.md](../../AGENTS.md)):
 - **No inline assembly** (`no asm!`);
 - **No architecture-specific intrinsics or SIMD libraries** (`no std::arch`, `no core::simd`);
 - **No conditional optimization tiers or variant build flags**;
 - Stable compiler `rustc 1.99.1`.
 
 > [!NOTE]
-> All local execution timings reported in this document were measured on a local test workstation (Intel Core i7-11700K) pinned under `taskset -c 3` with CPU 2 strictly excluded. These timings are for directional validation only and are labelled **unpublishable**. Canonical benchmark results are produced on GCP `c3d-highmem-16` virtual machines (planned `c3d-highmem-30`, unavailable; see `README.md`, "Benchmark machines").
+> All local execution timings reported in this document were measured on a local test workstation (Intel Core i7-11700K) pinned under `taskset -c 3` with CPU 2 strictly excluded. These timings are for directional validation only and are labelled **unpublishable**. Canonical benchmark results are produced on the NUS SoC Slurm cluster: x86-64 node class `xcnh` (AMD EPYC 9755, Zen 5) and Arm node class `xcng` (Neoverse-N1); see [README.md](../README.md), "Benchmark machines (SoC cluster)".
 
 ---
 
@@ -24,7 +24,7 @@ All optimizations adhere strictly to the portable Rust rule ([CLAUDE.md](../../.
 | **`Mont127` Reduction** (`reduce_mont127`) | 3-iteration nested loop with array indexing in CIOS Montgomery reduction. | Fully unrolled 3-word CIOS reduction with register-pinned limbs and `carrying_add`. | Complete loop unrolling into straight-line assembly; zero array bounds checks; branchless conditional move (`cmovbq`). |
 | **Expander Graph Traversal** (`encode_column_block_range_shard`) | Multi-edge loop ($B=4$) computed index arithmetic `e, e+1, e+2, e+3` and performed redundant slice indexing on `weights[e]` and `lefts[e]`. Output destination computed per-row slice indexing. | Used `chunks_exact(4)` and `.remainder()` for edge blocking; used `output.chunks_exact_mut(n_rows)` for disjoint column outputs. | Eliminated edge indexing bounds checks and destination column index calculations. |
 | **Reed-Solomon Evaluation** (`reed_solomon_column_block_range_shard`) | Matrix evaluation computed dynamic slice bounds `xo[local_col * n_rows..]` and `xi[j * n_rows..]`. | Sliced via `xo.chunks_exact_mut(n_rows)` and polynomial coefficient blocks via `xi.chunks_exact(n_rows).rev()`. | Eliminated all dynamic slice index checks on message polynomial evaluation. |
-| **`Fp2M61` MAC Form Evaluation** (Plan 02 §3.4) | Evaluated 4-mul Schoolbook vs 3-mul Karatsuba MAC forms. | Disassembly inspection and microbenchmarks evaluated. | **Schoolbook retained:** Karatsuba emitted 3 callee-saved register pushes, boolean materialization, `imulq`, and extra 128-bit subtractions; Schoolbook has 0 spills, 0 pushes, and fewer execution cycles. |
+| **`Fp2M61` MAC Form Evaluation** | Evaluated 4-mul Schoolbook vs 3-mul Karatsuba MAC forms. | Disassembly inspection and microbenchmarks evaluated. | **Schoolbook retained:** Karatsuba emitted 3 callee-saved register pushes, boolean materialization, `imulq`, and extra 128-bit subtractions; Schoolbook has 0 spills, 0 pushes, and fewer execution cycles. |
 
 ---
 
@@ -33,7 +33,7 @@ All optimizations adhere strictly to the portable Rust rule ([CLAUDE.md](../../.
 ### 2.1 Investigation 1: Redundant Carries and Boolean Materialization in 127-Bit MAC
 
 #### The Problem
-In the initial implementation of `mac_mont127` and `mac_mers127`, the accumulation of the 256-bit product $(t_0, t_1, t_2, t_3)$ into the 320-bit accumulator `acc.c[0..4]` was expressed via 128-bit additions:
+Expressing the accumulation of the 256-bit product $(t_0, t_1, t_2, t_3)$ into the 320-bit accumulator `acc.c[0..4]` via 128-bit additions:
 ```rust
 let s0 = (acc.c[0] as u128) + (t0 as u128);
 acc.c[0] = s0 as u64;
@@ -75,7 +75,7 @@ Because both steps can produce a carry, LLVM could not maintain a continuous CPU
 This sequence required 20 instructions, materializing boolean values across 3 general-purpose registers and forcing `%rbp` to be saved on the stack in the function prologue (`pushq %rbp`).
 
 #### The Solution: Portable `carrying_add`
-`rustc 1.99.1` provides `u64::carrying_add` on stable. We restructured the accumulation as:
+`rustc 1.99.1` provides `u64::carrying_add` on stable. The current implementation structures the accumulation as:
 ```rust
 let (s0, c) = acc.c[0].carrying_add(t0, false);
 let (s1, c) = acc.c[1].carrying_add(t1, c);
@@ -109,7 +109,7 @@ acc.c[4] = s4;
 ### 2.2 Investigation 2: Unrolling CIOS Montgomery Reduction in `reduce_mont127`
 
 #### The Problem
-The previous 3-word CIOS Montgomery reduction used a nested loop structure:
+Writing the 3-word CIOS Montgomery reduction as a nested loop:
 ```rust
 for i in 0..3 {
     let u = acc.c[i].wrapping_mul(Mont127::MU0) as u128;
@@ -124,7 +124,7 @@ for i in 0..3 {
 The inner loop bounds dynamically depended on `i`, which obstructed scalar replacement of aggregates and introduced array indexing overhead.
 
 #### The Solution
-We destructured the 5-limb accumulator into scalar local variables `[c0, mut c1, mut c2, mut c3, mut c4] = acc.c;` and fully unrolled the 3 word-clearing iterations with `carrying_add`.
+The current implementation destructures the 5-limb accumulator into scalar local variables `[c0, mut c1, mut c2, mut c3, mut c4] = acc.c;` and fully unrolls the 3 word-clearing iterations with `carrying_add`.
 
 #### Disassembly Impact:
 - Zero loop branching or induction variables.
@@ -153,7 +153,7 @@ We destructured the 5-limb accumulator into scalar local variables `[c0, mut c1,
    - *Option A:* Iterator enumerate `for (row, slot) in scratch_slice.iter_mut().enumerate()`
    - *Option B:* Indexed loop `for row in 0..n_rows { let mut acc = scratch_slice[row]; ... scratch_slice[row] = acc; }`
 
-   *Measurement Finding:* Option B was **~4% faster** (7.62 ms vs 7.88 ms at $\log N = 16$). Under Option B, all five buffers (`scratch_slice`, `src0`, `src1`, `src2`, `src3`) share a single 64-bit induction variable `%rax` (`row`) with hardware scaled index addressing (`(%rdi, %rax, 8)`). Option A introduced separate pointer tracking registers that increased register pressure under $B = 4$. Following project policy ("keep only non-regressing changes"), Option B was retained.
+   *Measurement Finding:* Option B is **~4% faster** (7.62 ms vs 7.88 ms at $\log N = 16$). Under Option B, all five buffers (`scratch_slice`, `src0`, `src1`, `src2`, `src3`) share a single 64-bit induction variable `%rax` (`row`) with hardware scaled index addressing (`(%rdi, %rax, 8)`). Option A introduces separate pointer tracking registers that increase register pressure under $B = 4$. Option B is retained.
 
 #### In `reed_solomon_column_block_range_shard`
 Replaced dynamic indexing with:
@@ -175,7 +175,7 @@ All slice bounds checks on output columns and polynomial input coefficients were
 
 ### 2.4 Investigation 4: Field MAC Form for $\mathbb{F}_{p^2}$ (Schoolbook vs. Karatsuba)
 
-Per Plan 02 §3.4, the implementation evaluates two candidate MAC forms for $\mathbb{F}_{p^2}$ ($p = 2^{61}-1$):
+Two candidate MAC forms exist for $\mathbb{F}_{p^2}$ ($p = 2^{61}-1$):
 - **Form A (Schoolbook, 4 multiplications):**
   $$\text{Re} = x_r w_r + x_i w_{i,\text{neg}}, \quad \text{Im} = x_r w_i + x_i w_r$$
 - **Form B (Karatsuba, 3 multiplications):**
@@ -183,7 +183,7 @@ Per Plan 02 §3.4, the implementation evaluates two candidate MAC forms for $\ma
   $$\text{Im} = P_2 - P_0 - P_1, \quad \text{Re} = P_0 + p^2 - P_1$$
 
 #### Disassembly Comparison:
-We compiled and disassembled both forms under `-C target-cpu=native -C no-vectorize-loops -C no-vectorize-slp`:
+Compiling and disassembling both forms under `-C target-cpu=native -C no-vectorize-loops -C no-vectorize-slp`:
 - **Schoolbook:**
   - Instructions: Exactly 4 `mulxq` instructions, 4 `addq`/`adcq` carry additions.
   - Stack frame: **0 stack pushes, 0 stack pops, 0 spills.**
@@ -193,8 +193,8 @@ We compiled and disassembled both forms under `-C target-cpu=native -C no-vector
   - Stack frame: Required **3 callee-saved register pushes** (`pushq %r15`, `%r14`, `%rbx`) to handle high register pressure.
   - Emitted multiple boolean carry materializations (`setb`, `imulq`).
 
-#### Decision:
-On modern out-of-order 64-bit cores, integer multipliers operate with 1-cycle throughput. Saving 1 multiply while introducing 8 additional ALU instructions and register spilling is a net microarchitectural regression. **Schoolbook 4-multiplication MAC is confirmed as the superior portable scalar form.**
+#### Selection:
+On modern out-of-order 64-bit cores, integer multipliers operate with 1-cycle throughput. Saving 1 multiply while introducing 8 additional ALU instructions and register spilling is a net microarchitectural regression. **Schoolbook 4-multiplication MAC is the chosen portable scalar form.**
 
 ---
 
@@ -237,7 +237,7 @@ On modern out-of-order 64-bit cores, integer multipliers operate with 1-cycle th
 
 ## 4. Portability Verification Across Target Architectures
 
-Automated scalar verification was re-executed across all targets via `scripts/check_codegen.py`:
+Scalar codegen is verified across all targets via `scripts/check_codegen.py`:
 
 ```
 x86_64_native     : PASS (16 hot kernels checked, 0 vector arithmetic violations)

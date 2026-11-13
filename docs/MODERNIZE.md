@@ -2,15 +2,15 @@
 
 # Step 01: Workspace Modernization (`step/01-modernize`)
 
-This document records the toolchain, compiler profile, Cargo workspace, and
-dependency updates applied in `step/01-modernize`, together with the RNG
+This document describes the toolchain, compiler profile, Cargo workspace, and
+dependency updates of the modernized workspace, together with the RNG
 compatibility layer that preserves **bit-exact** outputs (expander/Reed-Solomon
 code matrices, codewords, Merkle roots, Fiat-Shamir column openings, and
 `bincode`-serialized evaluation proofs) relative to original upstream LCPC
 (`f0e2116001af5a1bbf39481535f837d6a25772e8`).
 
 No algorithmic changes to encoding, commitment, proving, or verification are
-made in this step.
+introduced by this workspace baseline.
 
 ---
 
@@ -29,22 +29,23 @@ made in this step.
      under `[build]`, disabling LLVM loop and SLP auto-vectorization while
      allowing scalar ISA extensions (such as BMI2 `mulx` and ADX `adcx`/`adox`
      on x86-64).
-4. **Tracked `Cargo.lock`**: Removed `Cargo.lock` from `.gitignore` so exact
-   dependency versions are locked and reproducible across machines.
+4. **Tracked `Cargo.lock`**: `Cargo.lock` is tracked in Git so exact dependency
+   versions are locked and reproducible across machines.
 5. **Removal of Nightly `#![feature(test)]`**:
-   - Removed `#![feature(test)]`, `extern crate test;`, `src/bench.rs`, and the
-     `[features]` sections from `lcpc-brakedown-pc` and `lcpc-ligero-pc` (as
-     well as `def_bench!` and `paste` from `lcpc-test-fields`).
-   - Added the stable Rust workspace member `bench/` (`lcpc-bench`), whose CLI
+   - Nightly `#![feature(test)]`, `extern crate test;`, `src/bench.rs`, and the
+     `[features]` sections are removed from `lcpc-brakedown-pc` and
+     `lcpc-ligero-pc` (along with `def_bench!` and `paste` from
+     `lcpc-test-fields`).
+   - The stable Rust workspace member `bench/` (`lcpc-bench`) provides CLI
      flags (`--params`, `--logN`, `--runs`, `--warmup`, `--threads`, `--cores`,
-     `--output`, `--generate-golden`, `--check-golden`) and `lcpc-bench-v1` JSON
-     output schema match `external/lcpc-orig` (see `docs/bench-json-schema.md`).
+     `--output`, `--generate-golden`, `--check-golden`) and the `lcpc-bench-v1` JSON
+     output schema matching `external/lcpc-orig` (see [bench-json-schema.md](bench-json-schema.md)).
 
 ---
 
 ## 2. Dependency Version Matrix
 
-| Dependency | Upstream (`f0e2116`) | Modernized (`step/01-modernize`) | Notes |
+| Dependency | Upstream (`f0e2116`) | Current Workspace | Notes |
 | :--- | :--- | :--- | :--- |
 | `ff` | `0.12.1` | `0.14.0` | Associated constants `Field::ZERO`, `Field::ONE`, `PrimeField::ROOT_OF_UNITY`; uses `rand_core 0.10`. |
 | `digest` | `0.9.0` | `0.10.7` | Updated `Digest`, `Update`, `FixedOutput`, `FixedOutputReset`, `OutputSizeUser`, `HashMarker`. |

@@ -2,10 +2,10 @@
 
 # Step 04: Right-to-Left Graph Evaluation and Runtime Code Parameters (`step/04-r2l`)
 
-This step changes how the expander graphs are stored and evaluated, and makes
-the code parameters a runtime choice. Field arithmetic stays eager (one
-modular multiply and add per edge and row); lazy reduction comes in
-`step/05-lazy`.
+This document describes right-to-left (R2L) expander graph storage and
+evaluation and runtime code parameter selection in `lcpc-brakedown-pc`. For
+lazy modular reduction and multi-edge blocking applied inside the R2L gather
+kernel, see [LAZY.md](LAZY.md) and [BLOCKING.md](BLOCKING.md).
 
 ## Graph storage (`lcpc-brakedown-pc/src/graph.rs`)
 
@@ -45,12 +45,12 @@ column-major block (SIMD-Spielman's Algorithm 3, right-to-left "gather"): for
 each right node `r`, the first incoming edge initializes output column `r`
 (`out[r][row] = w * in[l][row]`), the remaining edges accumulate into it, and a
 node without edges gets zeros. Each output column is written in one pass over
-its edges, and input columns are only read. Rows are the unit-stride inner loop,
-as in `step/03-column-major`.
+its edges, and input columns are only read. Rows form the unit-stride inner
+loop (see [COLUMN_MAJOR.md](COLUMN_MAJOR.md)).
 
-Eager field addition is associative and commutative, so the result is the
-same field element as the left-to-right scatter: the encoder is bit-exact with
-`step/03-column-major` and with upstream LCPC in mode (a).
+Field addition is associative and commutative, so the R2L gather produces the
+same field element as left-to-right scatter and is bit-exact with upstream
+LCPC in mode (a).
 
 `encode_col_major(buf, n_rows, code)` and the single-vector
 `encode(xi, code)` now take an `ExpanderCode<F>`: the per-level precode and
@@ -75,10 +75,7 @@ fork's own transpose and encoder.
 `reed_solomon_column_block` are public, generic, and `#[inline(never)]`, so
 each field gets its own symbol (e.g.
 `lcpc_brakedown_pc::encode::encode_column_block::<lcpc_fields::mont127::Mont127>`),
-which `scripts/check_codegen.py` finds by pattern. This step also fixes the
-checker's symbol-header regex, which stopped at the first `>` and so never
-matched demangled generic symbols (the `step/03` kernel `mac_column_block`
-was not inspected before this fix).
+which `scripts/check_codegen.py` finds by pattern.
 
 ## Runtime code parameters (`codespec.rs`, `matgen.rs`)
 
@@ -113,10 +110,9 @@ not how; both modes use the same encoder.
   soundness analysis of the degree choice applies to mode (a), not to the
   fixed degrees of mode (b).
 - `lcpc-bench --params lcpc-sdig6|lcpc-sdig3|simd-spielman` selects the mode.
-  `--field fp2m61` is now accepted too. The bench builds every encoding through
-  `SpielmanEncoding::with_params`. Mode-(a) seeds are unchanged from earlier
-  steps, and mode (b) uses seed tag `0x5353`. `level_parameters` in the JSON
-  report are read from the sampled graphs (see `docs/bench-json-schema.md`).
+  `--field fp2m61` is accepted too. The bench builds every encoding through
+  `SpielmanEncoding::with_params`. Mode (b) uses seed tag `0x5353`. `level_parameters` in the JSON
+  report are read from the sampled graphs (see [bench-json-schema.md](bench-json-schema.md)).
 
 ## Tests
 

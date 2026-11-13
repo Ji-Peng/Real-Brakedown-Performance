@@ -2,13 +2,13 @@
 
 # Step 06: Multi-Edge Blocking in R2L Lazy Kernels (`step/06-blocking`)
 
-This document records the implementation, microarchitectural analysis, and empirical evaluation of **multi-edge blocking** (Plan 01 §3.5, Plan 03 §2.2, Decision D8) in the right-to-left (R2L) lazy encoding kernels of `lcpc-brakedown-pc`.
+This document describes the implementation, microarchitectural analysis, and empirical evaluation of **multi-edge blocking** in the right-to-left (R2L) lazy encoding kernels of `lcpc-brakedown-pc`.
 
 ---
 
 ## 1. Background & Motivation
 
-In `step/04-r2l`, graph evaluation was reformulated from left-to-right (L2R) sparse scattering into right-to-left (R2L) sparse gathering (Algorithm 3 of SIMD-Spielman). In `step/05-lazy`, we introduced the `LazyField` abstraction (`lcpc-fields`), allowing accumulators to defer expensive modular reductions until all incoming edges for a given output column have been processed.
+The R2L kernels evaluate expander graphs via right-to-left sparse gathering (Algorithm 3 of SIMD-Spielman; see [R2L.md](R2L.md)), using the `LazyField` abstraction (`lcpc-fields`; see [LAZY.md](LAZY.md)) so accumulators defer modular reductions until all incoming edges for a given output column have been processed.
 
 In an unblocked gather ($B = 1$), for each output column $r$, incoming edges $(l_0, w_0), (l_1, w_1), \dots$ are processed sequentially across all rows in the batch:
 
@@ -75,7 +75,7 @@ Let us evaluate the register footprint for `Mont127` and `Fp2M61`:
 - **Accumulator (`Mont127Acc`):** 5 limbs of `u64` (`a0..a4`) $= 5$ GPRs.
 - **Weights:** Each Montgomery weight fits in 2 `u64` limbs (since $p < 2^{127}$, limb 1 is $\le 2^{63}-1$).
   - For $B = 2$: $2 \times 2 = 4$ GPRs for weights. Total $= 5 + 4 = 9$ GPRs.
-  - For $B = 4$: LLVM holds weights in registers or uses single-limb constants where applicable. Total active registers $\approx 12\text{--}13$ GPRs, which this estimate placed within the 14 available GPRs. **Corrected (see `docs/CODEGEN.md` §5.2):** the generated code does spill: in the x86-64 `B = 4` inner row loop of `encode_column_block::<Mont127>`, 22 of 113 instructions access the stack (reloaded weights and source pointers, a spilled partial accumulator); `Mers127` has 20 and `Fp2M61` 34. The choice of `B = 4` rests on measured timings, not on spill-free code.
+  - For $B = 4$: While a rough count of active values (5 accumulator limbs plus weights) is around 12–13 GPRs, the generated code does spill (see [CODEGEN.md](CODEGEN.md) §5.2): in the x86-64 `B = 4` inner row loop of `encode_column_block::<Mont127>`, 22 of 113 instructions access the stack (reloaded weights and source pointers, and a spilled partial accumulator); `Mers127` has 20 and `Fp2M61` 34. The choice of `B = 4` rests on measured timings, not on spill-free code.
   - For $B = 8$: Requires $\ge 8 \times 2 = 16$ GPRs for weights alone! This causes severe register spills to the stack on every iteration, destroying performance.
 
 ### Fp2M61:
@@ -88,7 +88,7 @@ Let us evaluate the register footprint for `Mont127` and `Fp2M61`:
 ## 4. Empirical Evaluation & Selection of $B$
 
 > [!NOTE]
-> **Measurement Notice:** The following benchmarks were conducted locally on the development machine (Intel Core i7-11700K, pinned to Core 3 via `taskset -c 3`, turbo boost disabled, single-threaded, `params = lcpc-sdig6`, 10 runs, 2 warmups). As dictated by the project instructions, these numbers are **direction-only engineering measurements** intended solely to guide the choice of the compile-time constant $B$. They are not published benchmark numbers.
+> **Measurement Notice:** The following benchmarks were conducted locally on the development machine (Intel Core i7-11700K, pinned to Core 3 via `taskset -c 3`, turbo boost disabled, single-threaded, `params = lcpc-sdig6`, 10 runs, 2 warmups). These numbers are **direction-only engineering measurements** intended solely to guide the choice of the compile-time constant $B$; they are not published benchmark numbers.
 
 ### Median Matrix Encoding Time (`encode_matrix`)
 
@@ -101,7 +101,7 @@ Let us evaluate the register footprint for `Mont127` and `Fp2M61`:
 | **Fp2M61** | 18 | 19.95 ms | 18.68 ms | **18.37 ms** | **+7.9%** ($1.09\times$) |
 | **Fp2M61** | 20 | 76.82 ms | 71.81 ms | **71.71 ms** | **+6.7%** ($1.07\times$) |
 
-### Comparison with Prior Eager Baseline (`step/04-r2l`):
+### Comparison with Eager R2L Baseline (`step/04-r2l`):
 - **Mont127 ($\log_2 N = 16$):** Eager was **44.4 ms** $\longrightarrow$ Blocked Lazy ($B=4$) is **8.89 ms** (**$5.0\times$ faster**).
 - **Fp2M61 ($\log_2 N = 16$):** Eager was **12.8 ms** $\longrightarrow$ Blocked Lazy ($B=4$) is **5.29 ms** (**$2.4\times$ faster**).
 
@@ -111,14 +111,12 @@ Let us evaluate the register footprint for `Mont127` and `Fp2M61`:
 
 ---
 
-## 5. Decision & Fixed Constant
+## 5. Fixed Constant
 
-In accordance with Decision D8 and project requirements:
-- The blocking factor is fixed as a compile-time constant:
+- The blocking factor is fixed as a compile-time constant in `lcpc-brakedown-pc/src/encode.rs`:
   ```rust
   pub const BLOCK_FACTOR: usize = 4;
   ```
-  in `lcpc-brakedown-pc/src/encode.rs`.
 - It is **not** exposed as a runtime argument or Cargo feature.
 
 ---
@@ -131,9 +129,8 @@ In accordance with Decision D8 and project requirements:
      - Bit-exactness against unmodified LCPC `f0e2116001af5a1bbf39481535f837d6a25772e8` (`lcpc-oracle-tests/tests/original_lcpc.rs`).
      - Bit-exactness against all 18 SIMD-Spielman test vectors (`lcpc-oracle-tests/tests/simd_spielman_tv.rs`).
      - Worst-case accumulator overflow and intermediate fold stress test (`test_worst_case_accumulation_and_fold`).
-2. **Disassembly & Vector Free Verification:**
-   - Executed `python3 scripts/check_codegen.py target-blocking/release/lcpc-bench --strict`.
-   - Result:
+2. **Disassembly & Vector-Free Verification:**
+   - Verified with `python3 scripts/check_codegen.py target-blocking/release/lcpc-bench --strict`:
      ```text
      [INFO] Inspecting target-blocking/release/lcpc-bench (detected arch: x86_64)...
        Result: PASS | Hot kernels checked: 16 | Violations: 0

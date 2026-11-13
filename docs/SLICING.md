@@ -2,7 +2,7 @@
 
 # Step 07: LLC-Aware Slicing, Runtime Cache Detection & Adaptive Auto-Tuning (`step/07-slicing`)
 
-This document details the design, algorithmic formulation, microarchitectural analysis, and verification of **Last-Level Cache (LLC) slicing**, **portable runtime cache detection**, and **adaptive slice auto-tuning** (Plan 04 §2, README §8.1 M4) in `lcpc-brakedown-pc` and `lcpc-bench`.
+This document details the design, algorithmic formulation, microarchitectural analysis, and verification of **Last-Level Cache (LLC) slicing**, **portable runtime cache detection**, and **adaptive slice auto-tuning** in `lcpc-brakedown-pc` and `lcpc-bench`.
 
 ---
 
@@ -10,7 +10,7 @@ This document details the design, algorithmic formulation, microarchitectural an
 
 In Brakedown-style polynomial commitment schemes, committing to a multilinear polynomial with $N = 2^\ell$ coefficients arranges the evaluations into a $k \times k$ matrix ($k = 2^{\lfloor \ell/2 \rfloor} = \sqrt{N}$), and encodes each row into an expander codeword of length $n \approx 1.72 k$.
 
-In `step/03` through `step/06`, all $n_{\text{rows}}$ rows are encoded in one batched column-major pass with lazy modular accumulation and multi-edge blocking ($B = 4$). In this batched layout, each expander graph edge $(l, r, w)$ streams across all $n_{\text{rows}}$ elements of column $l$ with unit stride:
+Without horizontal slicing ($s = 1$), all $n_{\text{rows}}$ rows are encoded in one batched column-major pass with lazy modular accumulation and multi-edge blocking ($B = 4$). In this batched layout, each expander graph edge $(l, r, w)$ streams across all $n_{\text{rows}}$ elements of column $l$ with unit stride:
 
 $$W_{\text{left}}(s=1) = n_{\text{per\_row}} \cdot n_{\text{rows}} \cdot 16\text{ bytes} = 16 N\text{ bytes}$$
 
@@ -26,7 +26,7 @@ During right-to-left (R2L) evaluation of the top-level expander graph $G_1$:
 
 ## 2. Horizontal Batch Slicing Architecture
 
-To eliminate LLC thrashing while maintaining unit-stride streaming locality, `step/07-slicing` partitions the $n_{\text{rows}}$ rows of the coefficient matrix into $s \ge 1$ horizontal slices:
+To eliminate LLC thrashing while maintaining unit-stride streaming locality, the encoder partitions the $n_{\text{rows}}$ rows of the coefficient matrix into $s \ge 1$ horizontal slices:
 
 $$R_s = \lfloor n_{\text{rows}} / s \rfloor$$
 
@@ -51,7 +51,7 @@ When $s > 1$, this slashes scratch memory footprint by up to $s\times$, dramatic
 
 ## 3. Portable Runtime Cache Detection (No `cpuid`)
 
-Unlike upstream SIMD-Spielman which relied on compile-time `#define SELECTED_CPU` hard-coded tables, our implementation probes the host cache hierarchy dynamically at runtime in strict priority order (Plan 04 §2.2):
+Unlike upstream SIMD-Spielman, which relies on compile-time `#define SELECTED_CPU` hard-coded tables, this implementation probes the host cache hierarchy dynamically at runtime in strict priority order:
 
 ```mermaid
 flowchart TD
@@ -82,11 +82,11 @@ The recommended slice count $s^*$ is computed dynamically via `adaptive_slice_co
    To prevent unit-stride streaming degradation and excessive graph streaming overhead:
    $$s^* = \text{clamp}\left(s_{\text{llc}}, \; 1, \; \text{prev\_power\_of\_two}\left(\frac{n_{\text{rows}}}{R_{\min}}\right)\right)$$
 
-### Validation against Plan 04 §2.2 Table 166
+### Analytical Slice Counts Across Problem Sizes
 
-The implementation matches the planned model across all problem sizes and LLC sizes:
+The closed-form model produces the following slice counts across problem sizes for 16 MiB and 32 MiB LLCs:
 
-| $\log_2 N$ | $k = \sqrt{N}$ | $W_{\text{left}}(s=1)$ | $s^*$ for 16 MiB LLC (i7-11700K) | $s^*$ for 32 MiB LLC (GCP Zen 4) | Rows / Slice $R_s$ (16 MiB LLC) |
+| $\log_2 N$ | $k = \sqrt{N}$ | $W_{\text{left}}(s=1)$ | $s^*$ for 16 MiB LLC (i7-11700K) | $s^*$ for 32 MiB LLC | Rows / Slice $R_s$ (16 MiB LLC) |
 | :---: | :---: | :---: | :---: | :---: | :---: |
 | **16** | 256 | 1 MiB | **1** | **1** | 256 |
 | **18** | 512 | 4 MiB | **1** | **1** | 512 |

@@ -2,13 +2,7 @@
 
 # Step 03: Batched Column-Major Encoding (`step/03-column-major`)
 
-This step changes how the commitment encodes the coefficient matrix. Upstream
-LCPC (`f0e2116`) encodes each of the `n_rows` rows independently (Rayon
-`par_chunks_mut` over rows, one `sprs` sparse matrix-vector product per
-precode/postcode and row). From this step on, all rows are encoded in **one
-batched pass** over a column-major copy of the matrix. Field arithmetic stays
-eager and the graph stays in `sprs::CsMat` form; R2L evaluation and lazy
-reduction come in later steps.
+This document describes batched column-major encoding of the coefficient matrix in `lcpc-brakedown-pc`. Upstream LCPC (`f0e2116`) encodes each of the `n_rows` rows independently (Rayon `par_chunks_mut` over rows, one `sprs` sparse matrix-vector product per precode/postcode and row). Here, all rows of a slice are encoded in **one batched pass** over a column-major buffer; R2L graph evaluation, lazy modular reduction, multi-edge blocking, LLC slicing, and expander-level multithreading build on this layout (see [R2L.md](R2L.md), [LAZY.md](LAZY.md), [BLOCKING.md](BLOCKING.md), [SLICING.md](SLICING.md), and [THREADS.md](THREADS.md)).
 
 ## Layout
 
@@ -18,56 +12,53 @@ position is one contiguous column of `n_rows` elements.
 
 ## Kernel (`lcpc-brakedown-pc/src/encode.rs`)
 
-- `encode_col_major(buf, n_rows, precodes, postcodes)` follows the same
-  recursion as upstream `encode` (precodes down, Reed-Solomon base case,
-  postcodes back up), with every offset scaled by `n_rows`.
-- `mac_column_block` evaluates one sparse matrix on a column block. Each
-  nonzero `(r, l, w)` is loaded once and applied to the whole column:
-  `out[r][row] += w * in[l][row]` for `row in 0..n_rows`. Both columns are
-  unit-stride and consecutive rows are independent. Edges are visited in the
-  matrix's storage order (by input node for LCPC's CSC matrices).
+- `encode_col_major(buf, n_rows, code)` follows the same recursion as upstream
+  `encode` (precodes down, base case, postcodes back up), with every offset
+  scaled by `n_rows`.
+- `encode_column_block` evaluates one R2L sparse graph on a column block: for
+  each right node `r`, incoming edges `(l, w)` are gathered across the entire
+  column `row in 0..n_rows` (`out[r][row] += w * in[l][row]`). Both columns are
+  unit-stride and consecutive rows are independent.
 - `reed_solomon_column_block` evaluates the Vandermonde base case with Horner's
   rule element-wise across each column.
 - The single-vector `encode` is `encode_col_major` with `n_rows = 1`, so the
   verifier's 1-vector encodings use the same kernel.
-- `mac_column_block` and `reed_solomon_column_block` are `#[inline(never)]` so
-  their disassembly can be inspected.
+- `encode_column_block` and `reed_solomon_column_block` are `#[inline(never)]`
+  so their disassembly can be inspected.
 
 Field addition is associative and commutative, so the outputs are bit-exact
 with the per-row `sprs` products this replaces.
 
 ## PCS integration (`lcpc-2d`)
 
-- New trait method `LcEncoding::encode_rows(&self, comm, n_cols)`: encode every
+- The trait method `LcEncoding::encode_rows(&self, comm, n_cols)` encodes every
   row of a row-major codeword matrix whose message prefixes are filled in. The
   default implementation is upstream's row-parallel loop, so `lcpc-ligero-pc`
   is unchanged.
 - `commit` copies the message prefixes into `comm` and calls `encode_rows`.
-- `SdigEncodingS` overrides `encode_rows`: transpose the messages into a
-  column-major buffer, run `encode_col_major`, transpose the redundancy columns
-  back (the message columns are unchanged because the code is systematic).
+- `SdigEncodingS` overrides `encode_rows`: transpose message slices into a
+  column-major slice buffer, run the batched column-major encoder, and transpose
+  the redundancy columns back (the message columns are unchanged because the
+  code is systematic).
 
 `LcCommit::comm` stays row-major, so serialization, `hash_columns`,
-`open_column`, `prove`, and `verify` are unchanged. The README §3.2 option of
-keeping `comm` column-major (which would make column hashing contiguous) is
-left for a later step after measurement. Costs of this choice:
-
-- one extra copy of the matrix (the column-major buffer) during `commit`;
-- two transposes (tiled, single-threaded) per `commit`.
+`open_column`, `prove`, and `verify` are unchanged. Keeping `comm` row-major
+avoids changing downstream PCS interfaces, at the cost of a column-major slice
+buffer (sized by horizontal slicing in [SLICING.md](SLICING.md)) and two
+transposes per `commit`.
 
 ## Threads
 
-The batched encoder runs on the calling thread. Rayon still parallelizes the
-coefficient copy, column hashing, and Merkle tree. Multi-threaded encoding
-returns in `step/08-threads` (expander-level worker pool). Multi-thread
-`commit` timings between `step/03` and `step/07` are therefore not comparable
-with upstream's row-parallel encoder; per-step attribution uses one thread.
+When `threads > 1`, the batched expander encoder executes across the persistent
+pinned worker pool (see [THREADS.md](THREADS.md)); Rayon parallelizes the
+coefficient copy, column hashing, and Merkle tree. Single-thread per-step
+attribution (`reproduce/steps.sh`) sets `threads = 1`.
 
 ## Benchmark harness
 
-`lcpc-bench`'s `encode_matrix` now calls `LcEncoding::encode_rows`, the entry
-point that `commit` uses. Its time includes allocating the column-major buffer
-and both transposes (see `docs/bench-json-schema.md`).
+`lcpc-bench`'s `encode_matrix` calls `LcEncoding::encode_rows`, the entry
+point that `commit` uses. Its time includes allocating the column-major slice
+buffer and both transposes (see [bench-json-schema.md](bench-json-schema.md)).
 
 ## Tests
 

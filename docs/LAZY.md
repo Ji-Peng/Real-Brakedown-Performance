@@ -2,13 +2,13 @@
 
 # Step 05: Lazy Modular Reduction in R2L Gather Kernels (`step/05-lazy`)
 
-This step integrates **lazy modular reduction** (Plan 01 §3.4, Plan 02 §3–4) into the right-to-left (R2L) expander graph gather kernels of `lcpc-brakedown-pc`.
+This document describes **lazy modular reduction** in the right-to-left (R2L) expander graph gather kernels of `lcpc-brakedown-pc`.
 
 ---
 
 ## 1. Background & Motivation
 
-In `step/04-r2l`, graph evaluation was converted from left-to-right (L2R) sparse scattering into right-to-left (R2L) sparse gathering. While R2L replaced random read-modify-writes with linear writes to the output columns, field arithmetic remained eager: every incoming edge performed a full modular multiplication and modular addition per row.
+Right-to-left (R2L) graph evaluation replaces random L2R read-modify-writes with linear writes to the output columns (see [R2L.md](R2L.md)). With eager field arithmetic, every incoming edge would perform a full modular multiplication and modular addition per row; lazy reduction defers those reductions.
 
 Under Brakedown's `SdigCode6` parameters ($\alpha = 0.238, \beta = 0.1205, r = 1.72$):
 - In mode (b) (`SimdSpielman`), average right-node in-degrees are $\overline{\text{deg}}(G_1) \approx 42.02$ in precodes and $\overline{\text{deg}}(G_2) \approx 26.36$ in postcodes.
@@ -69,7 +69,7 @@ pub fn encode_column_block<F: LazyField>(
 ```
 
 ### Key Principles:
-1. **Unblocked, 1 Edge per Inner Iteration**: This commit implements strictly lazy reduction without multi-edge blocking (`BLOCK_FACTOR` is deferred to `step/06-blocking`).
+1. **Unblocked Reference Structure vs. Multi-Edge Blocking**: The snippet above shows the unblocked ($B = 1$) lazy reduction loop; the current implementation adds $B = 4$ multi-edge blocking on top of this same `LazyField` structure (see [BLOCKING.md](BLOCKING.md)).
 2. **Scratch Buffer in L1d**: `scratch` is allocated once and reused across all output columns $r$. For each column, it accumulates unreduced products and is zeroed upon reduction.
 3. **Weight Preparation**: `F::prepare_weight(&weights[e])` transforms raw edge weights into the representation expected by `F::mac` outside the inner row loop:
    - For `Mont127`: computes $w \cdot R_{192} \bmod q$, enabling 3-word Montgomery reduction ($R = 2^{192}$).
@@ -86,8 +86,8 @@ pub fn encode_column_block<F: LazyField>(
 1. **Bit-Exactness**:
    - All 18 SIMD-Spielman test vectors (`tv/`) across `Mont127`, `Mers127`, and `Fp2M61` (Brakedown and Orion shapes, $N \in \{2^{12}, 2^{14}, 2^{16}\}$) match bit-for-bit.
    - Original LCPC oracle tests match bit-for-bit with upstream `f0e2116`.
-   - Golden vectors for mode (a) are identical to `step/04-r2l`.
+   - Golden vectors for mode (a) match upstream LCPC bit-for-bit.
 2. **Worst-Case Accumulation & Fold Testing**:
-   - Added `test_worst_case_accumulation_and_fold` testing degree-100 graphs with worst-case $(p-1)$ inputs and weights across `Mont127`, `Mers127`, and `Fp2M61` for both single-row ($n_{\text{rows}} = 1$) and batched ($n_{\text{rows}} = 8$) configurations, verifying correct intermediate folding when degrees exceed `MAX_ACCUMULATIONS`.
+   - `test_worst_case_accumulation_and_fold` tests degree-100 graphs with worst-case $(p-1)$ inputs and weights across `Mont127`, `Mers127`, and `Fp2M61` for both single-row ($n_{\text{rows}} = 1$) and batched ($n_{\text{rows}} = 8$) configurations, verifying correct intermediate folding when degrees exceed `MAX_ACCUMULATIONS`.
 3. **Scalar Codegen Verification**:
-   - Disassembly verified with `scripts/check_codegen.py --strict`: **0 vector-register arithmetic violations** in `encode_column_block` and all hot field kernels across all targets.
+   - Disassembly is verified with `scripts/check_codegen.py --strict`: **0 vector-register arithmetic violations** in `encode_column_block` and all hot field kernels across all targets.

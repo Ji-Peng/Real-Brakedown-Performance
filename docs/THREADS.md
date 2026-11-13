@@ -2,7 +2,7 @@
 
 # Step 08: Expander-Level Multithreading, Persistent Pinned Worker Pool & Barrier (`step/08-threads`)
 
-This document details the design, algorithmic formulation, barrier memory ordering, microarchitectural analysis, and verification of **expander-level multithreading with a persistent pinned worker pool** (Plan 04 §3, Decision D2, README §8.1 M5) in `lcpc-brakedown-pc`, `lcpc-2d`, and `lcpc-bench`.
+This document describes the design, algorithmic formulation, barrier memory ordering, microarchitectural behavior, and verification of **expander-level multithreading with a persistent pinned worker pool** in `lcpc-brakedown-pc`, `lcpc-2d`, and `lcpc-bench`.
 
 ---
 

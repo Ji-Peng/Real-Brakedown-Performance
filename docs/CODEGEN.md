@@ -2,15 +2,13 @@
 
 # Compiler Code Generation and Portability Report
 
-This document reports on the scalar assembly codegen, portability verification, and microarchitectural behavior of the LCPC fork in [`code/`](../) across target 64-bit architectures (`x86_64`, `aarch64`, `riscv64gc`), following [Plan 03 (64-Bit CPU Microarchitecture and Compiler Code Generation)](../../agent/plan/03-cpu-microarchitecture-and-codegen.md).
-
-All inspection listings and machine-readable JSON reports are archived under [`docs/codegen/`](codegen/).
+This document describes the scalar assembly codegen, portability verification, and microarchitectural behavior of the LCPC fork in [`code/`](../) across target 64-bit architectures (`x86_64`, `aarch64`, `riscv64gc`).
 
 ---
 
 ## 1. Design Principle: Portable Rust, Compiler-Emitted Scalar Code
 
-As established in [CLAUDE.md](../../.claude/CLAUDE.md) and Plan 03 §1, the project maintains **one implementation**: the stable Rust LCPC fork. It contains:
+As established in [AGENTS.md](../../AGENTS.md), the project maintains **one implementation**: the stable Rust LCPC fork. It contains:
 - **No inline assembly:** `no asm!`;
 - **No architecture-specific intrinsics or SIMD libraries:** `no std::arch`, `no core::arch`, `no core::simd`;
 - **No SIMD-accelerated dependencies:** `blake3` is compiled in portable-only mode (`features = ["pure", "no_sse2", "no_sse41", "no_avx2", "no_avx512"]`);
@@ -86,13 +84,13 @@ Disassembly of all 16 hot kernels was verified across all three architectures us
 | **Hot Kernel Stack Accesses** | 717 (`mov` to/from `(%rsp)`) | 767 (`mov` to/from `(%rsp)`) | 161 (`str`/`stp` to `[sp]`) | 224 (`sd` to `(sp)`) |
 | **Total Hot Instructions** | 5,521 | 6,087 | 4,481 | 1,281 |
 
-> **Correction (independent verification, 2026-10-21; see `docs/STATUS.md`).** Earlier versions of this table were produced by a `check_codegen.py` that classified every AT&T `movq`/`movd` and every AArch64 `ldr`/`str` as a vector move, even on general-purpose registers. That inflated the vector-move counts (previously 1,711 / 2,297 / 327) and hid stack accesses, so x86-64 reported 0 spills. The classifier now counts these instructions as vector moves only when a vector register is involved. It treats any other instruction on a vector register as vector arithmetic, except the register-zeroing idiom. The numbers above come from the fixed checker on the same code (the instruction totals are unchanged). The verdict still holds: no hot kernel contains vector arithmetic on any target. The stack-access row counts loads and stores anywhere in the function on x86-64, but only stores on AArch64 and RISC-V. In the x86-64 `B = 4` inner row loop of `encode_column_block`, the stack accesses are real spills and reloads (§5.2).
+> **Note:** `check_codegen.py` counts load, store, and copy instructions as vector moves only when a vector register is involved, and treats any other instruction on a vector register (except the register-zeroing idiom) as vector arithmetic. No hot kernel contains vector arithmetic on any target. The stack-access row counts loads and stores anywhere in the function on x86-64, but only stores on AArch64 and RISC-V. In the x86-64 `B = 4` inner row loop of `encode_column_block`, the stack accesses are real spills and reloads (§5.2).
 
 ---
 
 ### 3.2 x86-64 with BMI2 (`-C target-cpu=native`)
 
-On modern x86-64 processors (Intel Cypress Cove / AMD Zen 4), `-C target-cpu=native` enables BMI2 instruction selection.
+On modern x86-64 processors (such as Intel Cypress Cove and AMD Zen 5), `-C target-cpu=native` enables BMI2 instruction selection.
 
 #### 1. Widening Multiplications: `mulxq`
 In portable Rust:
@@ -143,7 +141,7 @@ AArch64 provides separate instructions for the low and high 64 bits of a widenin
 mul     x16, x13, x8                # x16 = lo(x13 * x8)
 umulh   x15, x13, x8                # x15 = hi(x13 * x8)
 ```
-Each 64×64→128 multiply requires two scalar instructions. Modern AArch64 cores (Neoverse V1/V2, Cortex-X series) dual-issue `mul` and `umulh` across independent multiply pipelines.
+Each 64×64→128 multiply requires two scalar instructions.
 
 #### 2. Carry Chains: `adds`, `adcs`, `cinc`
 Carry propagation is handled via condition flags and conditional increments:
@@ -212,7 +210,7 @@ The disassembly listings record vector move instructions (`vmovaps`, `vmovups`, 
 - **AArch64:** the same zeroing and copies appear as `movi v0.2d, #0` followed by `stp q0, q0, [x8]` (and `str`/`ldr`/`ldp q` copies of accumulators).
 - **Classification:** These instructions perform bulk memory initialization (`memset`) and copies, not mathematical computation. They do not alter arithmetic results and are classified separately as `VEC_MOVE` (`vector_moves` in the JSON report).
 
-**Classification rules (`check_codegen.py`, classifier `rbd-codegen-classifier-v2`).** The report gives two counts per symbol and for the hot kernels: `vector_arithmetic` and `vector_moves`. Only vector arithmetic in a hot kernel makes the status `FAIL`; a run that matches no hot kernel is `NO_HOT_KERNELS`, not `PASS`. Every report records `classifier_version`; reports without it (all reports of the 2026-10-22/23 campaign) come from the earlier classifier, which misread AArch64 branch targets (§4.5).
+**Classification rules (`check_codegen.py`, classifier `rbd-codegen-classifier-v2`).** The report gives two counts per symbol and for the hot kernels: `vector_arithmetic` and `vector_moves`. Only vector arithmetic in a hot kernel makes the status `FAIL`; a run that matches no hot kernel is `NO_HOT_KERNELS`, not `PASS`. Every report records `classifier_version`.
 
 | Class | x86-64 | AArch64 | Effect |
 | :--- | :--- | :--- | :--- |
@@ -233,15 +231,14 @@ features = ["pure", "no_sse2", "no_sse41", "no_avx2", "no_avx512"]
 - **Investigation:** Inspection of the binary shows vector-register arithmetic outside the hot kernels. Most of it is in `blake3::sse2::compress_in_place` and `blake3::sse41::compress_in_place` (316 and 307 instructions). Those modules are compiled but never selected at run time. The rest is scalar SSE floating point (`addsd`, `cvtsi2sd`, and so on) in the benchmark harness and in `matgen::get_dims`, which the conservative classifier also counts.
 - **Run-time Verification:** When built with `no_sse2`, `no_sse41`, `no_avx2`, and `no_avx512`, BLAKE3's dynamic platform detection (`blake3::platform::Platform::detect()`) is hardwired to always select the portable scalar implementation. The compiled SIMD code blocks are dead code paths and are never executed at run time.
 
-### 4.5 Wording of the scalar claim (campaign audit, 2026-10-23)
+### 4.5 Scope of the scalar claim
 
-The evidence supports **"no vector arithmetic in the hot kernels; the compiler emits vector registers only for zeroing and copy stores"**. It does not support "the binary contains no SIMD" or "the hot kernels contain no vector instructions". Known gaps, to state with T11 and in the paper:
+The evidence supports **"no vector arithmetic in the hot kernels; the compiler emits vector registers only for zeroing and copy stores"**. It does not support "the binary contains no SIMD" or "the hot kernels contain no vector instructions". Important caveats:
 
-- **Vector stores in hot kernels, on both architectures.** With `target-cpu=native`, the GCP x86-64 codegen reports show `vector_arithmetic = 0` but about 99 vector moves in the hot kernels, e.g. `vmovups %ymm0,(%rcx)` and `vmovups %zmm0,0x40(%rcx)` in `encode_column_block::<Mont127>` (zeroing and 32-byte accumulator copies, §4.2). The Arm hot kernels on the `c4a` VM contain 26 vector moves, e.g. `movi v0.2d, #0` and `stp q0, q0, [x8]`. So the claim is "zeroing and copy stores only" on x86-64 **and** Arm.
+- **Vector moves in hot kernels on both x86-64 and AArch64.** As shown in §3.1 and §4.2, the hot kernels have `vector_arithmetic = 0` but emit vector moves for zeroing and bulk accumulator copies (e.g. `vmovaps`/`vmovups`/`vxorps` on x86-64, and `movi`/`stp q` on AArch64). So the claim is "zeroing and copy stores only" on both x86-64 and Arm.
 - **BLAKE3 SIMD code is linked.** The `pure` feature still compiles BLAKE3's Rust SSE2/SSE4.1 modules on x86-64; they are dead code because `no_sse2`/`no_sse41` make `Platform::detect()` return the portable backend (§4.4). BLAKE3 documents those features as a testing-only short-circuit; the run-time platform is not asserted by the driver.
 - **Layout conversion is not a hot pattern.** `transpose_into` (row-major to column-major) runs inside This Work's timed `encode_matrix` but is not in `check_codegen.py`'s hot-pattern list, so its instruction mix is not checked. SIMD-Spielman's timed region contains no layout conversion at all (its benchmark generates input in the reordered layout), which slightly favours SIMD-Spielman.
 - **x86-64 and Arm use different target flags.** `.cargo/config.toml` sets `target-cpu=native` only for `x86_64-unknown-linux-gnu`; the Arm build is generic `aarch64` with only the no-vectorize flags.
-- **Arm checker false positive.** On the `c4a` VM, the campaign's `check_codegen.py --strict` failed This Work's Arm blocks with 56 "vector arithmetic" instructions in hot kernels. All 56 are scalar branches (`b.eq`, `b.ne`, `cbz`, `b.cs`, `b.cc`, `b.hi`, `b.ls`, `cbnz`) whose GNU `objdump` branch-target addresses (e.g. `b3334`) the AArch64 classifier misread as `b` registers. The cross-compiled object listings in §3.1 (from `llvm-objdump`) were unaffected. The classifier now follows the rules in §4.2 (branches scalar, zeroing/copy moves reported as `vector_moves`, vector arithmetic fails). The Arm This Work blocks still have to be re-run with it (`docs/STATUS.md` §7.6); until then there is no Arm This Work timing, and the campaign's Arm codegen reports (status `FAIL`) are not evidence of vector arithmetic.
 
 ---
 
@@ -267,10 +264,10 @@ The evidence supports **"no vector arithmetic in the hot kernels; the compiler e
 
 1. **RISC-V Carry Emulation Penalty:**
    - Because RV64GC lacks a hardware carry flag, each carry propagation costs 2 instructions (`add` + `sltu`) and introduces a data-dependency latency of 2 cycles compared to 1 cycle for `adcq` (x86) and `adcs` (AArch64).
-   - *Impact:* RISC-V requires approximately 20–30% more instructions for multi-limb arithmetic. Redundant-headroom accumulators (Plan 02 §4.2) that postpone carry propagation until reduction offer the highest relative speedup on RISC-V.
+   - *Impact:* RISC-V requires approximately 20–30% more instructions for multi-limb arithmetic. Redundant-headroom accumulators that postpone carry propagation until reduction offer the highest relative speedup on RISC-V.
 
 2. **Register Pressure under Multi-Edge Blocking ($B = 4$):**
-   - x86-64 has only 16 GPRs. With $B = 4$, keeping a 4-word accumulator (`scratch[row]`), 4 input pointers, row counter, and edge weights resident in registers stresses the register allocator. **Corrected:** LLVM does *not* keep everything in registers. In the `B = 4` inner row loop of `encode_column_block::<Mont127>` (113 instructions, 16 `mulx`), 22 instructions access `(%rsp)`. They reload prepared weights and source pointers and spill and reload a partial accumulator; `Mers127` has 20 and `Fp2M61` 34. Choosing `B = 4` (D8) therefore rests on the timings in `docs/BLOCKING.md`, not on spill-free code. Whether `B = 2` would avoid the spills on x86-64 has not been measured.
+   - x86-64 has only 16 GPRs. With $B = 4$, keeping a 4-word accumulator (`scratch[row]`), 4 input pointers, row counter, and edge weights resident in registers exceeds the GPR budget and causes spills. In the `B = 4` inner row loop of `encode_column_block::<Mont127>` (113 instructions, 16 `mulx`), 22 instructions access `(%rsp)` to reload prepared weights and source pointers and spill and reload a partial accumulator; `Mers127` has 20 stack accesses and `Fp2M61` has 34. Choosing `B = 4` therefore rests on the timings in [BLOCKING.md](BLOCKING.md), not on spill-free code. Whether `B = 2` would avoid the spills on x86-64 has not been measured.
    - RISC-V has 32 GPRs, but LLVM emitted 245 stack accesses across the full outer function frame due to conservative frame-pointer and callee-saved register preservation (`s0`–`s11`).
 
 3. **Single vs Dual Instruction Widening Multiplies:**
@@ -281,7 +278,7 @@ The evidence supports **"no vector arithmetic in the hot kernels; the compiler e
 
 ## 6. How to Reproduce
 
-All reports and listings can be re-generated from the repository root:
+Reports and listings can be generated under `target/codegen/` from the repository root:
 
 ```bash
 cd code
@@ -295,17 +292,17 @@ RUSTFLAGS="-C no-vectorize-loops -C no-vectorize-slp" cargo test --workspace --r
 # 3. Generate x86-64 native listings & JSON report
 cargo build -p lcpc-bench --bin lcpc-bench --release
 python3 scripts/check_codegen.py target/release/lcpc-bench \
-    --output-listing docs/codegen/x86_64_native.listing.txt \
-    --output-json docs/codegen/x86_64_native.report.json
+    --output-listing target/codegen/x86_64_native.listing.txt \
+    --output-json target/codegen/x86_64_native.report.json
 
 # 4. Generate cross-architecture listings (AArch64 & RISC-V)
 cargo rustc -p lcpc-bench --target aarch64-unknown-linux-gnu --release --bin lcpc-bench -- --emit=asm,obj
 python3 scripts/check_codegen.py target/aarch64-unknown-linux-gnu/release/deps/lcpc_bench-*.rcgu.o \
-    --output-listing docs/codegen/aarch64.listing.txt \
-    --output-json docs/codegen/aarch64.report.json
+    --output-listing target/codegen/aarch64.listing.txt \
+    --output-json target/codegen/aarch64.report.json
 
 cargo rustc -p lcpc-bench --target riscv64gc-unknown-linux-gnu --release --bin lcpc-bench -- --emit=asm,obj
 python3 scripts/check_codegen.py target/riscv64gc-unknown-linux-gnu/release/deps/lcpc_bench-*.rcgu.o \
-    --output-listing docs/codegen/riscv64.listing.txt \
-    --output-json docs/codegen/riscv64.report.json
+    --output-listing target/codegen/riscv64.listing.txt \
+    --output-json target/codegen/riscv64.report.json
 ```
