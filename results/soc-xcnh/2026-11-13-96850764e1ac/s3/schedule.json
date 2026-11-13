@@ -1,0 +1,205 @@
+{
+  "format": "rbd-session-schedule-v1",
+  "session_id": "s3",
+  "profile": "full",
+  "host": "soc-xcnh",
+  "run_id": "2026-11-13-96850764e1ac",
+  "note": "Append-only: one entry per all.sh invocation (stage) of this session; each stage's full schedule, manifest and execution log are under its stage_dir. Output dirs named <block>.prev-<UTC> hold an earlier stage's run of that block and are not analysed.",
+  "stages": [
+    {
+      "stage": "20261113T151235Z_B28",
+      "stage_label": "B28",
+      "stage_dir": "stages/20261113T151235Z_B28",
+      "started_utc": "2026-11-13T15:12:35Z",
+      "finished_utc": "2026-11-13T16:39:23Z",
+      "profile": "full",
+      "seed": 151124712,
+      "code_sha": "96850764e1ac",
+      "instance": "xcnh3",
+      "arguments": {
+        "blocks": "^full_(this_work_mode_b|simd_spielman)",
+        "logn": "28",
+        "warmup": "1",
+        "lcpc_variants": "as-published-as-is,fork-flags-portable",
+        "tags": null,
+        "multi_cores": "0,1,2,3,4,5,6,7",
+        "single_core": "1"
+      },
+      "block_ids": [
+        "full_this_work_mode_b_mont127_t8_n28",
+        "full_simd_spielman_mont127_t8_n28",
+        "full_this_work_mode_b_fp2m61_t8_n28",
+        "full_simd_spielman_fp2m61_t8_n28",
+        "full_this_work_mode_b_mers127_t8_n28",
+        "full_simd_spielman_fp2m61_t7_n28",
+        "full_this_work_mode_b_fp2m61_t1_n28",
+        "full_simd_spielman_mers127_t7_n28",
+        "full_simd_spielman_mont127_t7_n28",
+        "full_this_work_mode_b_mers127_t1_n28",
+        "full_simd_spielman_mers127_t1_n28",
+        "full_simd_spielman_mont127_t1_n28",
+        "full_simd_spielman_fp2m61_t1_n28",
+        "full_simd_spielman_mers127_t8_n28",
+        "full_this_work_mode_b_mont127_t1_n28"
+      ],
+      "blocks": [
+        {
+          "id": "full_this_work_mode_b_mont127_t8_n28",
+          "out": "full_this_work_mode_b_mont127_t8_n28",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 364
+        },
+        {
+          "id": "full_simd_spielman_mont127_t8_n28",
+          "out": "full_simd_spielman_mont127_t8_n28",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 805
+        },
+        {
+          "id": "full_this_work_mode_b_fp2m61_t8_n28",
+          "out": "full_this_work_mode_b_fp2m61_t8_n28",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 218
+        },
+        {
+          "id": "full_simd_spielman_fp2m61_t8_n28",
+          "out": "full_simd_spielman_fp2m61_t8_n28",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 67
+        },
+        {
+          "id": "full_this_work_mode_b_mers127_t8_n28",
+          "out": "full_this_work_mode_b_mers127_t8_n28",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 219
+        },
+        {
+          "id": "full_simd_spielman_fp2m61_t7_n28",
+          "out": "full_simd_spielman_fp2m61_t7_n28",
+          "threads": 7,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 48
+        },
+        {
+          "id": "full_this_work_mode_b_fp2m61_t1_n28",
+          "out": "full_this_work_mode_b_fp2m61_t1_n28",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 911
+        },
+        {
+          "id": "full_simd_spielman_mers127_t7_n28",
+          "out": "full_simd_spielman_mers127_t7_n28",
+          "threads": 7,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 52
+        },
+        {
+          "id": "full_simd_spielman_mont127_t7_n28",
+          "out": "full_simd_spielman_mont127_t7_n28",
+          "threads": 7,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 54
+        },
+        {
+          "id": "full_this_work_mode_b_mers127_t1_n28",
+          "out": "full_this_work_mode_b_mers127_t1_n28",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 943
+        },
+        {
+          "id": "full_simd_spielman_mers127_t1_n28",
+          "out": "full_simd_spielman_mers127_t1_n28",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 73
+        },
+        {
+          "id": "full_simd_spielman_mont127_t1_n28",
+          "out": "full_simd_spielman_mont127_t1_n28",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 73
+        },
+        {
+          "id": "full_simd_spielman_fp2m61_t1_n28",
+          "out": "full_simd_spielman_fp2m61_t1_n28",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 98
+        },
+        {
+          "id": "full_simd_spielman_mers127_t8_n28",
+          "out": "full_simd_spielman_mers127_t8_n28",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 71
+        },
+        {
+          "id": "full_this_work_mode_b_mont127_t1_n28",
+          "out": "full_this_work_mode_b_mont127_t1_n28",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 1203
+        }
+      ],
+      "exit_status": 0,
+      "state": "finished",
+      "failed_blocks": []
+    }
+  ],
+  "profiles": [
+    "full"
+  ]
+}

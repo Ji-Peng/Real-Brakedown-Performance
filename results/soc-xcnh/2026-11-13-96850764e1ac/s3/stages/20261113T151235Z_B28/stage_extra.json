@@ -1,0 +1,38 @@
+{
+  "stage": "20261113T151235Z_B28",
+  "stage_label": "B28",
+  "stage_started_utc": "2026-11-13T15:12:35Z",
+  "profile": "full",
+  "session_id": "s3",
+  "seed": 151124712,
+  "instance": "xcnh3",
+  "arguments": {
+    "blocks": "^full_(this_work_mode_b|simd_spielman)",
+    "logn": "28",
+    "warmup": "1",
+    "lcpc_variants": "as-published-as-is,fork-flags-portable",
+    "tags": null,
+    "multi_cores": "0,1,2,3,4,5,6,7",
+    "single_core": "1"
+  },
+  "arguments_string": "profile=full blocks=^full_(this_work_mode_b|simd_spielman) logn=28 warmup=1 lcpc_variants=as-published-as-is,fork-flags-portable tags= seed=151124712",
+  "block_ids": [
+    "full_this_work_mode_b_mont127_t8_n28",
+    "full_simd_spielman_mont127_t8_n28",
+    "full_this_work_mode_b_fp2m61_t8_n28",
+    "full_simd_spielman_fp2m61_t8_n28",
+    "full_this_work_mode_b_mers127_t8_n28",
+    "full_simd_spielman_fp2m61_t7_n28",
+    "full_this_work_mode_b_fp2m61_t1_n28",
+    "full_simd_spielman_mers127_t7_n28",
+    "full_simd_spielman_mont127_t7_n28",
+    "full_this_work_mode_b_mers127_t1_n28",
+    "full_simd_spielman_mers127_t1_n28",
+    "full_simd_spielman_mont127_t1_n28",
+    "full_simd_spielman_fp2m61_t1_n28",
+    "full_simd_spielman_mers127_t8_n28",
+    "full_this_work_mode_b_mont127_t1_n28"
+  ],
+  "any_block_failed": false,
+  "note": "benchmark_parameters.logN/warmup/threads describe the stage filters; per-block values are in schedule.json and each block's manifest"
+}
