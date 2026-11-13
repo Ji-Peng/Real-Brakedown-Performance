@@ -3106,7 +3106,7 @@ class BenchmarkAnalyzer:
     def check_latex_compiles(self) -> List[str]:
         """Compiles every generated LaTeX table with pdflatex (skipped with a warning if not installed)."""
         tex_paths = sorted(glob.glob(os.path.join(self.latex_dir, "table_T*_*.tex")))
-        build_dir = self.latex_build_dir or os.path.join(self.out_dir, "latex_build")
+        build_dir = os.path.abspath(self.latex_build_dir or os.path.join(self.out_dir, "latex_build"))
         try:
             compiled, errors = compile_latex_tables(tex_paths, build_dir)
         except FileNotFoundError:
