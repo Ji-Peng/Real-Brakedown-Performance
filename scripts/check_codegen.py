@@ -18,7 +18,7 @@ check_codegen.py - Disassembles Rust binaries, verifies hot kernels contain NO
 vector-register arithmetic, reports vector moves separately, and outputs listings
 and JSON reports.
 
-Per Plan 03 (CPU Microarchitecture & Codegen):
+Scope:
 - Target architectures: x86_64, aarch64, riscv64
 - Pass/Fail Gate: Rejects any SIMD arithmetic instructions in hot kernels
   (x86 vpadd/vpmul/..., AArch64 add/mul/umull/pmull/shl/ushr/and/orr/eor/...
@@ -44,7 +44,7 @@ import sys
 import tempfile
 from typing import Dict, List, Optional, Set, Tuple
 
-# Default hot kernel patterns per Plan 03 §1, §3.4, §6.1
+# Default hot kernel patterns
 DEFAULT_HOT_PATTERNS = [
     r"encode_column_block",
     r"reed_solomon_column_block",

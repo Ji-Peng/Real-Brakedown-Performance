@@ -5,7 +5,7 @@
 """
 analyze.py - Aggregates raw benchmark JSON results and produces paper artefacts.
 
-Generates the evaluation artefacts defined in agent/plan/06-evaluation-and-paper-tables.md:
+Generates the evaluation artefacts:
   - Tables T0 - T12 (LaTeX booktabs in latex/ and CSV summaries in csv/)
   - Figures F1 - F3 (PDF and PNG in plots/ via matplotlib, with their data in csv/)
 
@@ -19,7 +19,7 @@ Result selection (paper mode)
   directories (used by reproduce/all.sh for per-session and local smoke
   output); such output is not paper evidence.
 
-Cells and statistics (Plan 06 §3)
+Cells and statistics
   - A cell is one configuration: (implementation, build variant, field, code
     parameters, matrix shape, slice mode and slice count, log2 N, threads,
     block family, machine). The analyzer refuses to pool records whose cell
@@ -75,7 +75,7 @@ except ImportError:
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_SELECTION = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "results", "selection.json"))
 
-# Plan 06 D10: original LCPC is reported "as published" and "with the fork's
+# Original LCPC is reported "as published" and "with the fork's
 # flags"; the BLAKE3 backend is a second axis. Order = column order in tables.
 LCPC_VARIANTS = ("as-published-as-is", "as-published-portable", "fork-flags-as-is", "fork-flags-portable")
 PRIMARY_LCPC_VARIANTS = ("as-published-as-is", "fork-flags-portable")
@@ -1570,7 +1570,7 @@ class BenchmarkAnalyzer:
         provenance = self._get_provenance_text()
         notes = list(notes or [])
         if any("D" in str(c) and re.search(r" D\d+\.\d%", str(c)) for row in rows for c in row):
-            notes.append("D<x>%: the two session medians differ by more than 5% (Plan 06 §3); see csv/session_divergence.csv.")
+            notes.append("D<x>%: the two session medians differ by more than 5%; see csv/session_divergence.csv.")
         if any(re.search(r"\[[^\]]+ only\]", str(c)) for row in rows for c in row):
             notes.append("[sX only]: measured in fewer sessions than planned; see csv/todo_cells.csv.")
         if (self.is_smoke or self.has_smoke_watermark) and name.startswith("table_"):
@@ -1759,7 +1759,7 @@ class BenchmarkAnalyzer:
 
     # ---- T1 ---------------------------------------------------------------
     def generate_T1_headline_encoding(self):
-        """E1: This Work (adaptive headline blocks only) vs original LCPC per build variant vs PolyCommit."""
+        """This Work (adaptive headline blocks only) vs original LCPC per build variant vs PolyCommit."""
         self._begin("T1")
         T = "T1"
         variant_cols = []
@@ -1804,7 +1804,7 @@ class BenchmarkAnalyzer:
             rows.append(row)
         notes = [
             "Mode (a) SdigCode6; This Work = blocks full_this_work_mode_a_* only (adaptive slices, Mont127); "
-            "original LCPC = blocks full_lcpc_orig_mode_a_* over Ft127 (the same prime), one column group per build variant (D10).",
+            "original LCPC = blocks full_lcpc_orig_mode_a_* over Ft127 (the same prime), one column group per build variant.",
             "LCPC as-published-as-is: upstream Cargo defaults with default BLAKE3 features; fork-flags-portable: the fork's "
             "rustflags with portable-only BLAKE3. The variants are never pooled.",
             "PolyCommit: same prime, pinned default graph constants, explicit square shape, opening sec_param 80; its codeword "
@@ -1825,14 +1825,14 @@ class BenchmarkAnalyzer:
 
     # ---- T2 ---------------------------------------------------------------
     def generate_T2_simd_spielman(self):
-        """E2/E15: mode (b) This Work vs SIMD-Spielman (T=1, T=8 and 7 workers + coordinator)."""
+        """mode (b) This Work vs SIMD-Spielman (T=1, T=8 and 7 workers + coordinator)."""
         self._begin("T2")
         T = "T2"
         headers = ["Field", "T", "log2(N)", "This Work (ms)", "SIMD-Spielman T workers (ms)",
                    "SIMD-Spielman 7 workers + coordinator (ms)", "SIMD Gap Recovered (8 cores)",
                    "SIMD best-of-T incl. T=1 (ms)", "Gap vs SIMD best-of-T", "SIMD MT slower than its T=1",
                    "SIMD params.patch", "[KDHR26] SIMD reported (ms)", "[KDHR26] LCPC/SIMD reported",
-                   "E15 measured LCPC as-published-as-is/SIMD", "Measured LCPC fork-flags-portable/SIMD"]
+                   "Measured LCPC as-published-as-is/SIMD", "Measured LCPC fork-flags-portable/SIMD"]
         tw_pool = self.select(self.reports_this_work, family="tw_b", params="simd-spielman", shape="brakedown")
         simd_pool = self.select(self.reports_simd_spielman, family="simd", params="simd-spielman", shape="brakedown")
         lcpc_pool = self.select(self.reports_lcpc_orig, family="lcpc_a", params="lcpc-sdig6")
@@ -1872,7 +1872,7 @@ class BenchmarkAnalyzer:
                 rep_ratio = f"{entry[key_sp]}x" if entry.get(key_sp) is not None else f"N/A (not reported for {cpu})"
             measured_ratios = []
             for v in PRIMARY_LCPC_VARIANTS:
-                col = ("E15 measured LCPC as-published-as-is/SIMD" if v == "as-published-as-is"
+                col = ("Measured LCPC as-published-as-is/SIMD" if v == "as-published-as-is"
                        else "Measured LCPC fork-flags-portable/SIMD")
                 if field != "Mont127":
                     measured_ratios.append("N/A (original LCPC measured over Ft127/Mont127 prime only)")
@@ -1895,7 +1895,7 @@ class BenchmarkAnalyzer:
             "SIMD best-of-T also includes SIMD-Spielman's own T=1 time. Where 'SIMD MT slower than its T=1' is yes, the 8-core "
             "gap reflects SIMD-Spielman's multithreading overhead at that size, not a faster encoder; use the best-of-T gap.",
             f"[KDHR26] columns quoted verbatim from Table 2 (page 11) for {cpu_text}, the reference CPU recorded for this "
-            "machine in selection.json (Zen 4c; our host is a Zen 5 EPYC 9755). E15 compares our measured LCPC/SIMD ratio "
+            "machine in selection.json (Zen 4c; our host is a Zen 5 EPYC 9755). The table compares our measured LCPC/SIMD ratio "
             "with their reported LCPC speedup; at T=8 our ratio uses SIMD-Spielman's best-of-T time.",
         ]
         if mt_overhead_rows:
@@ -1996,7 +1996,7 @@ class BenchmarkAnalyzer:
         return tags, values, fields, reasons, sizes
 
     def generate_T3_steps_breakdown(self):
-        """E3: cumulative per-technique breakdown, mode (a) and mode (b), T=1."""
+        """cumulative per-technique breakdown, mode (a) and mode (b), T=1."""
         self._begin("T3")
         T = "T3"
         technique = {
@@ -2051,7 +2051,7 @@ class BenchmarkAnalyzer:
         notes = [
             "Evaluated at T=1 with steps.sh: each tag's mode is taken from the block named for it (full_steps_mode_a / "
             "full_steps_mode_b); both blocks time both modes, the other copy is excluded in selection.json.",
-            f"Measured sizes: {', '.join('2^%d' % n for n in all_sizes)}. Plan 06 E3 also lists 2^28 (not measured).",
+            f"Measured sizes: {', '.join('2^%d' % n for n in all_sizes)}.",
             "Mode (b) uses SIMD-Spielman parameters over Mers127; it is unavailable before step/04-r2l.",
             "The per-step breakdown is order-dependent; optimizations interact non-linearly.",
         ] + notes_extra + sorted(na_reasons) + self.gate_step_codegen()
@@ -2060,11 +2060,11 @@ class BenchmarkAnalyzer:
 
     # ---- T4 ---------------------------------------------------------------
     def generate_T4_slice_sweep(self):
-        """E5: explicit slice sweep vs the adaptive model."""
+        """explicit slice sweep vs the adaptive model."""
         self._begin("T4")
         T = "T4"
         headers = ["log2(N)", "T", "s=1 (ms)", "Best s*", "Best (ms)", "Adaptive s", "Sweep at adaptive s (ms)",
-                   "Headline adaptive (ms)", "Adaptive Gap (%)", "M4 gap <= 10%", "Slicing Speedup (s=1 / best)"]
+                   "Headline adaptive (ms)", "Adaptive Gap (%)", "Gap <= 10%", "Slicing Speedup (s=1 / best)"]
         sweep = self.select(self.reports_this_work, family="slice_sweep", params="lcpc-sdig6", shape="brakedown")
         headline = self.select(self.reports_this_work, family="tw_a", params="lcpc-sdig6", shape="brakedown",
                                slice_mode="adaptive")
@@ -2104,15 +2104,15 @@ class BenchmarkAnalyzer:
             "Adaptive s = the model's choice recorded in the sweep records; the headline column is the separately measured "
             "full_this_work_mode_a_* block.",
             "Adaptive Gap = (T(s_adapt) - T(s*)) / T(s*) within the sweep. "
-            + (f"M4 criterion (gap <= 10%) met in {verdicts.count('yes')} of {len(verdicts)} rows." if verdicts else
-               "M4 criterion not evaluated (no sweep at the adaptive s)."),
+            + (f"Gap <= 10% in {verdicts.count('yes')} of {len(verdicts)} rows." if verdicts else
+               "Gap not evaluated (no sweep at the adaptive s)."),
         ]
         self._write_artefact("table_T4_slice_sweep", "LLC Slice Sweep and Adaptive Cache Model Validation",
                              "tab:slice_sweep", headers, rows, notes, key_cols=2)
 
     # ---- T5 ---------------------------------------------------------------
     def generate_T5_field_comparison(self):
-        """E7: field microbenchmarks + mode (b) encodings at T=1 (same parameters for every field)."""
+        """field microbenchmarks + mode (b) encodings at T=1 (same parameters for every field)."""
         self._begin("T5")
         T = "T5"
         sizes = (20, 24)
@@ -2207,7 +2207,7 @@ class BenchmarkAnalyzer:
         return out
 
     def generate_T6_pcs_breakdown(self):
-        """E8: commit (encode/hash), prove, verify, proof size; per implementation and LCPC variant."""
+        """commit (encode/hash), prove, verify, proof size; per implementation and LCPC variant."""
         self._begin("T6")
         T = "T6"
         headers = ["Implementation", "T", "log2(N)", "Hashing", "Commit (ms)", "Encode (ms)", "Hash (ms)",
@@ -2273,7 +2273,7 @@ class BenchmarkAnalyzer:
 
     # ---- T7 ---------------------------------------------------------------
     def generate_T7_verifier_encoding(self):
-        """E9: verifier-side encoding of 1 and 2 vectors, T=1."""
+        """verifier-side encoding of 1 and 2 vectors, T=1."""
         self._begin("T7")
         T = "T7"
         headers = ["Mode", "Field", "log2(N)", "k", "This Work v=1 (us)", "This Work v=2 (us)",
@@ -2327,7 +2327,7 @@ class BenchmarkAnalyzer:
 
     # ---- T8 ---------------------------------------------------------------
     def generate_T8_setup_memory(self):
-        """E10: setup time and peak RSS, T=1."""
+        """setup time and peak RSS, T=1."""
         self._begin("T8")
         T = "T8"
         headers = ["Implementation", "log2(N)", "Setup (ms)", "Encode (ms)", "Setup / Encode", "Peak RSS (MB)"]
@@ -2436,7 +2436,7 @@ class BenchmarkAnalyzer:
 
     # ---- T9 ---------------------------------------------------------------
     def generate_T9_orion_shape(self):
-        """E11: Orion shape (128 rows), mode (b)."""
+        """Orion shape (128 rows), mode (b)."""
         self._begin("T9")
         T = "T9"
         headers = ["Field", "T", "log2(N)", "This Work Orion (ms)", "SIMD-Spielman Orion T workers (ms)",
@@ -2514,7 +2514,7 @@ class BenchmarkAnalyzer:
 
     # ---- T10 --------------------------------------------------------------
     def generate_T10_brakedown_vs_rs(self):
-        """E12: RS (Ligero) vs Brakedown encoding in the same library, T=1, at the sizes RS was measured."""
+        """RS (Ligero) vs Brakedown encoding in the same library, T=1, at the sizes RS was measured."""
         self._begin("T10")
         T = "T10"
         headers = ["log2(N)", "N", "RS field", "RS k x n (rate)", "Brakedown field", "Brakedown k x n (rate)",
@@ -2670,7 +2670,7 @@ class BenchmarkAnalyzer:
         return notes
 
     def generate_T11_codegen_evidence(self):
-        """E13: codegen evidence of the measured binaries, one row per (arch, fork commit) build."""
+        """codegen evidence of the measured binaries, one row per (arch, fork commit) build."""
         self._begin("T11")
         T = "T11"
         headers = ["Architecture", "Hot Kernel / Symbol", "Reports", "Total Insns", "mul / mulx", "adc / adcx",
@@ -2749,7 +2749,7 @@ class BenchmarkAnalyzer:
 
     # ---- T12 --------------------------------------------------------------
     def generate_T12_arm_portability(self):
-        """E14: Arm (SoC xcng) This Work vs original LCPC per build variant."""
+        """Arm (SoC xcng) This Work vs original LCPC per build variant."""
         self._begin("T12")
         T = "T12"
         headers = ["log2(N)", "Threads", "This Work Arm (ms)"]
@@ -2901,7 +2901,7 @@ class BenchmarkAnalyzer:
                           ["Series", "log2(N)", "T", "Latency (ms)", "Speedup", "Efficiency", "Sessions"], data)
 
     # ------------------------------------------------------------------
-    # Smoke coverage (local dry run, Plan 06 §6.8)
+    # Smoke coverage (local dry run)
     # ------------------------------------------------------------------
 
     def _has_measurement(self, report: Dict, op_name: str) -> bool:
