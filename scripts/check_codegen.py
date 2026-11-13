@@ -749,10 +749,9 @@ def run_self_test(objdump_cmd: Optional[str] = None) -> bool:
             return False
     print(f"[SELF-TEST] Line parsing: {len(line_cases)} cases OK")
 
-    # Real AArch64 hot-kernel lines (GNU objdump 2.40, rustc 1.99.1, Neoverse-V2
-    # c4a-highmem-16), copied verbatim from the listing of the 2026-10-23 Arm
-    # session, code/results/gcp-c4a-highmem-16/2026-10-23-acfac2349c11/arm1/
-    # arm_this_work_t1_n18-22-26/.../this_work/codegen/disassembly.txt.
+    # Real AArch64 hot-kernel lines (GNU objdump 2.40, rustc 1.99.1, Arm
+    # Neoverse-V2), copied verbatim from the codegen listing of an Arm
+    # This Work block (this_work/codegen/disassembly.txt).
     # Classifier v1 reported 56 vector-arithmetic hits (all branches) there;
     # these must PASS with vector moves only.
     real_arm_listing = """\
