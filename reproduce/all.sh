@@ -857,7 +857,7 @@ TOTAL_BLOCKS=$(wc -l < "$BLOCKS_TSV" | tr -d ' ')
 CURRENT_INDEX=1
 
 # CPU frequency of the block's first pinned core. With a cpufreq driver this is
-# the observed scaling_cur_freq; without one (e.g. many VM guests) only the
+# the observed scaling_cur_freq; without one (e.g. many virtual machines) only the
 # constant 'cpu MHz' of /proc/cpuinfo exists, which is a nominal value and is
 # labelled as such (freq_source / freq_is_nominal in every record).
 cpu_freq_source() {

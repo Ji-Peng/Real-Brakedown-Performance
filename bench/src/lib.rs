@@ -451,7 +451,7 @@ where
 /// Provenance of [`get_cpu_mhz`], recorded with every report that carries a
 /// frequency. The value is one snapshot of the first `cpu MHz` entry of
 /// `/proc/cpuinfo` (CPU 0, not necessarily the pinned benchmark core); on
-/// guests without cpufreq (e.g. GCP) it is the constant nominal frequency.
+/// hosts without cpufreq it is the constant nominal frequency.
 pub const CPU_MHZ_SOURCE: &str =
     "/proc/cpuinfo first 'cpu MHz' entry (CPU 0), one snapshot before and one after the timed runs; \
      nominal, not the pinned core's measured clock";

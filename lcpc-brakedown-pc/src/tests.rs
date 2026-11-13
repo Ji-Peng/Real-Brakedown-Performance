@@ -1315,7 +1315,7 @@ fn test_cache_detection_sanity() {
         );
     }
 
-    // 32 MiB LLC (e.g. GCP c3d Genoa Zen 4)
+    // 32 MiB LLC
     let llc_32m = 32 * 1024 * 1024;
     let expected_32m = [
         (16, 256, 1),
