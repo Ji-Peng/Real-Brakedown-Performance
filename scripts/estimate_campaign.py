@@ -27,9 +27,9 @@ time is
 with rates in seconds per 2^28 for one warm-up and five timed runs (the
 campaign setting). The rates were measured per block on an 8-core AMD Zen 4
 server with one thread per core (x86-64) and on an Arm Neoverse-V2 server
-(Arm); --speed scales them for the target nodes (default 1.0 for xcnh,
-ARM_DEFAULT_SPEED for xcng, whose Neoverse-N1 cores are slower than the
-Neoverse-V2 reference). Original-LCPC rates are per build variant.
+(Arm); --speed-x86 and --speed-arm scale them for the target nodes
+(defaults X86_DEFAULT_SPEED and ARM_DEFAULT_SPEED, from smoke runs on xcnh
+and xcng compared with the reference machines). Original-LCPC rates are per build variant.
 SIMD-Spielman blocks use a per-size table instead, because upstream's
 single-threaded Orion graph generation dominates them up to 2^26.
 """
@@ -45,6 +45,7 @@ CODE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RUN_STAGES = os.path.join(CODE_DIR, "reproduce", "soc", "run_stages.sh")
 
 FULL_LOGN = [16, 18, 20, 22, 24, 26, 28]
+X86_DEFAULT_SPEED = 1.3  # EPYC 9755 / Zen 4 reference: 1.5 encode and commit, 1.1 prove at 2^20, T = 1
 ARM_DEFAULT_SPEED = 0.3  # Neoverse-N1 / Neoverse-V2: 0.25 encode, 0.32 commit at 2^18, T = 1
 
 # (seconds per 2^28 for warm-up 1 + 5 runs, fixed seconds per block)
@@ -152,8 +153,8 @@ def estimate(preset: str, speed: float) -> List[Tuple[str, int, float]]:
 def main():
     parser = argparse.ArgumentParser(description="Estimate the wall time of the SoC cluster benchmark sessions.")
     parser.add_argument("--preset", choices=["x86", "arm", "all"], default="all")
-    parser.add_argument("--speed-x86", type=float, default=1.0,
-                        help="throughput of the xcnh cores relative to the x86-64 reference (default 1.0)")
+    parser.add_argument("--speed-x86", type=float, default=X86_DEFAULT_SPEED,
+                        help=f"throughput of the xcnh cores relative to the x86-64 reference (default {X86_DEFAULT_SPEED})")
     parser.add_argument("--speed-arm", type=float, default=ARM_DEFAULT_SPEED,
                         help=f"throughput of the xcng cores relative to the Arm reference (default {ARM_DEFAULT_SPEED})")
     args = parser.parse_args()
