@@ -49,7 +49,8 @@
     "T5": {"Field": ["Mont127", "Mers127", "Fp2M61", "Ft127"]},
     "T6": [
       {"Implementation": ["This Work", "Original LCPC as-published-as-is", "Original LCPC fork-flags-portable"], "T": [1, 8], "log2(N)": [20, 24, 28]},
-      {"Implementation": ["Original LCPC as-published-portable", "Original LCPC fork-flags-as-is"], "T": [1, 8], "log2(N)": [20, 24]}
+      {"Implementation": ["Original LCPC as-published-portable", "Original LCPC fork-flags-as-is"], "T": [1, 8], "log2(N)": [20, 24]},
+      {"Implementation": ["This Work Ft127"], "T": [1, 8], "log2(N)": [20, 24]}
     ],
     "T7": {"Mode": ["a", "b"], "Field": ["Mont127"], "log2(N)": [16, 18, 20, 22, 24, 26, 28]},
     "T8": {"Implementation": ["This Work", "Original LCPC as-published-as-is", "Original LCPC fork-flags-portable", "SIMD-Spielman"], "log2(N)": [20, 24, 28]},

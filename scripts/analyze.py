@@ -41,7 +41,7 @@ Cells and statistics (Plan 06 §3)
     slowest This Work sample is faster than the fastest baseline sample
     (non-overlapping ranges); otherwise "comparable" (or "slower").
   - Provenance footer on every table: the run directories and sessions that
-    contributed, with their fork commit, GCP zone and baseline/patch hashes.
+    contributed, with their fork commit, Slurm job, node and baseline/patch hashes.
   - Published [KDHR26] values load only from scripts/kdhr26_reported.json and
     are looked up by (reference CPU of the machine, log2 N).
   - --check fails on missing artefacts or cells, duplicates, missing sessions,
@@ -84,6 +84,9 @@ PRIMARY_LCPC_VARIANTS = ("as-published-as-is", "fork-flags-portable")
 # compiler flags; no other table reports them.
 SECONDARY_LCPC_VARIANTS = ("as-published-portable", "fork-flags-as-is")
 SECONDARY_LCPC_SIZES = (20, 24)
+# This Work over Ft127 (full_this_work_ft127_*) is measured at these sizes and
+# reported in T6 only.
+FT127_SIZES = (20, 24)
 # Block families measured as same-boot pairs (This Work next to original LCPC):
 # superseding is per cell, so a re-run that lands for one side only would pair
 # records from different runs; analyze.py warns about it.
@@ -99,6 +102,7 @@ _FAMILY_RULES = [
     ("arm_lcpc_orig", r"^arm_lcpc_orig"),
     ("tw_a", r"^this_work_mode_a(_|$)"),
     ("tw_b", r"^this_work_mode_b(_|$)"),
+    ("tw_ft127", r"^this_work_ft127_"),
     ("slice_sweep", r"^(slice_sweep_|this_work_slice_s)"),
     ("tw_threads", r"^(this_work_threads_|thread_scaling_this_work_)"),
     ("lcpc_threads", r"^(lcpc_orig_threads_|thread_scaling_lcpc_orig_)"),
@@ -1130,10 +1134,10 @@ class BenchmarkAnalyzer:
             self.block_simd_patch[(meta["machine"], meta["run"], meta["session_dir"], meta["block"])].add(
                 str(git["simd_params_patch_sha256"])[:12])
         ident = data.get("machine_identity") if isinstance(data.get("machine_identity"), dict) else {}
-        if ident.get("gcp_zone"):
-            info["zone"].add(str(ident["gcp_zone"]))
-        if ident.get("gcp_machine_type"):
-            info["type"].add(str(ident["gcp_machine_type"]))
+        if ident.get("slurm_job_id"):
+            info["zone"].add("job " + str(ident["slurm_job_id"]))
+        if ident.get("hostname"):
+            info["vm"].add(str(ident["hostname"]))
         node = ((data.get("machine") or {}).get("uname") or {}).get("node") if isinstance(data.get("machine"), dict) else None
         if node:
             info["vm"].add(str(node))
@@ -1183,7 +1187,7 @@ class BenchmarkAnalyzer:
             family = self._infer_family(impl, item)
         m["family"] = family
         m["arch"] = ("aarch64" if (str(family).startswith("arm_") or item.get("arch") == "aarch64"
-                                   or "c4a" in meta["machine"]) else "x86_64")
+                                   or "xcng" in meta["machine"]) else "x86_64")
         if impl == "lcpc_orig":
             variant, recorded = infer_build_variant(item, path)
             m["variant"], m["variant_recorded"] = variant, recorded
@@ -1526,7 +1530,7 @@ class BenchmarkAnalyzer:
             if info.get("zone"):
                 desc.append("/".join(sorted(info["zone"])))
             if info.get("vm"):
-                desc.append("VM " + "/".join(sorted(info["vm"])))
+                desc.append("node " + "/".join(sorted(info["vm"])))
             label = "/".join(p for p in (machine, run, sess) if p) or "local"
             parts.append(label + (f" ({', '.join(desc)})" if desc else ""))
         recs = self._used_records
@@ -1661,7 +1665,7 @@ class BenchmarkAnalyzer:
         self._write_plain_csv("cell_statistics", headers, rows,
                               "Every table cell: per-session medians, mean of session medians, min-max over samples.")
         self._write_plain_csv("session_divergence", headers, div_rows,
-                              "Cells whose session medians differ by more than 5% (Plan 06 §3: flag; re-run if VM time allows).")
+                              "Cells whose session medians differ by more than 5% (flagged for a re-run).")
         self._write_plain_csv("todo_cells", ["Cell", "Status"], sorted(self.todo_cells.items()),
                               "Cells that are pending re-measurement or documented omissions (selection.json).")
 
@@ -1891,7 +1895,7 @@ class BenchmarkAnalyzer:
             "SIMD best-of-T also includes SIMD-Spielman's own T=1 time. Where 'SIMD MT slower than its T=1' is yes, the 8-core "
             "gap reflects SIMD-Spielman's multithreading overhead at that size, not a faster encoder; use the best-of-T gap.",
             f"[KDHR26] columns quoted verbatim from Table 2 (page 11) for {cpu_text}, the reference CPU recorded for this "
-            "machine in selection.json (Zen 4c; our host is a Zen 4 EPYC 9B14). E15 compares our measured LCPC/SIMD ratio "
+            "machine in selection.json (Zen 4c; our host is a Zen 5 EPYC 9755). E15 compares our measured LCPC/SIMD ratio "
             "with their reported LCPC speedup; at T=8 our ratio uses SIMD-Spielman's best-of-T time.",
         ]
         if mt_overhead_rows:
@@ -2215,6 +2219,8 @@ class BenchmarkAnalyzer:
         groups += [(f"Original LCPC {v}", self.select(self.reports_lcpc_orig, family="lcpc_a", params="lcpc-sdig6",
                                                       variant=v), SECONDARY_LCPC_SIZES)
                    for v in SECONDARY_LCPC_VARIANTS]
+        groups.append(("This Work Ft127", self.select(self.reports_this_work, family="tw_ft127", params="lcpc-sdig6",
+                                                      shape="brakedown", slice_mode="adaptive"), FT127_SIZES))
         for label, pool, sizes in groups:
             for threads in (1, 8):
                 for log_n in sizes:
@@ -2240,7 +2246,7 @@ class BenchmarkAnalyzer:
                                  self.value_cell(T, rk, "Verify (ms)", sts["verify"], with_range=False),
                                  "/".join(str(p) for p in sorted(proof)) if proof else self.missing_text(f"{T}|{rk}|Proof Size (B)")])
         for (label, threads, log_n, op), v in means.items():
-            if label == "This Work" or op not in ("prove", "verify"):
+            if label.startswith("This Work") or op not in ("prove", "verify"):
                 continue
             tw = means.get(("This Work", threads, log_n, op))
             if tw and v and tw > v:
@@ -2251,6 +2257,8 @@ class BenchmarkAnalyzer:
             "Cells: mean of per-session medians of each operation.",
             "Original LCPC as-published-portable and fork-flags-as-is are measured at 2^20 and 2^24 only, to separate "
             "the BLAKE3 backend from the compiler flags.",
+            "This Work Ft127 = full_this_work_ft127_* (2^20 and 2^24): the fork over original LCPC's field Ft127 with "
+            "the headline parameters, for a same-field comparison with the original LCPC rows.",
         ]
         effects = self._t6_variant_effects(means)
         if effects:
@@ -2548,7 +2556,7 @@ class BenchmarkAnalyzer:
                              "tab:brakedown_vs_rs", headers, rows, notes, key_cols=1)
 
     # ---- T11 --------------------------------------------------------------
-    CODEGEN_FAMILIES = ("tw_a", "tw_b", "arm_this_work", "slice_sweep", "tw_threads", "ligero")
+    CODEGEN_FAMILIES = ("tw_a", "tw_b", "tw_ft127", "arm_this_work", "slice_sweep", "tw_threads", "ligero")
     PASS_STATUSES = ("PASS", "PASS on re-check")
 
     def _recheck(self, report: Dict) -> Optional[Dict[str, Any]]:
@@ -2741,7 +2749,7 @@ class BenchmarkAnalyzer:
 
     # ---- T12 --------------------------------------------------------------
     def generate_T12_arm_portability(self):
-        """E14: Arm (c4a) This Work vs original LCPC per build variant."""
+        """E14: Arm (SoC xcng) This Work vs original LCPC per build variant."""
         self._begin("T12")
         T = "T12"
         headers = ["log2(N)", "Threads", "This Work Arm (ms)"]
@@ -2769,7 +2777,7 @@ class BenchmarkAnalyzer:
             notes = ["Local smoke does not run on Arm; these cells are explicitly not applicable and contain no Arm measurements."]
         else:
             notes = [
-                "GCP c4a (Neoverse V2), mode (a); This Work: arm_this_work_* (adaptive slices); original LCPC: arm_lcpc_orig_* "
+                "SoC cluster xcng (Neoverse-N1), mode (a); This Work: arm_this_work_* (adaptive slices); original LCPC: arm_lcpc_orig_* "
                 "over Ft127, one column group per build variant.",
             ]
             notes += self.rustflags_notes(self._used_records)
@@ -2778,7 +2786,7 @@ class BenchmarkAnalyzer:
             if pending:
                 reasons = sorted({self.todo_cells[sel] for sel in pending})
                 notes.append("TODO (pending) cells: " + " | ".join(reasons))
-        self._write_artefact("table_T12_arm_portability", "Arm Architecture Portability Benchmark (GCP c4a Neoverse V2)",
+        self._write_artefact("table_T12_arm_portability", "Arm Architecture Portability Benchmark (SoC xcng, Neoverse-N1)",
                              "tab:arm_portability", headers, rows, notes, key_cols=2)
 
     # ---- Figures -------------------------------------------------------------

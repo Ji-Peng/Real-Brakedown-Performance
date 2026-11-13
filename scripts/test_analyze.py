@@ -24,7 +24,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import analyze  # noqa: E402
 
-MACHINE = "gcp-test"
+MACHINE = "soc-test"
 RUN = "2026-01-01-abc"
 
 
@@ -553,10 +553,10 @@ class DerivedCellTests(unittest.TestCase):
     def test_t12_shows_effective_rustflags(self):
         rec = lcpc_record("arm1", (500,) * 5, log_n=18)
         rec.update({"build_variant": "fork-flags-portable", "effective_rustflags": "-C target-cpu=native"})
-        self.fx.write("arm1", "arm_lcpc_orig_t1_n18", "lcpc_orig/x.json", [rec], machine="gcp-c4a-test")
+        self.fx.write("arm1", "arm_lcpc_orig_t1_n18", "lcpc_orig/x.json", [rec], machine="soc-xcng-test")
         path = os.path.join(self.fx.root, "selection.json")
         with open(path, "w") as f:
-            json.dump({"schema_version": "rbd-selection-v1", "machines": {"gcp-c4a-test": {
+            json.dump({"schema_version": "rbd-selection-v1", "machines": {"soc-xcng-test": {
                 "expected_sessions": ["arm1"], "runs": [{"run_dir": RUN, "sessions": ["arm1"]}]}},
                 "omissions": [{"kind": "pending", "reason": "Arm This Work blocks failed",
                                "cells": ["T12|*|This Work Arm (ms)", "T12|*|Arm Speedup vs *"]}]}, f)
@@ -768,33 +768,30 @@ class SupersedeTests(unittest.TestCase):
         a.stat(a.select(a.reports_lcpc_orig, log_n=20), label="T1|20,1|LCPC")
         self.assertTrue(any("duplicate" in m for _, m in a.cell_errors))
 
-    def test_real_selection_prewires_the_remeasure(self):
+    def test_real_selection_covers_the_cluster_campaign(self):
         real = analyze.Selection(analyze.DEFAULT_SELECTION)
-        self.assertIsNotNone(real.run_entry("gcp-c3d-highmem-16", "2026-10-23-375a6e18355a"))
-        self.assertIsNotNone(real.run_entry("gcp-c4a-highmem-16", "2026-10-23-375a6e18355a"))
-        by = [p for rule in real.supersede for p in rule["by"]]
-        self.assertIn("gcp-c3d-highmem-16/2026-10-23-375a6e1*", by)
-        self.assertIn("gcp-c4a-highmem-16/2026-10-23-375a6e1*", by)
-        blocks = [p for rule in real.supersede for p in rule["blocks"]]
-        for blk in ("gcp-c3d-highmem-16/2026-10-23-8dec85493004/s1/full_lcpc_orig_mode_a_t1_n16-18-20-22-24-26",
-                    "gcp-c3d-highmem-16/2026-10-22-8dec85493004/s2/full_lcpc_orig_mode_a_t8_n28",
-                    "gcp-c3d-highmem-16/2026-10-22-18d75f808f59/s1/full_this_work_threads_t4_n20-24-26",
-                    "gcp-c3d-highmem-16/2026-10-22-18d75f808f59/s2/full_lcpc_orig_threads_t2_n20-24-26",
-                    "gcp-c4a-highmem-16/2026-10-23-acfac2349c11/arm1/arm_this_work_t1_n18-22-26",
-                    "gcp-c4a-highmem-16/2026-10-23-acfac2349c11/arm1/arm_lcpc_orig_t8_n18-22-26"):
-            self.assertTrue(any(analyze.fnmatch.fnmatchcase(blk, p) for p in blocks), blk)
-        for blk in ("gcp-c3d-highmem-16/2026-10-22-2557b5517338/s1/full_this_work_mode_a_t1_n16-18-20-22-24-26",
-                    "gcp-c3d-highmem-16/2026-10-22-8dec85493004/s1/full_simd_spielman_mont127_t1_n28"):
-            self.assertFalse(any(analyze.fnmatch.fnmatchcase(blk, p) for p in blocks), blk)
-        # As-published LCPC from every older run stays excluded, recorded build_variant or not.
+        for machine, session in (("soc-xcnh", "s1"), ("soc-xcnh", "s2"), ("soc-xcng", "arm1")):
+            entry = real.run_entry(machine, "2026-11-14-0123456789ab")
+            self.assertIsNotNone(entry, machine)
+            self.assertIn(session, entry["sessions"])
+        self.assertIsNone(real.run_entry("soc-xcnh", "host-profile-xcnh1.json"))
+        self.assertEqual(real.supersede, [])
+        self.assertFalse(any(om["kind"] == "pending" for om in real.omissions))
+        self.assertEqual(real.expected_sessions("soc-xcnh"), ["s1", "s2"])
+        self.assertEqual(real.expected_sessions("soc-xcng"), ["arm1"])
+        status, _ = real.classify("soc-xcnh/2026-11-14-0123456789ab/s1/full_this_work_mode_a_t1_n28.prev-20261114T000000Z",
+                                  "x.json", {})
+        self.assertEqual(status, "exclude")
+        status, _ = real.classify("local-i7-11700k/2026-11-14-0123456789ab/s1/full_this_work_mode_a_t1", "x.json", {})
+        self.assertEqual(status, "exclude")
         fields = {"implementation": "lcpc-original-upstream", "build_variant": "as-published-as-is",
                   "build_variant_recorded": "true"}
-        for run in ("2026-10-22-8dec85493004", "2026-10-23-8dec85493004", "2026-10-23-acfac2349c11"):
-            status, _ = real.classify(f"gcp-c3d-highmem-16/{run}/s1/full_lcpc_orig_mode_a_t1_n28", "x.json", fields)
-            self.assertEqual(status, "exclude", run)
-        status, _ = real.classify("gcp-c3d-highmem-16/2026-10-23-375a6e18355a/s1/full_lcpc_orig_mode_a_t1_n28",
-                                  "x.json", fields)
+        status, _ = real.classify("soc-xcnh/2026-11-14-0123456789ab/s1/full_lcpc_orig_mode_a_t1_n28", "x.json", fields)
         self.assertEqual(status, "include")
+
+    def test_ft127_blocks_have_their_own_family(self):
+        self.assertEqual(analyze.block_family("full_this_work_ft127_t8_n20-24"), "tw_ft127")
+        self.assertEqual(analyze.block_family("full_this_work_mode_a_t8_n20-24"), "tw_a")
 
 
 class CodegenRecheckTests(unittest.TestCase):
@@ -979,10 +976,10 @@ class TableNoteTests(unittest.TestCase):
             rec.update({"build_variant": "fork-flags-portable"})
             if flags is not None:
                 rec["effective_rustflags"] = flags
-            fx.write("arm1", "arm_lcpc_orig_t1_n18", "lcpc_orig/x.json", [rec], machine="gcp-c4a-test")
+            fx.write("arm1", "arm_lcpc_orig_t1_n18", "lcpc_orig/x.json", [rec], machine="soc-xcng-test")
             path = os.path.join(fx.root, "selection.json")
             with open(path, "w") as f:
-                json.dump({"schema_version": "rbd-selection-v1", "machines": {"gcp-c4a-test": {
+                json.dump({"schema_version": "rbd-selection-v1", "machines": {"soc-xcng-test": {
                     "expected_sessions": ["arm1"], "runs": [{"run_dir": RUN, "sessions": ["arm1"]}]}}}, f)
             a = fx.analyzer(analyze.Selection(path))
             with contextlib.redirect_stdout(io.StringIO()):
@@ -1127,7 +1124,11 @@ class Review3Tests(unittest.TestCase):
         self.assertEqual(sorted(rh[0]["Implementation"]),
                          ["Original LCPC as-published-portable", "Original LCPC fork-flags-as-is"])
         self.assertEqual(rh[0]["log2(N)"], list(analyze.SECONDARY_LCPC_SIZES))
-        self.assertIsNotNone(real.omission_for("T8|SIMD-Spielman,28|Peak RSS (MB)"))
+        # Every session measures SIMD-Spielman's setup and peak RSS at 2^28.
+        self.assertIsNone(real.omission_for("T8|SIMD-Spielman,28|Peak RSS (MB)"))
+        ft127 = [s for s in specs if "This Work Ft127" in s["Implementation"]]
+        self.assertEqual(len(ft127), 1)
+        self.assertEqual(ft127[0]["log2(N)"], list(analyze.FT127_SIZES))
 
 
 if __name__ == "__main__":
