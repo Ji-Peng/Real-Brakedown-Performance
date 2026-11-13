@@ -79,7 +79,7 @@ Options:
 Presets (block ids of reproduce/all.sh; '\$' anchors the id before the
 _n<logN> suffix):
   x86 (xcnh, profile full):
-    A    '^full_(this_work_mode|lcpc_orig_mode|polycommit|ligero)'   16..26
+    A    '^full_(this_work_mode|this_work_ft127|lcpc_orig_mode|polycommit|ligero)'  16..26
     H    '^full_lcpc_orig_mode_a_t[18]\$'  20,24  lcpc=as-published-portable,fork-flags-as-is
     S    '^full_simd_spielman'                                     16..26
     C    '^full_slice_sweep'                                       20,24,26
@@ -135,7 +135,7 @@ case "$PRESET" in
     '') ;;
     x86)
         NODE_CLASS=${NODE_CLASS:-xcnh}
-        add_stage 'A|^full_(this_work_mode|lcpc_orig_mode|polycommit|ligero)|16,18,20,22,24,26'
+        add_stage 'A|^full_(this_work_mode|this_work_ft127|lcpc_orig_mode|polycommit|ligero)|16,18,20,22,24,26'
         add_stage 'H|^full_lcpc_orig_mode_a_t[18]$|20,24|lcpc=as-published-portable,fork-flags-as-is'
         add_stage 'S|^full_simd_spielman|16,18,20,22,24,26'
         add_stage 'C|^full_slice_sweep|20,24,26'

@@ -366,9 +366,9 @@ if profile == "smoke":
         "cmd": f"'{script_dir}/this_work.sh' --params simd-spielman --field mont127 --logN 20 --threads 1 --runs 2 --warmup 1 --slices adaptive --shape both --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_mode_b_mont127_t1'"
     })
     blocks.append({
-        "id": "smoke_this_work_mode_a_ft127_t1",
+        "id": "smoke_this_work_ft127_t1",
         "description": "This Work mode (a) Ft127 tiny smoke T=1",
-        "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field ft127 --logN 16,20 --threads 1 --runs 2 --warmup 1 --slices adaptive --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_mode_a_ft127_t1'"
+        "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field ft127 --logN 16,20 --threads 1 --runs 2 --warmup 1 --slices adaptive --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_ft127_t1'"
     })
     for smoke_field in ["mers127", "fp2m61"]:
         blocks.append({
@@ -463,9 +463,9 @@ else:
     # same-node commit/prove/verify comparison with Mont127 and original LCPC.
     for t_count in [1, 8]:
         blocks.append({
-            "id": f"full_this_work_mode_a_ft127_t{t_count}",
+            "id": f"full_this_work_ft127_t{t_count}",
             "description": f"E8: This Work mode (a) Ft127 T={t_count} (logN 20,24)",
-            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field ft127 --logN 20,24 --threads {t_count} --runs 5 --warmup 2 --slices adaptive --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_this_work_mode_a_ft127_t{t_count}'"
+            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field ft127 --logN 20,24 --threads {t_count} --runs 5 --warmup 2 --slices adaptive --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_this_work_ft127_t{t_count}'"
         })
 
     # E2: Comparison with SIMD-Spielman (mode b, Mont127, Mers127, Fp2M61)
