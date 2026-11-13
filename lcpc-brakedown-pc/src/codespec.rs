@@ -237,7 +237,7 @@ pub type SdigCode6 = SdigSpec<
 >;
 
 // ---------------------------------------------------------------------------
-// Runtime code parameters (added in step/04-r2l by the RealBrakedownPerf authors)
+// Runtime code parameters
 // ---------------------------------------------------------------------------
 
 /// A snapshot of an [`SdigSpecification`] as runtime values.
@@ -365,7 +365,7 @@ impl SimdSpielmanParams {
     pub const DN: usize = 20;
 }
 
-/// Code-parameter mode, chosen at runtime (README §3 of the project plan).
+/// Code-parameter mode, chosen at runtime.
 ///
 /// This selects *which code* is computed, not how it is computed: both modes
 /// use the same encoder (R2L graphs, column-major batches). The mode is

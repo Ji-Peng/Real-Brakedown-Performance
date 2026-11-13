@@ -132,7 +132,7 @@ fn mers127_constants_match_bigint() {
 }
 
 #[test]
-fn mont127_differential_vs_ft127_plan02_sec4_4() {
+fn mont127_differential_vs_ft127() {
     let mut rng_a = ChaCha20Rng::seed_from_u64(0xdeadbeef);
     let mut rng_b = ChaCha20Rng::seed_from_u64(0xdeadbeef);
 
@@ -445,7 +445,7 @@ fn mont127_max_accumulator_fill_and_boundaries() {
     Mont127::add(&mut acc_combined, &acc_half);
     assert_eq!(Mont127::reduce(acc_combined), reduced);
 
-    // 3. Direct mathematical limit test (Plan 02 §4.2):
+    // 3. Direct mathematical limit test:
     // Construct accumulator corresponding to D = 2^64 maximal products (q - 1)^2,
     // and also A = 2^192 * q - 1 (the absolute ceiling before 2q overflow).
     let r192 = BigUint::one() << 192usize;
@@ -505,7 +505,7 @@ fn mers127_max_accumulator_fill_and_boundaries() {
     let reduced = Mers127::reduce(acc);
     assert_eq!(reduced, Mers127::from(count as u64));
 
-    // 2. Direct mathematical limit test (Plan 02 §4.2):
+    // 2. Direct mathematical limit test:
     // Test D = 2^66 maximal products (p - 1)^2, and all-ones 320-bit accumulator [u64::MAX; 5]
     let pm1 = &p - BigUint::one();
     let max_d_66 = (BigUint::one() << 66usize) * &pm1 * &pm1;
@@ -568,7 +568,7 @@ fn non_inlined_column_kernels_match_scalar_oracle() {
 }
 
 // ============================================================================
-// Fp2M61 TESTS (step/02-fields, part 2)
+// Fp2M61 TESTS
 // ============================================================================
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -658,7 +658,7 @@ fn fp2m61_constants_and_properties() {
     assert_eq!(p, (BigUint::one() << 61usize) - BigUint::one());
     assert_eq!(p.bits(), 61);
 
-    // Plan 02 §4.3: CLOG2 = 122, FLOG2 = 121
+    // Cardinality p^2 = (2^61 - 1)^2 lies in (2^121, 2^122): CLOG2 = 122, FLOG2 = 121
     assert_eq!(<Fp2M61 as SizedField>::CLOG2, 122);
     assert_eq!(<Fp2M61 as SizedField>::FLOG2, 121);
 

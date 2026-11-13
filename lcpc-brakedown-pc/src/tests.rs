@@ -919,7 +919,7 @@ fn to_sprs<F: Clone>(g: &R2lGraph<F>) -> CsMat<F> {
 }
 
 // Upstream LCPC's per-row encoder (`f0e2116`, `encode.rs`), kept verbatim as a test-only
-// reference for the batched column-major encoder introduced in `step/03-column-major`:
+// reference for the batched column-major encoder:
 // one `sprs` CSC matrix-vector product per precode/postcode, on a single row.
 fn encode_row_sprs_reference<F>(xi: &mut [F], precodes: &[CsMat<F>], postcodes: &[CsMat<F>])
 where
@@ -977,7 +977,7 @@ where
 
 // The batched column-major R2L encoder (direct kernel, single-vector wrapper, and the
 // `LcEncoding::encode_rows` override used by `commit`) must reproduce the upstream
-// per-row `sprs` encoder bit for bit (as `step/03-column-major` did), for every batch
+// per-row `sprs` encoder bit for bit, for every batch
 // size including the verifier's 1 and 2.
 #[test]
 fn batched_col_major_encode_matches_per_row_reference() {
@@ -1292,7 +1292,7 @@ fn test_cache_detection_sanity() {
         cache.l3_bytes
     );
 
-    // 3. Test analytical model against Plan 04 §2.2 Table 166
+    // 3. Test analytical slice-count model across problem sizes and LLC capacities
     let elem_bytes = 16;
     let gamma = DEFAULT_LLC_HEADROOM_GAMMA;
 
@@ -1356,7 +1356,7 @@ fn test_slice_invariance_all_fields_and_modes() {
             }
         }
 
-        // Base run: s = 1 (single slice, previous behaviour)
+        // Base run: s = 1 (single slice)
         let mut base_matrix = initial_matrix.clone();
         enc.encode_rows_with_slices(&mut base_matrix, n_cols, 1)
             .expect("encode s=1 failed");

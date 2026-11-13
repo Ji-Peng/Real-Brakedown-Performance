@@ -8,7 +8,7 @@
 #![deny(missing_docs)]
 
 //! Test-only SIMD-Spielman (`SIMD-Spielman-for-ZKPs`) test-vector oracle and
-//! straightforward Algorithms 1–4 reference encoder (Plan README §3, §6.1; Plan 01 §4).
+//! straightforward Algorithms 1–4 reference encoder.
 //!
 //! This crate provides:
 //! 1. [`GlibcRandom`]: a portable, bit-exact implementation of GNU C Library (`glibc`)
@@ -23,8 +23,8 @@
 //!    depth-first recursive expander-graph sampling (Algorithm 1, `seed = 4567`, sampling
 //!    right neighbors with replacement via `random() % right_nodes` interleaved with
 //!    `T::randomPacked()`), plus the L2R-to-R2L transpose (`ExpanderGraph.h`, `SpielmanCode.h`).
-//!    These structures are exposed publicly so the fork's own encoder can also be checked
-//!    against `tv/` starting at `step/04-r2l`.
+//!    These structures are exposed publicly so the fork's own encoder is also checked
+//!    against `tv/`.
 //! 4. Straightforward eager Algorithms 1–4 oracle encoders ([`encode_row_l2r_eager`],
 //!    [`encode_row_r2l_eager`], [`encode_matrix_l2r_eager`], [`encode_matrix_r2l_eager`])
 //!    and a lazy-reduction reference ([`encode_row_r2l_lazy`], [`encode_matrix_r2l_lazy`])
@@ -401,7 +401,7 @@ impl<F: Copy> L2rExpanderGraph<F> {
     }
 
     /// Transposes this L2R expander graph into a right-to-left (R2L) CSR representation
-    /// using a linear-time $\mathcal{O}(R + E)$ stable counting sort (Plan 01 §3.3).
+    /// using a linear-time $\mathcal{O}(R + E)$ stable counting sort.
     ///
     /// Because the counting sort is stable, incoming edges for each right node `r` appear
     /// in increasing `edge_index = l * left_degree + d` order—identical to the
@@ -457,7 +457,7 @@ impl<F: Copy> L2rExpanderGraph<F> {
 }
 
 /// Right-to-left (R2L) Compressed Sparse Row (CSR) transposed expander graph
-/// matching `ExpanderGraph.h` and `step/04-r2l`'s `R2lGraph<F>` (Plan 01 §3.3).
+/// matching `ExpanderGraph.h` and `lcpc_brakedown_pc::graph::R2lGraph<F>`.
 ///
 /// For right node `r in 0..n_right`, its `rnode_degrees[r]` incoming edges live at
 /// indices `e in row_ptr[r] as usize .. row_ptr[r + 1] as usize`, connecting from
@@ -697,7 +697,7 @@ pub fn encode_row_l2r_eager<F: Field>(code: &SpielmanOracleCode<F>, row: &mut [F
 
     fn recurse<F: Field>(code: &SpielmanOracleCode<F>, buf: &mut [F], level: usize) {
         if level >= code.num_levels() {
-            // Base case: nr_left_nodes < 13 => identity no-op (Plan 01 §4).
+            // Base case: nr_left_nodes < 13 => identity no-op.
             return;
         }
         let g1 = &code.graphs1_l2r[level];

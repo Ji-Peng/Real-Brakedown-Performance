@@ -17,7 +17,7 @@ generate a random code for a given n
 
 Graphs are sampled left to right, one left node at a time, exactly as the code
 specification prescribes, and then transposed into [`R2lGraph`] form by a
-linear-time counting sort (`step/04-r2l`):
+linear-time counting sort:
 
 - mode (a), [`CodeParams::Lcpc`]: upstream LCPC's sampler, unchanged. Level `i`
   uses its own `ChaCha20Rng` stream `(seed, i)` and samples the precode and

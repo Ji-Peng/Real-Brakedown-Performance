@@ -10,7 +10,7 @@
 //! Portable 64-bit scalar finite fields and the [`LazyField`] trait for the LCPC
 //! Brakedown polynomial commitment scheme fork.
 //!
-//! # Architecture & Overflow Bounds (Plan 02 §4.1–§4.2, Decision D7)
+//! # Architecture & Overflow Bounds
 //!
 //! All arithmetic is implemented in portable stable Rust using native `u64` and `u128`
 //! integer operations (`no std::arch`, `no core::simd`, `no asm!`).
@@ -31,7 +31,7 @@ pub use fp2m61::{
 pub use mers127::{mac_column_mers127, reduce_column_mers127, Mers127, Mers127Acc};
 pub use mont127::{mac_column_mont127, reduce_column_mont127, Mont127, Mont127Acc};
 
-/// Trait abstracting unreduced lazy accumulation across finite fields (Plan 02 §4.1, D7).
+/// Trait abstracting unreduced lazy accumulation across finite fields.
 ///
 /// Decouples batched right-to-left (R2L) expander graph traversal from field-specific
 /// modular reduction math:

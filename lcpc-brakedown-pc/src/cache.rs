@@ -1,25 +1,25 @@
 // Copyright 2026 RealBrakedownPerf Authors
 // Licensed under Apache-2.0.
 
-//! Runtime CPU cache hierarchy detection and adaptive LLC slicing model (Plan 04 §2).
+//! Runtime CPU cache hierarchy detection and adaptive LLC slicing model.
 //!
 //! Detects L1d, L2, and L3 (LLC) cache capacities without architecture-specific `cpuid`
 //! instructions, querying Linux sysfs first, falling back to POSIX `libc::sysconf`, and
 //! finally defaulting to conservative parameters (32 KiB L1d, 512 KiB L2, 16 MiB LLC).
 //!
-//! Provides the closed-form analytical model (Plan 04 §2.2) to select the recommended
+//! Provides the closed-form analytical model to select the recommended
 //! slice count $s^*$ such that the active left-node working set fits comfortably in the
 //! target CPU's effective LLC budget while maintaining unit-stride streaming locality.
 
 use std::sync::OnceLock;
 
-/// Default fraction of detected LLC capacity budgeted for left-node submatrix residency (Plan 04 §2.2).
+/// Default fraction of detected LLC capacity budgeted for left-node submatrix residency.
 ///
 /// Headroom factor $\gamma = 0.50$ accounts for expander graph metadata ($\approx 200\text{ KiB}$),
 /// per-thread scratch accumulators, recent destination columns, and pseudo-random associativity conflicts.
 pub const DEFAULT_LLC_HEADROOM_GAMMA: f64 = 0.50;
 
-/// Minimum row count per slice ($R_{\min} = 16$ rows = 256 bytes = 4 cache lines; Plan 04 §2.2).
+/// Minimum row count per slice ($R_{\min} = 16$ rows = 256 bytes = 4 cache lines).
 ///
 /// Ensures unit-stride inner streaming loops maintain hardware stream prefetcher ramp-up
 /// and amortizes the graph metadata streaming overhead across sufficient rows.
@@ -217,7 +217,7 @@ pub fn detect_cache_sysconf() -> Option<CacheInfo> {
     None
 }
 
-/// Detect the host CPU cache hierarchy in strict priority order (Plan 04 §2.2):
+/// Detect the host CPU cache hierarchy in strict priority order:
 /// 1. Linux sysfs `/sys/devices/system/cpu/cpu*/cache`
 /// 2. POSIX `libc::sysconf` fallback
 /// 3. Conservative defaults (32 KiB L1d, 512 KiB L2, 16 MiB LLC)
@@ -232,7 +232,7 @@ pub fn detect_cache() -> CacheInfo {
     })
 }
 
-/// Calculate the recommended adaptive slice count $s^*$ using explicit parameters (Plan 04 §2.2).
+/// Calculate the recommended adaptive slice count $s^*$ using explicit parameters.
 ///
 /// - `n_per_row`: Message length $k$ (number of left nodes in the first expander graph $G_1$).
 /// - `n_rows`: Total number of rows in the coefficient matrix batch.

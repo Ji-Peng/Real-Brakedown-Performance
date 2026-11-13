@@ -41,7 +41,6 @@ lcpc-fields = { path = "../lcpc-fields" }
 lcpc-test-fields = { path = "../lcpc-test-fields" }
 merlin = "3.0"
 num-traits = "0.2"
-ppv-lite86 = { version = "0.2", default-features = false, features = ["no_simd"] }
 rand = "0.10"
 rand_chacha = "0.10"
 rayon = "1.11"

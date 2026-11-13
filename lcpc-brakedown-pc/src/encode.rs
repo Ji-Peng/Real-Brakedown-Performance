@@ -17,23 +17,23 @@
 encode a batch of vectors using an expander code
 
 Every encoding goes through one batched kernel, [`encode_col_major`], which
-encodes `n_rows` codewords at once (`step/03-column-major`). The batch is
+encodes `n_rows` codewords at once. The batch is
 stored **column-major** (position-major, row-minor): codeword position `col`
 of row `row` lives at index `col * n_rows + row`, so each codeword position is
 one contiguous "column" of `n_rows` elements. The single-vector [`encode`] is
 the special case `n_rows = 1`.
 
-Since `step/04-r2l`, the graphs are [`R2lGraph`]s and are evaluated right to
+The graphs are [`R2lGraph`]s and are evaluated right to
 left (Algorithm 3 of SIMD-Spielman): for each output column `r`, the incoming
 edges `(l, w)` are gathered, `out[r][row] = sum_l w * in[l][row]` for
-`row in 0..n_rows`, and `out[r]` is written once. Input columns are only read.
-This replaces the left-to-right scatter of `sprs`'s CSC matrix-vector product.
+`row in 0..n_rows`, and `out[r]` is written once. Input columns are only read,
+rather than scattering left to right as in `sprs`'s CSC matrix-vector product.
 
 Field arithmetic uses lazy reduction via [`LazyField`]: for each output column,
 unreduced products are accumulated in [`LazyField::Acc`] across incoming
 edges, respecting [`LazyField::MAX_ACCUMULATIONS`] with intermediate folding, and
 reduced once per output column into the destination. Multi-edge blocking
-(`step/06-blocking`) processes `BLOCK_FACTOR = 4` edges simultaneously in the
+processes `BLOCK_FACTOR = 4` edges simultaneously in the
 inner loop, keeping the row accumulator in registers and reducing scratch memory
 traffic by 4x.
 
@@ -49,7 +49,7 @@ use crate::thread_pool::{split_range, SenseReversingBarrier, ThreadPool, WorkerJ
 use ff::Field;
 use lcpc_fields::LazyField;
 
-/// Compile-time multi-edge blocking factor B (Plan 01 §3.5, Plan 03 §2.2, Decision D8).
+/// Compile-time multi-edge blocking factor B.
 ///
 /// B edges are processed simultaneously per inner iteration, keeping the row accumulator
 /// in scalar registers across B edges and reducing memory traffic to the scratch accumulator buffer by Bx.
@@ -272,10 +272,10 @@ where
     assert_eq!(out_start, n_cols);
 }
 
-/// Encode a batch of `n_rows` rows stored row-major in `comm` using `slices` horizontal slices (Plan 04 §2).
+/// Encode a batch of `n_rows` rows stored row-major in `comm` using `slices` horizontal slices.
 ///
 /// If `slices == 0`, the recommended adaptive slice count from [`crate::cache::adaptive_slice_count`] is used.
-/// If `slices == 1`, all rows are processed in a single batch (previous behaviour).
+/// If `slices == 1`, all rows are processed in a single batch.
 /// If `slices > 1`, rows are processed in `slices` horizontal slices, keeping the working set
 /// of each slice within the host CPU's LLC budget.
 ///
@@ -538,7 +538,7 @@ impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
     }
 }
 
-/// Encode a batch of `n_rows` rows stored row-major in `comm` using multithreaded expander-level parallelism (Plan 04 §3).
+/// Encode a batch of `n_rows` rows stored row-major in `comm` using multithreaded expander-level parallelism.
 ///
 /// Workers in `pool` collaboratively encode each slice, synchronizing between expander levels via a barrier.
 pub fn encode_row_major_slices_mt<F: LazyField>(
@@ -598,7 +598,7 @@ pub fn encode_row_major_slices_mt<F: LazyField>(
     pool.execute(&job);
 }
 
-/// Encode a batch of `n_rows` vectors laid out in slice-column-major format (Plan 04 §1.2).
+/// Encode a batch of `n_rows` vectors laid out in slice-column-major format.
 ///
 /// In slice-column-major layout, each horizontal slice $i \in [0, s)$ is contiguous and stored
 /// column-major with $R_s$ rows per column. Slices are evaluated sequentially to ensure LLC residence.
@@ -860,7 +860,7 @@ pub fn encode_col_major_sliced_mt<F: LazyField>(
     pool.execute(&job);
 }
 
-/// Auto-tune the optimal slice count empirically by timing candidate slice counts around $s^*$ (Plan 04 §2.2 Step 3).
+/// Auto-tune the optimal slice count empirically by timing candidate slice counts around $s^*$.
 ///
 /// Evaluates candidate slice counts in $\{s^*/2, s^*, 2s^*, 4s^*\}$ filtered to valid slice counts
 /// between 1 and `n_rows`. Performs 1 warm-up iteration and 2 timed iterations per candidate,
@@ -944,7 +944,7 @@ pub fn autotune_slices_with_pool<F: LazyField>(
 }
 
 /// Evaluate one expander graph on a column block, right to left (gather) with
-/// unreduced lazy accumulation and multi-edge register blocking (Plan 01 §3.4-§3.5, Plan 03).
+/// unreduced lazy accumulation and multi-edge register blocking.
 ///
 /// `input` holds `graph.n_left()` columns and `output` holds `graph.n_right()`
 /// columns, each of `n_rows` contiguous elements. Output column `r` is

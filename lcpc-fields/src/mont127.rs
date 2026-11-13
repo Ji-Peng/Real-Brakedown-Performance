@@ -167,7 +167,7 @@ impl Mont127 {
         }
     }
 
-    /// Eager Montgomery multiplication $a \cdot b \cdot 2^{-128} \bmod q$ (Plan 02 §2.1).
+    /// Eager Montgomery multiplication $a \cdot b \cdot 2^{-128} \bmod q$.
     #[inline(always)]
     pub const fn mul_val(a: Self, b: Self) -> Self {
         let a0 = a.0[0] as u128;
@@ -232,7 +232,7 @@ impl Mont127 {
     }
 }
 
-/// Unreduced lazy multiply-accumulate for [`Mont127`]: `acc += w * x` (Plan 02 §2.1).
+/// Unreduced lazy multiply-accumulate for [`Mont127`]: `acc += w * x`.
 #[inline(always)]
 pub fn mac_mont127(acc: &mut Mont127Acc, w: &Mont127, x: &Mont127) {
     let w0 = w.0[0] as u128;
@@ -284,8 +284,7 @@ pub fn add_mont127_acc(acc: &mut Mont127Acc, other: &Mont127Acc) {
     acc.c[4] = s4;
 }
 
-/// 3-word CIOS Montgomery reduction of a 5-limb [`Mont127Acc`] with radix $R = 2^{192}$
-/// (Plan 02 §2.1).
+/// 3-word CIOS Montgomery reduction of a 5-limb [`Mont127Acc`] with radix $R = 2^{192}$.
 ///
 /// Divides `acc` by $2^{192} \bmod q$ in 3 word-aligned iterations (9 64-bit multiplications
 /// and zero unaligned bit shifts), followed by a single conditional subtraction of $q$.
@@ -353,7 +352,7 @@ impl LazyField for Mont127 {
     type Acc = Mont127Acc;
 
     /// `Mont127Acc` (320 bits) supports up to $D \le 2^{64}$ unreduced MACs before
-    /// `reduce` without intermediate folding (Plan 02 §4.2).
+    /// `reduce` without intermediate folding.
     const MAX_ACCUMULATIONS: usize = usize::MAX;
 
     #[inline(always)]
@@ -430,7 +429,7 @@ impl Field for Mont127 {
     const ONE: Self = Self::R_MOD_Q;
 
     /// Samples a uniform random element using the exact rejection loop of `ff_derive`
-    /// (`Ft127`), ensuring bit-exact RNG stream consumption and Montgomery limbs (Plan 02 §4.4).
+    /// (`Ft127`), ensuring bit-exact RNG stream consumption and Montgomery limbs.
     #[inline]
     fn try_random<R: TryRng + ?Sized>(rng: &mut R) -> Result<Self, R::Error> {
         loop {

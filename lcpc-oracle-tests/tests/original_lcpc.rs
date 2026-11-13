@@ -94,7 +94,7 @@ fn fork_fields_match_original_lcpc_mode_a() {
     }
 }
 
-// Since step/04-r2l the fork stores each graph transposed (right to left). The graphs
+// The fork stores each graph transposed (right to left). The graphs
 // sampled by the fork must be exactly upstream's CSC matrices, transposed: same
 // dimensions, the same incoming edges per right node, the same weights.
 #[test]

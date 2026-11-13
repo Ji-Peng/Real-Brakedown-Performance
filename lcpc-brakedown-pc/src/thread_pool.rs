@@ -1,7 +1,7 @@
 // Copyright 2026 RealBrakedownPerf Authors
 // Licensed under Apache-2.0.
 
-//! Expander-level persistent pinned worker pool and sense-reversing barrier (Plan 04 §3).
+//! Expander-level persistent pinned worker pool and sense-reversing barrier.
 //!
 //! Provides:
 //! 1. [`SenseReversingBarrier`]: Reusable barrier using an atomic generation counter and release-acquire
@@ -241,7 +241,7 @@ struct WorkerState {
 unsafe impl Send for WorkerState {}
 unsafe impl Sync for WorkerState {}
 
-/// Persistent pinned worker thread pool for expander-level multithreading (Plan 04 §3).
+/// Persistent pinned worker thread pool for expander-level multithreading.
 ///
 /// Spawns worker threads once during initialization and preserves them across all slices,
 /// recursion levels, and benchmark repetitions. When idle, workers park via condition variables

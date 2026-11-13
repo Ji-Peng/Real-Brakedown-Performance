@@ -1,7 +1,7 @@
 // Copyright 2026 RealBrakedownPerf Authors
 // Licensed under Apache-2.0.
 
-//! The fork's own encoder (since `step/04-r2l`) against SIMD-Spielman's `tv/` test vectors.
+//! The fork's own encoder against SIMD-Spielman's `tv/` test vectors.
 //!
 //! Mode (b) (`CodeParams::SimdSpielman`) uses SIMD-Spielman's code parameters. Its graphs
 //! are reproduced exactly by the test-only glibc `random()` sampler of

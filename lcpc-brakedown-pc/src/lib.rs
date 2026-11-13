@@ -55,17 +55,17 @@ mod tests;
 ///
 /// The type parameter `S` selects the LCPC code specification used by the
 /// upstream constructors [`new`](Self::new), [`new_ml`](Self::new_ml), and
-/// [`new_from_dims`](Self::new_from_dims). Since `step/04-r2l` the encoding
+/// [`new_from_dims`](Self::new_from_dims). The encoding
 /// itself is driven by runtime [`CodeParams`] (stored in the value), so the
 /// same type can also hold a SIMD-Spielman (mode (b)) code; see
 /// [`SpielmanEncoding`] and [`with_params`](Self::with_params).
 ///
-/// Since `step/07-slicing`, the horizontal matrix slice count can be configured
+/// The horizontal matrix slice count is configured
 /// via [`set_slices`](Self::set_slices) or [`with_slices`](Self::with_slices).
 /// A slice count of 0 (the default) indicates adaptive slice selection based on
 /// detected host Last-Level Cache (LLC) capacity.
 ///
-/// Since `step/08-threads`, expander-level multithreading can be configured via
+/// Expander-level multithreading is configured via
 /// [`set_threads`](Self::set_threads), [`with_threads`](Self::with_threads), or
 /// [`with_threads_and_cores`](Self::with_threads_and_cores).
 #[derive(Clone, Debug)]
@@ -74,7 +74,7 @@ pub struct SdigEncodingS<Ft, S> {
     n_cols: usize,    // number of outputs from the encoding
     params: CodeParams,
     code: ExpanderCode<Ft>,
-    slices: usize,    // 0 = adaptive (Plan 04 §2.2), >0 = explicit slice count
+    slices: usize,    // 0 = adaptive, >0 = explicit slice count
     threads: usize,   // 1 = single-threaded, >1 = expander-level multithreading
     pool: Option<std::sync::Arc<ThreadPool>>,
     _p: std::marker::PhantomData<S>,
@@ -169,7 +169,7 @@ where
             n_cols: code.codeword_len(),
             params,
             code,
-            slices: 0, // 0 = adaptive (Plan 04 §2.2)
+            slices: 0, // 0 = adaptive
             threads: 1,
             pool: None,
             _p: std::marker::PhantomData,
@@ -279,7 +279,7 @@ where
     ///
     /// If `self.slices > 0`, returns `self.slices`.
     /// If `self.slices == 0`, calculates the adaptive slice count $s^*$ using the detected
-    /// host LLC budget (Plan 04 §2.2).
+    /// host LLC budget.
     pub fn effective_slices(&self, n_rows: usize) -> usize {
         if self.slices > 0 {
             self.slices
@@ -289,7 +289,7 @@ where
     }
 
     /// Auto-tune the optimal slice count empirically by timing candidate slice counts around $s^*$
-    /// on this encoding instance (Plan 04 §2.2 Step 3).
+    /// on this encoding instance.
     pub fn autotune_slices(&self, n_rows: usize) -> usize {
         crate::encode::autotune_slices_with_pool(&self.code, n_rows, self.pool.as_deref())
     }

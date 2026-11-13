@@ -19,6 +19,7 @@ digest = "0.10"
 err-derive = "0.3"
 ff = "0.14"
 merlin = "3.0"
+# Forces the scalar generic backend in rand_chacha (disables SSE2/AVX2 in ppv-lite86).
 ppv-lite86 = { version = "0.2", default-features = false, features = ["no_simd"] }
 rand = "0.10"
 rand_chacha = "0.10"

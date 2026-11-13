@@ -15,7 +15,5 @@ publish = false
 
 [dependencies]
 ff = "0.14"
-lcpc-2d = { path = "../lcpc-2d", version = "0.1.1" }
 lcpc-fields = { path = "../lcpc-fields", version = "0.1.1" }
 libc = "0.2"
-num-traits = "0.2"

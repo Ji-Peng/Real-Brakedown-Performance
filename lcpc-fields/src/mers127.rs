@@ -5,7 +5,7 @@
 // This file may not be copied, modified, or distributed
 // except according to those terms.
 
-//! 127-bit Mersenne prime field [`Mers127`] ($p = 2^{127} - 1$, Plan 02 §2.2).
+//! 127-bit Mersenne prime field [`Mers127`] ($p = 2^{127} - 1$).
 //!
 //! Elements are stored in canonical residue form $a \in [0, 2^{127} - 1)$ across two
 //! little-endian `u64` limbs (`self.0[0]` = bits $0..63$, `self.0[1]` = bits $64..126$).
@@ -27,7 +27,7 @@ use crate::{impl_field_ops_and_num, LazyField};
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Mers127(pub [u64; 2]);
 
-/// 5-limb (320-bit) unreduced accumulator for [`Mers127`] lazy MACs (Plan 02 §2.2).
+/// 5-limb (320-bit) unreduced accumulator for [`Mers127`] lazy MACs.
 ///
 /// Represents $\sum_{i=0}^4 c_i \cdot 2^{64i}$. Each product of two canonical elements is
 /// $< (2^{127}-1)^2 < 2^{254}$, so up to $D < 2^{66}$ products fit in 320 bits without
@@ -194,7 +194,7 @@ impl Mers127 {
     }
 }
 
-/// Unreduced lazy multiply-accumulate for [`Mers127`]: `acc += w * x` (Plan 02 §2.2).
+/// Unreduced lazy multiply-accumulate for [`Mers127`]: `acc += w * x`.
 #[inline(always)]
 pub fn mac_mers127(acc: &mut Mers127Acc, w: &Mers127, x: &Mers127) {
     let w0 = w.0[0] as u128;
@@ -247,7 +247,7 @@ pub fn add_mers127_acc(acc: &mut Mers127Acc, other: &Mers127Acc) {
 }
 
 /// Shift-and-add Mersenne reduction of a 320-bit [`Mers127Acc`] modulo $2^{127} - 1$
-/// with **zero multiplications** (Plan 02 §2.2).
+/// with **zero multiplications**.
 #[inline(always)]
 pub fn reduce_mers127(acc: Mers127Acc) -> Mers127 {
     const P: u128 = Mers127::MODULUS_U128;
@@ -298,7 +298,7 @@ impl LazyField for Mers127 {
     type Acc = Mers127Acc;
 
     /// `Mers127Acc` (320 bits) supports up to $D < 2^{66}$ unreduced MACs before
-    /// `reduce` without intermediate folding (Plan 02 §4.2).
+    /// `reduce` without intermediate folding.
     const MAX_ACCUMULATIONS: usize = usize::MAX;
 
     #[inline(always)]

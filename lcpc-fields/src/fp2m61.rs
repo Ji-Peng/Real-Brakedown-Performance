@@ -6,7 +6,7 @@
 // except according to those terms.
 
 //! Quadratic extension field [`Fp2M61`] ($\mathbb{F}_{p^2} = \mathbb{F}_p[i]/(i^2+1)$ where
-//! $p = 2^{61} - 1$, Plan 02 §3).
+//! $p = 2^{61} - 1$).
 //!
 //! Elements $a = a_r + i a_i$ are stored in canonical residue form across two 64-bit
 //! limbs `real` and `img`, each strictly in $[0, 2^{61} - 1)$.
@@ -14,7 +14,7 @@
 //! Accumulators [`Fp2M61Acc`] maintain two 128-bit unsigned integers (`re: u128`, `im: u128`).
 //! By precomputing the negated imaginary weight $w_{i,\text{neg}} = p \oplus w_i$, both real
 //! and imaginary accumulations are purely unsigned positive sums of products, permitting up
-//! to 32 incident edges before partial folding or reduction is required (Plan 02 §3.3).
+//! to 32 incident edges before partial folding or reduction is required.
 
 use ff::Field;
 use lcpc_2d::{FieldHash, SizedField};
@@ -35,7 +35,7 @@ pub struct Fp2M61 {
     pub img: u64,
 }
 
-/// 32-byte unreduced accumulator for [`Fp2M61`] lazy MACs (Plan 02 §3.3).
+/// 32-byte unreduced accumulator for [`Fp2M61`] lazy MACs.
 ///
 /// Accumulates up to [`Fp2M61::MAX_ACCUMULATIONS`] (32) incident graph edges directly into
 /// two native 128-bit unsigned integers (`re` and `im`) without carry propagation or reduction.
@@ -72,7 +72,7 @@ impl Fp2M61 {
     };
 
     /// Maximum number of unreduced MAC operations before [`LazyField::fold`] or
-    /// [`LazyField::reduce`] must be called (Plan 02 §3.3).
+    /// [`LazyField::reduce`] must be called.
     pub const MAX_ACCUMULATIONS: usize = 32;
 
     /// Create a new [`Fp2M61`] from canonical coordinates `real` and `img`.
@@ -175,7 +175,7 @@ impl Fp2M61 {
         }
     }
 
-    /// Field multiplication in $\mathbb{F}_{p^2}$ via 4-mul unsigned MAC form (Plan 02 §3.3).
+    /// Field multiplication in $\mathbb{F}_{p^2}$ via 4-mul unsigned MAC form.
     #[inline(always)]
     pub const fn mul_val(a: Self, b: Self) -> Self {
         let a_r = a.real as u128;
@@ -338,7 +338,7 @@ pub const fn div2_p(x: u64) -> u64 {
     (x + (mask & Fp2M61::MODULUS_P)) >> 1
 }
 
-/// Reduce a native `u128` integer modulo $p = 2^{61} - 1$ using zero multiplications (Plan 02 §3.3).
+/// Reduce a native `u128` integer modulo $p = 2^{61} - 1$ using zero multiplications.
 #[inline(always)]
 pub const fn reduce_128_m61(x: u128) -> u64 {
     const P: u64 = Fp2M61::MODULUS_P;
@@ -447,7 +447,7 @@ pub fn sqrt_p(r: u64) -> u64 {
     root
 }
 
-/// Fold upper bits $\ge 61$ of a `u128` back into bits $0..60$ modulo $2^{61} - 1$ (Plan 02 §3.3).
+/// Fold upper bits $\ge 61$ of a `u128` back into bits $0..60$ modulo $2^{61} - 1$.
 ///
 /// Reduces accumulator value from 128 bits down to $< 2^{62}$, restoring headroom for another
 /// 31 unreduced MAC operations without overflow.
@@ -460,14 +460,14 @@ pub const fn fold_u128(x: u128) -> u128 {
     (s & P) + (s >> 61)
 }
 
-/// Partial fold of an [`Fp2M61Acc`] accumulator (Plan 02 §3.3).
+/// Partial fold of an [`Fp2M61Acc`] accumulator.
 #[inline(always)]
 pub fn fold_fp2_m61(acc: &mut Fp2M61Acc) {
     acc.re = fold_u128(acc.re);
     acc.im = fold_u128(acc.im);
 }
 
-/// Unreduced lazy multiply-accumulate for [`Fp2M61`]: `acc += w * x` (Plan 02 §3.3).
+/// Unreduced lazy multiply-accumulate for [`Fp2M61`]: `acc += w * x`.
 #[inline(always)]
 pub fn mac_fp2_m61(acc: &mut Fp2M61Acc, w: &Fp2M61, x: &Fp2M61) {
     let w_r = w.real as u128;
@@ -487,7 +487,7 @@ pub fn add_fp2_m61_acc(acc: &mut Fp2M61Acc, other: &Fp2M61Acc) {
     acc.im += other.im;
 }
 
-/// Full reduction of a 32-byte [`Fp2M61Acc`] to a canonical [`Fp2M61`] element (Plan 02 §3.3).
+/// Full reduction of a 32-byte [`Fp2M61Acc`] to a canonical [`Fp2M61`] element.
 #[inline(always)]
 pub fn reduce_fp2_m61(acc: Fp2M61Acc) -> Fp2M61 {
     Fp2M61 {
@@ -532,7 +532,7 @@ impl LazyField for Fp2M61 {
     type Acc = Fp2M61Acc;
 
     /// Documented maximum of 32 unreduced MAC operations before [`LazyField::fold`] is
-    /// required (Plan 02 §3.3, §4.2).
+    /// required.
     const MAX_ACCUMULATIONS: usize = 32;
 
     #[inline(always)]

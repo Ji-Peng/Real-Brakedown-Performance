@@ -10,11 +10,11 @@
 /*!
 right-to-left (transposed) storage of a bipartite expander graph
 
-Since `step/04-r2l`, every expander graph of the code is stored as an
+Every expander graph of the code is stored as an
 [`R2lGraph`]: for each right (output) node `r`, the contiguous list of its
 incoming edges `(l, w)` (left node index and weight). This is the compressed
 sparse row (CSR) form of the `n_right x n_left` matrix that upstream LCPC
-stored as a compressed sparse column (CSC) `sprs::CsMat`.
+stores as a compressed sparse column (CSC) `sprs::CsMat`.
 
 Graphs are always *sampled* left to right, in the RNG order of the code
 specification (one left node at a time, see [`crate::matgen`]), and then
