@@ -1,0 +1,1206 @@
+{
+  "format": "rbd-session-schedule-v1",
+  "session_id": "s2",
+  "profile": "full",
+  "host": "soc-xcnh",
+  "run_id": "2026-11-13-96850764e1ac",
+  "note": "Append-only: one entry per all.sh invocation (stage) of this session; each stage's full schedule, manifest and execution log are under its stage_dir. Output dirs named <block>.prev-<UTC> hold an earlier stage's run of that block and are not analysed.",
+  "stages": [
+    {
+      "stage": "20261113T045218Z_A",
+      "stage_label": "A",
+      "stage_dir": "stages/20261113T045218Z_A",
+      "started_utc": "2026-11-13T04:52:18Z",
+      "finished_utc": "2026-11-13T05:43:08Z",
+      "profile": "full",
+      "seed": 261134776,
+      "code_sha": "96850764e1ac",
+      "instance": "xcnh2",
+      "arguments": {
+        "blocks": "^full_(this_work_mode|this_work_ft127|lcpc_orig_mode|polycommit|ligero)",
+        "logn": "16,18,20,22,24,26",
+        "warmup": "1",
+        "lcpc_variants": "as-published-as-is,fork-flags-portable",
+        "tags": null,
+        "multi_cores": "0,1,2,3,4,5,6,7",
+        "single_core": "1"
+      },
+      "block_ids": [
+        "full_this_work_ft127_t8_n20-24",
+        "full_polycommit_t1_n16-18-20-22-24-26",
+        "full_lcpc_orig_mode_a_t1_n16-18-20-22-24-26",
+        "full_this_work_mode_a_t1_n16-18-20-22-24-26",
+        "full_ligero_rs_n20-22-24",
+        "full_this_work_mode_b_mont127_t1_n16-18-20-22-24-26",
+        "full_this_work_mode_b_mers127_t8_n16-18-20-22-24-26",
+        "full_this_work_mode_b_mont127_t8_n16-18-20-22-24-26",
+        "full_this_work_ft127_t1_n20-24",
+        "full_lcpc_orig_mode_a_t8_n16-18-20-22-24-26",
+        "full_this_work_mode_a_t8_n16-18-20-22-24-26",
+        "full_polycommit_t8_n16-18-20-22-24-26",
+        "full_this_work_mode_b_fp2m61_t1_n16-18-20-22-24-26",
+        "full_this_work_mode_b_mers127_t1_n16-18-20-22-24-26",
+        "full_this_work_mode_b_fp2m61_t8_n16-18-20-22-24-26"
+      ],
+      "blocks": [
+        {
+          "id": "full_this_work_ft127_t8_n20-24",
+          "out": "full_this_work_ft127_t8_n20-24",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 81
+        },
+        {
+          "id": "full_polycommit_t1_n16-18-20-22-24-26",
+          "out": "full_polycommit_t1_n16-18-20-22-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 202
+        },
+        {
+          "id": "full_lcpc_orig_mode_a_t1_n16-18-20-22-24-26",
+          "out": "full_lcpc_orig_mode_a_t1_n16-18-20-22-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 1095
+        },
+        {
+          "id": "full_this_work_mode_a_t1_n16-18-20-22-24-26",
+          "out": "full_this_work_mode_a_t1_n16-18-20-22-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 169
+        },
+        {
+          "id": "full_ligero_rs_n20-22-24",
+          "out": "full_ligero_rs_n20-22-24",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 43
+        },
+        {
+          "id": "full_this_work_mode_b_mont127_t1_n16-18-20-22-24-26",
+          "out": "full_this_work_mode_b_mont127_t1_n16-18-20-22-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 379
+        },
+        {
+          "id": "full_this_work_mode_b_mers127_t8_n16-18-20-22-24-26",
+          "out": "full_this_work_mode_b_mers127_t8_n16-18-20-22-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 74
+        },
+        {
+          "id": "full_this_work_mode_b_mont127_t8_n16-18-20-22-24-26",
+          "out": "full_this_work_mode_b_mont127_t8_n16-18-20-22-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 91
+        },
+        {
+          "id": "full_this_work_ft127_t1_n20-24",
+          "out": "full_this_work_ft127_t1_n20-24",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 42
+        },
+        {
+          "id": "full_lcpc_orig_mode_a_t8_n16-18-20-22-24-26",
+          "out": "full_lcpc_orig_mode_a_t8_n16-18-20-22-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 149
+        },
+        {
+          "id": "full_this_work_mode_a_t8_n16-18-20-22-24-26",
+          "out": "full_this_work_mode_a_t8_n16-18-20-22-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 40
+        },
+        {
+          "id": "full_polycommit_t8_n16-18-20-22-24-26",
+          "out": "full_polycommit_t8_n16-18-20-22-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 34
+        },
+        {
+          "id": "full_this_work_mode_b_fp2m61_t1_n16-18-20-22-24-26",
+          "out": "full_this_work_mode_b_fp2m61_t1_n16-18-20-22-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 283
+        },
+        {
+          "id": "full_this_work_mode_b_mers127_t1_n16-18-20-22-24-26",
+          "out": "full_this_work_mode_b_mers127_t1_n16-18-20-22-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 290
+        },
+        {
+          "id": "full_this_work_mode_b_fp2m61_t8_n16-18-20-22-24-26",
+          "out": "full_this_work_mode_b_fp2m61_t8_n16-18-20-22-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 73
+        }
+      ],
+      "exit_status": 0,
+      "state": "finished",
+      "failed_blocks": []
+    },
+    {
+      "stage": "20261113T054309Z_H",
+      "stage_label": "H",
+      "stage_dir": "stages/20261113T054309Z_H",
+      "started_utc": "2026-11-13T05:43:09Z",
+      "finished_utc": "2026-11-13T05:48:15Z",
+      "profile": "full",
+      "seed": 84136000,
+      "code_sha": "96850764e1ac",
+      "instance": "xcnh2",
+      "arguments": {
+        "blocks": "^full_lcpc_orig_mode_a_t[18]$",
+        "logn": "20,24",
+        "warmup": "1",
+        "lcpc_variants": "as-published-portable,fork-flags-as-is",
+        "tags": null,
+        "multi_cores": "0,1,2,3,4,5,6,7",
+        "single_core": "1"
+      },
+      "block_ids": [
+        "full_lcpc_orig_mode_a_t8_n20-24",
+        "full_lcpc_orig_mode_a_t1_n20-24"
+      ],
+      "blocks": [
+        {
+          "id": "full_lcpc_orig_mode_a_t8_n20-24",
+          "out": "full_lcpc_orig_mode_a_t8_n20-24",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [
+            "full_lcpc_orig_mode_a_t8_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 85
+        },
+        {
+          "id": "full_lcpc_orig_mode_a_t1_n20-24",
+          "out": "full_lcpc_orig_mode_a_t1_n20-24",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [
+            "full_lcpc_orig_mode_a_t1_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 214
+        }
+      ],
+      "exit_status": 0,
+      "state": "finished",
+      "failed_blocks": []
+    },
+    {
+      "stage": "20261113T054815Z_S",
+      "stage_label": "S",
+      "stage_dir": "stages/20261113T054815Z_S",
+      "started_utc": "2026-11-13T05:48:15Z",
+      "finished_utc": "2026-11-13T07:46:32Z",
+      "profile": "full",
+      "seed": 302477455,
+      "code_sha": "96850764e1ac",
+      "instance": "xcnh2",
+      "arguments": {
+        "blocks": "^full_simd_spielman",
+        "logn": "16,18,20,22,24,26",
+        "warmup": "1",
+        "lcpc_variants": "as-published-as-is,fork-flags-portable",
+        "tags": null,
+        "multi_cores": "0,1,2,3,4,5,6,7",
+        "single_core": "1"
+      },
+      "block_ids": [
+        "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+        "full_simd_spielman_mers127_t8_n16-18-20-22-24-26",
+        "full_simd_spielman_mont127_t1_n16-18-20-22-24-26",
+        "full_simd_spielman_mont127_t7_n16-18-20-22-24-26",
+        "full_simd_spielman_mers127_t1_n16-18-20-22-24-26",
+        "full_simd_spielman_mers127_t7_n16-18-20-22-24-26",
+        "full_simd_spielman_mont127_t8_n16-18-20-22-24-26",
+        "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+        "full_simd_spielman_fp2m61_t1_n16-18-20-22-24-26"
+      ],
+      "blocks": [
+        {
+          "id": "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+          "out": "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+          "threads": 7,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 1383
+        },
+        {
+          "id": "full_simd_spielman_mers127_t8_n16-18-20-22-24-26",
+          "out": "full_simd_spielman_mers127_t8_n16-18-20-22-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 734
+        },
+        {
+          "id": "full_simd_spielman_mont127_t1_n16-18-20-22-24-26",
+          "out": "full_simd_spielman_mont127_t1_n16-18-20-22-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 725
+        },
+        {
+          "id": "full_simd_spielman_mont127_t7_n16-18-20-22-24-26",
+          "out": "full_simd_spielman_mont127_t7_n16-18-20-22-24-26",
+          "threads": 7,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 698
+        },
+        {
+          "id": "full_simd_spielman_mers127_t1_n16-18-20-22-24-26",
+          "out": "full_simd_spielman_mers127_t1_n16-18-20-22-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 717
+        },
+        {
+          "id": "full_simd_spielman_mers127_t7_n16-18-20-22-24-26",
+          "out": "full_simd_spielman_mers127_t7_n16-18-20-22-24-26",
+          "threads": 7,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 699
+        },
+        {
+          "id": "full_simd_spielman_mont127_t8_n16-18-20-22-24-26",
+          "out": "full_simd_spielman_mont127_t8_n16-18-20-22-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 715
+        },
+        {
+          "id": "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+          "out": "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 672
+        },
+        {
+          "id": "full_simd_spielman_fp2m61_t1_n16-18-20-22-24-26",
+          "out": "full_simd_spielman_fp2m61_t1_n16-18-20-22-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 746
+        }
+      ],
+      "exit_status": 0,
+      "state": "finished",
+      "failed_blocks": []
+    },
+    {
+      "stage": "20261113T074633Z_C",
+      "stage_label": "C",
+      "stage_dir": "stages/20261113T074633Z_C",
+      "started_utc": "2026-11-13T07:46:33Z",
+      "finished_utc": "2026-11-13T08:16:47Z",
+      "profile": "full",
+      "seed": 381900449,
+      "code_sha": "96850764e1ac",
+      "instance": "xcnh2",
+      "arguments": {
+        "blocks": "^full_slice_sweep",
+        "logn": "20,24,26",
+        "warmup": "1",
+        "lcpc_variants": "as-published-as-is,fork-flags-portable",
+        "tags": null,
+        "multi_cores": "0,1,2,3,4,5,6,7",
+        "single_core": "1"
+      },
+      "block_ids": [
+        "full_slice_sweep_s4_t8_n20-24-26",
+        "full_slice_sweep_s16_t8_n20-24-26",
+        "full_slice_sweep_s16_t1_n20-24-26",
+        "full_slice_sweep_s32_t1_n20-24-26",
+        "full_slice_sweep_s2_t8_n20-24-26",
+        "full_slice_sweep_s1_t8_n20-24-26",
+        "full_slice_sweep_s128_t8_n20-24-26",
+        "full_slice_sweep_s256_t1_n20-24-26",
+        "full_slice_sweep_s128_t1_n20-24-26",
+        "full_slice_sweep_s64_t8_n20-24-26",
+        "full_slice_sweep_s4_t1_n20-24-26",
+        "full_slice_sweep_s2_t1_n20-24-26",
+        "full_slice_sweep_s32_t8_n20-24-26",
+        "full_slice_sweep_s256_t8_n20-24-26",
+        "full_slice_sweep_s64_t1_n20-24-26",
+        "full_slice_sweep_s8_t1_n20-24-26",
+        "full_slice_sweep_s8_t8_n20-24-26",
+        "full_slice_sweep_s1_t1_n20-24-26"
+      ],
+      "blocks": [
+        {
+          "id": "full_slice_sweep_s4_t8_n20-24-26",
+          "out": "full_slice_sweep_s4_t8_n20-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 41
+        },
+        {
+          "id": "full_slice_sweep_s16_t8_n20-24-26",
+          "out": "full_slice_sweep_s16_t8_n20-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 39
+        },
+        {
+          "id": "full_slice_sweep_s16_t1_n20-24-26",
+          "out": "full_slice_sweep_s16_t1_n20-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 157
+        },
+        {
+          "id": "full_slice_sweep_s32_t1_n20-24-26",
+          "out": "full_slice_sweep_s32_t1_n20-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 158
+        },
+        {
+          "id": "full_slice_sweep_s2_t8_n20-24-26",
+          "out": "full_slice_sweep_s2_t8_n20-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 43
+        },
+        {
+          "id": "full_slice_sweep_s1_t8_n20-24-26",
+          "out": "full_slice_sweep_s1_t8_n20-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 47
+        },
+        {
+          "id": "full_slice_sweep_s128_t8_n20-24-26",
+          "out": "full_slice_sweep_s128_t8_n20-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 37
+        },
+        {
+          "id": "full_slice_sweep_s256_t1_n20-24-26",
+          "out": "full_slice_sweep_s256_t1_n20-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 165
+        },
+        {
+          "id": "full_slice_sweep_s128_t1_n20-24-26",
+          "out": "full_slice_sweep_s128_t1_n20-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 162
+        },
+        {
+          "id": "full_slice_sweep_s64_t8_n20-24-26",
+          "out": "full_slice_sweep_s64_t8_n20-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 38
+        },
+        {
+          "id": "full_slice_sweep_s4_t1_n20-24-26",
+          "out": "full_slice_sweep_s4_t1_n20-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 159
+        },
+        {
+          "id": "full_slice_sweep_s2_t1_n20-24-26",
+          "out": "full_slice_sweep_s2_t1_n20-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 161
+        },
+        {
+          "id": "full_slice_sweep_s32_t8_n20-24-26",
+          "out": "full_slice_sweep_s32_t8_n20-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 38
+        },
+        {
+          "id": "full_slice_sweep_s256_t8_n20-24-26",
+          "out": "full_slice_sweep_s256_t8_n20-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 39
+        },
+        {
+          "id": "full_slice_sweep_s64_t1_n20-24-26",
+          "out": "full_slice_sweep_s64_t1_n20-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 158
+        },
+        {
+          "id": "full_slice_sweep_s8_t1_n20-24-26",
+          "out": "full_slice_sweep_s8_t1_n20-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 158
+        },
+        {
+          "id": "full_slice_sweep_s8_t8_n20-24-26",
+          "out": "full_slice_sweep_s8_t8_n20-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 40
+        },
+        {
+          "id": "full_slice_sweep_s1_t1_n20-24-26",
+          "out": "full_slice_sweep_s1_t1_n20-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 163
+        }
+      ],
+      "exit_status": 0,
+      "state": "finished",
+      "failed_blocks": []
+    },
+    {
+      "stage": "20261113T081647Z_T",
+      "stage_label": "T",
+      "stage_dir": "stages/20261113T081647Z_T",
+      "started_utc": "2026-11-13T08:16:47Z",
+      "finished_utc": "2026-11-13T08:53:19Z",
+      "profile": "full",
+      "seed": 702712415,
+      "code_sha": "96850764e1ac",
+      "instance": "xcnh2",
+      "arguments": {
+        "blocks": "^full_(this_work|lcpc_orig)_threads_t[0-9]+$",
+        "logn": "20,24,26",
+        "warmup": "1",
+        "lcpc_variants": "as-published-as-is,fork-flags-portable",
+        "tags": null,
+        "multi_cores": "0,1,2,3,4,5,6,7",
+        "single_core": "1"
+      },
+      "block_ids": [
+        "full_lcpc_orig_threads_t4_n20-24-26",
+        "full_lcpc_orig_threads_t1_n20-24-26",
+        "full_lcpc_orig_threads_t8_n20-24-26",
+        "full_lcpc_orig_threads_t2_n20-24-26",
+        "full_this_work_threads_t8_n20-24-26",
+        "full_this_work_threads_t2_n20-24-26",
+        "full_this_work_threads_t4_n20-24-26",
+        "full_this_work_threads_t1_n20-24-26"
+      ],
+      "blocks": [
+        {
+          "id": "full_lcpc_orig_threads_t4_n20-24-26",
+          "out": "full_lcpc_orig_threads_t4_n20-24-26",
+          "threads": 4,
+          "cores": "0,1,2,3",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 258
+        },
+        {
+          "id": "full_lcpc_orig_threads_t1_n20-24-26",
+          "out": "full_lcpc_orig_threads_t1_n20-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 954
+        },
+        {
+          "id": "full_lcpc_orig_threads_t8_n20-24-26",
+          "out": "full_lcpc_orig_threads_t8_n20-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 139
+        },
+        {
+          "id": "full_lcpc_orig_threads_t2_n20-24-26",
+          "out": "full_lcpc_orig_threads_t2_n20-24-26",
+          "threads": 2,
+          "cores": "0,1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 489
+        },
+        {
+          "id": "full_this_work_threads_t8_n20-24-26",
+          "out": "full_this_work_threads_t8_n20-24-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 38
+        },
+        {
+          "id": "full_this_work_threads_t2_n20-24-26",
+          "out": "full_this_work_threads_t2_n20-24-26",
+          "threads": 2,
+          "cores": "0,1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 91
+        },
+        {
+          "id": "full_this_work_threads_t4_n20-24-26",
+          "out": "full_this_work_threads_t4_n20-24-26",
+          "threads": 4,
+          "cores": "0,1,2,3",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 56
+        },
+        {
+          "id": "full_this_work_threads_t1_n20-24-26",
+          "out": "full_this_work_threads_t1_n20-24-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 159
+        }
+      ],
+      "exit_status": 0,
+      "state": "finished",
+      "failed_blocks": []
+    },
+    {
+      "stage": "20261113T085320Z_T28",
+      "stage_label": "T28",
+      "stage_dir": "stages/20261113T085320Z_T28",
+      "started_utc": "2026-11-13T08:53:20Z",
+      "finished_utc": "2026-11-13T10:44:14Z",
+      "profile": "full",
+      "seed": 3706619,
+      "code_sha": "96850764e1ac",
+      "instance": "xcnh2",
+      "arguments": {
+        "blocks": "^full_(this_work|lcpc_orig)_threads_t[0-9]+$",
+        "logn": "28",
+        "warmup": "1",
+        "lcpc_variants": "as-published-as-is,fork-flags-portable",
+        "tags": null,
+        "multi_cores": "0,1,2,3,4,5,6,7",
+        "single_core": "1"
+      },
+      "block_ids": [
+        "full_lcpc_orig_threads_t2_n28",
+        "full_lcpc_orig_threads_t4_n28",
+        "full_this_work_threads_t2_n28",
+        "full_lcpc_orig_threads_t8_n28",
+        "full_this_work_threads_t1_n28",
+        "full_this_work_threads_t8_n28",
+        "full_lcpc_orig_threads_t1_n28",
+        "full_this_work_threads_t4_n28"
+      ],
+      "blocks": [
+        {
+          "id": "full_lcpc_orig_threads_t2_n28",
+          "out": "full_lcpc_orig_threads_t2_n28",
+          "threads": 2,
+          "cores": "0,1",
+          "siblings": [
+            "full_lcpc_orig_threads_t2_n20-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 1517
+        },
+        {
+          "id": "full_lcpc_orig_threads_t4_n28",
+          "out": "full_lcpc_orig_threads_t4_n28",
+          "threads": 4,
+          "cores": "0,1,2,3",
+          "siblings": [
+            "full_lcpc_orig_threads_t4_n20-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 780
+        },
+        {
+          "id": "full_this_work_threads_t2_n28",
+          "out": "full_this_work_threads_t2_n28",
+          "threads": 2,
+          "cores": "0,1",
+          "siblings": [
+            "full_this_work_threads_t2_n20-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 258
+        },
+        {
+          "id": "full_lcpc_orig_threads_t8_n28",
+          "out": "full_lcpc_orig_threads_t8_n28",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [
+            "full_lcpc_orig_threads_t8_n20-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 419
+        },
+        {
+          "id": "full_this_work_threads_t1_n28",
+          "out": "full_this_work_threads_t1_n28",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [
+            "full_this_work_threads_t1_n20-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 459
+        },
+        {
+          "id": "full_this_work_threads_t8_n28",
+          "out": "full_this_work_threads_t8_n28",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [
+            "full_this_work_threads_t8_n20-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 99
+        },
+        {
+          "id": "full_lcpc_orig_threads_t1_n28",
+          "out": "full_lcpc_orig_threads_t1_n28",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [
+            "full_lcpc_orig_threads_t1_n20-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 2962
+        },
+        {
+          "id": "full_this_work_threads_t4_n28",
+          "out": "full_this_work_threads_t4_n28",
+          "threads": 4,
+          "cores": "0,1,2,3",
+          "siblings": [
+            "full_this_work_threads_t4_n20-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 152
+        }
+      ],
+      "exit_status": 0,
+      "state": "finished",
+      "failed_blocks": []
+    },
+    {
+      "stage": "20261113T104414Z_D",
+      "stage_label": "D",
+      "stage_dir": "stages/20261113T104414Z_D",
+      "started_utc": "2026-11-13T10:44:14Z",
+      "finished_utc": "2026-11-13T11:44:22Z",
+      "profile": "full",
+      "seed": 966879553,
+      "code_sha": "96850764e1ac",
+      "instance": "xcnh2",
+      "arguments": {
+        "blocks": "^full_steps",
+        "logn": "16,20,24",
+        "warmup": "1",
+        "lcpc_variants": "as-published-as-is,fork-flags-portable",
+        "tags": null,
+        "multi_cores": "0,1,2,3,4,5,6,7",
+        "single_core": "1"
+      },
+      "block_ids": [
+        "full_steps_mode_b_n16-20-24",
+        "full_steps_mode_a_n16-20-24"
+      ],
+      "blocks": [
+        {
+          "id": "full_steps_mode_b_n16-20-24",
+          "out": "full_steps_mode_b_n16-20-24",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 1880
+        },
+        {
+          "id": "full_steps_mode_a_n16-20-24",
+          "out": "full_steps_mode_a_n16-20-24",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 1718
+        }
+      ],
+      "exit_status": 0,
+      "state": "finished",
+      "failed_blocks": []
+    },
+    {
+      "stage": "20261113T114422Z_B",
+      "stage_label": "B",
+      "stage_dir": "stages/20261113T114422Z_B",
+      "started_utc": "2026-11-13T11:44:22Z",
+      "finished_utc": "2026-11-13T14:12:31Z",
+      "profile": "full",
+      "seed": 316206685,
+      "code_sha": "96850764e1ac",
+      "instance": "xcnh2",
+      "arguments": {
+        "blocks": "^full_(this_work_mode|lcpc_orig_mode|polycommit|simd_spielman)",
+        "logn": "28",
+        "warmup": "1",
+        "lcpc_variants": "as-published-as-is,fork-flags-portable",
+        "tags": null,
+        "multi_cores": "0,1,2,3,4,5,6,7",
+        "single_core": "1"
+      },
+      "block_ids": [
+        "full_simd_spielman_fp2m61_t1_n28",
+        "full_simd_spielman_fp2m61_t8_n28",
+        "full_simd_spielman_mont127_t7_n28",
+        "full_this_work_mode_b_mont127_t1_n28",
+        "full_this_work_mode_b_fp2m61_t1_n28",
+        "full_simd_spielman_mers127_t1_n28",
+        "full_this_work_mode_b_fp2m61_t8_n28",
+        "full_simd_spielman_fp2m61_t7_n28",
+        "full_simd_spielman_mers127_t8_n28",
+        "full_this_work_mode_a_t1_n28",
+        "full_simd_spielman_mers127_t7_n28",
+        "full_lcpc_orig_mode_a_t1_n28",
+        "full_this_work_mode_b_mers127_t1_n28",
+        "full_this_work_mode_a_t8_n28",
+        "full_polycommit_t8_n28",
+        "full_lcpc_orig_mode_a_t8_n28",
+        "full_simd_spielman_mont127_t1_n28",
+        "full_this_work_mode_b_mont127_t8_n28",
+        "full_simd_spielman_mont127_t8_n28",
+        "full_this_work_mode_b_mers127_t8_n28",
+        "full_polycommit_t1_n28"
+      ],
+      "blocks": [
+        {
+          "id": "full_simd_spielman_fp2m61_t1_n28",
+          "out": "full_simd_spielman_fp2m61_t1_n28",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [
+            "full_simd_spielman_fp2m61_t1_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 107
+        },
+        {
+          "id": "full_simd_spielman_fp2m61_t8_n28",
+          "out": "full_simd_spielman_fp2m61_t8_n28",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [
+            "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 73
+        },
+        {
+          "id": "full_simd_spielman_mont127_t7_n28",
+          "out": "full_simd_spielman_mont127_t7_n28",
+          "threads": 7,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [
+            "full_simd_spielman_mont127_t7_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 53
+        },
+        {
+          "id": "full_this_work_mode_b_mont127_t1_n28",
+          "out": "full_this_work_mode_b_mont127_t1_n28",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [
+            "full_this_work_mode_b_mont127_t1_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 1201
+        },
+        {
+          "id": "full_this_work_mode_b_fp2m61_t1_n28",
+          "out": "full_this_work_mode_b_fp2m61_t1_n28",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [
+            "full_this_work_mode_b_fp2m61_t1_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 914
+        },
+        {
+          "id": "full_simd_spielman_mers127_t1_n28",
+          "out": "full_simd_spielman_mers127_t1_n28",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [
+            "full_simd_spielman_mers127_t1_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 80
+        },
+        {
+          "id": "full_this_work_mode_b_fp2m61_t8_n28",
+          "out": "full_this_work_mode_b_fp2m61_t8_n28",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [
+            "full_this_work_mode_b_fp2m61_t8_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 220
+        },
+        {
+          "id": "full_simd_spielman_fp2m61_t7_n28",
+          "out": "full_simd_spielman_fp2m61_t7_n28",
+          "threads": 7,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [
+            "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 49
+        },
+        {
+          "id": "full_simd_spielman_mers127_t8_n28",
+          "out": "full_simd_spielman_mers127_t8_n28",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [
+            "full_simd_spielman_mers127_t8_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 74
+        },
+        {
+          "id": "full_this_work_mode_a_t1_n28",
+          "out": "full_this_work_mode_a_t1_n28",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [
+            "full_this_work_mode_a_t1_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 457
+        },
+        {
+          "id": "full_simd_spielman_mers127_t7_n28",
+          "out": "full_simd_spielman_mers127_t7_n28",
+          "threads": 7,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [
+            "full_simd_spielman_mers127_t7_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 54
+        },
+        {
+          "id": "full_lcpc_orig_mode_a_t1_n28",
+          "out": "full_lcpc_orig_mode_a_t1_n28",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [
+            "full_lcpc_orig_mode_a_t1_n16-18-20-22-24-26",
+            "full_lcpc_orig_mode_a_t1_n20-24"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 2971
+        },
+        {
+          "id": "full_this_work_mode_b_mers127_t1_n28",
+          "out": "full_this_work_mode_b_mers127_t1_n28",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [
+            "full_this_work_mode_b_mers127_t1_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 926
+        },
+        {
+          "id": "full_this_work_mode_a_t8_n28",
+          "out": "full_this_work_mode_a_t8_n28",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [
+            "full_this_work_mode_a_t8_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 97
+        },
+        {
+          "id": "full_polycommit_t8_n28",
+          "out": "full_polycommit_t8_n28",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [
+            "full_polycommit_t8_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 89
+        },
+        {
+          "id": "full_lcpc_orig_mode_a_t8_n28",
+          "out": "full_lcpc_orig_mode_a_t8_n28",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [
+            "full_lcpc_orig_mode_a_t8_n16-18-20-22-24-26",
+            "full_lcpc_orig_mode_a_t8_n20-24"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 417
+        },
+        {
+          "id": "full_simd_spielman_mont127_t1_n28",
+          "out": "full_simd_spielman_mont127_t1_n28",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [
+            "full_simd_spielman_mont127_t1_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 82
+        },
+        {
+          "id": "full_this_work_mode_b_mont127_t8_n28",
+          "out": "full_this_work_mode_b_mont127_t8_n28",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [
+            "full_this_work_mode_b_mont127_t8_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 270
+        },
+        {
+          "id": "full_simd_spielman_mont127_t8_n28",
+          "out": "full_simd_spielman_mont127_t8_n28",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [
+            "full_simd_spielman_mont127_t8_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 74
+        },
+        {
+          "id": "full_this_work_mode_b_mers127_t8_n28",
+          "out": "full_this_work_mode_b_mers127_t8_n28",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [
+            "full_this_work_mode_b_mers127_t8_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 220
+        },
+        {
+          "id": "full_polycommit_t1_n28",
+          "out": "full_polycommit_t1_n28",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [
+            "full_polycommit_t1_n16-18-20-22-24-26"
+          ],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 454
+        }
+      ],
+      "exit_status": 0,
+      "state": "finished",
+      "failed_blocks": []
+    }
+  ],
+  "profiles": [
+    "full"
+  ]
+}

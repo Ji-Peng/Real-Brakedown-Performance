@@ -1,0 +1,346 @@
+[
+  {
+    "block_id": "full_this_work_threads_t2_n20-24-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_this_work_threads_t2_n20-24-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T08:24:10Z",
+    "end_utc": "2026-11-13T08:25:40Z",
+    "duration_s": 90,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "4115.312",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 2 --runs 5 --warmup 1 --cores '0,1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_this_work_threads_t2_n20-24-26'",
+    "noise_before": {
+      "utc": "2026-11-13T08:24:10Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        1.09,
+        1.35,
+        1.67
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.42,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T08:25:41Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        1.61,
+        1.45,
+        1.68
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.42,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "full_this_work_threads_t8_n20-24-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_this_work_threads_t8_n20-24-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T08:25:41Z",
+    "end_utc": "2026-11-13T08:26:19Z",
+    "duration_s": 38,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "4125.779",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 8 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_this_work_threads_t8_n20-24-26'",
+    "noise_before": {
+      "utc": "2026-11-13T08:25:41Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        1.61,
+        1.45,
+        1.68
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.42,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T08:26:19Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        3.18,
+        1.85,
+        1.8
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.74,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "full_this_work_threads_t1_n20-24-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_this_work_threads_t1_n20-24-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T08:26:19Z",
+    "end_utc": "2026-11-13T08:28:57Z",
+    "duration_s": 158,
+    "core_for_frequency": "1",
+    "freq_before_mhz": "4130.401",
+    "freq_after_mhz": "4120.286",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 1 --runs 5 --warmup 1 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_this_work_threads_t1_n20-24-26'",
+    "noise_before": {
+      "utc": "2026-11-13T08:26:19Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        3.18,
+        1.85,
+        1.8
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.74,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T08:28:57Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        1.15,
+        1.49,
+        1.67
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.74,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "full_lcpc_orig_threads_t4_n20-24-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_lcpc_orig_threads_t4_n20-24-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T08:28:57Z",
+    "end_utc": "2026-11-13T08:33:15Z",
+    "duration_s": 258,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "4113.575",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 4 --runs 5 --warmup 1 --cores '0,1,2,3' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_lcpc_orig_threads_t4_n20-24-26'",
+    "noise_before": {
+      "utc": "2026-11-13T08:28:57Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        1.15,
+        1.49,
+        1.67
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.74,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T08:33:15Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        3.59,
+        2.84,
+        2.2
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 2.79,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "full_lcpc_orig_threads_t1_n20-24-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_lcpc_orig_threads_t1_n20-24-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T08:33:15Z",
+    "end_utc": "2026-11-13T08:49:16Z",
+    "duration_s": 961,
+    "core_for_frequency": "1",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "4125.212",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 1 --runs 5 --warmup 1 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_lcpc_orig_threads_t1_n20-24-26'",
+    "noise_before": {
+      "utc": "2026-11-13T08:33:15Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        3.59,
+        2.84,
+        2.2
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 2.79,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T08:49:16Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        1.0,
+        1.07,
+        1.41
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.13,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "full_lcpc_orig_threads_t8_n20-24-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_lcpc_orig_threads_t8_n20-24-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T08:49:16Z",
+    "end_utc": "2026-11-13T08:51:36Z",
+    "duration_s": 140,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "4130.635",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 8 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_lcpc_orig_threads_t8_n20-24-26'",
+    "noise_before": {
+      "utc": "2026-11-13T08:49:16Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        1.0,
+        1.07,
+        1.41
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.13,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T08:51:36Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        7.01,
+        3.42,
+        2.23
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.29,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "full_this_work_threads_t4_n20-24-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_this_work_threads_t4_n20-24-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T08:51:36Z",
+    "end_utc": "2026-11-13T08:52:32Z",
+    "duration_s": 56,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "4108.938",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 4 --runs 5 --warmup 1 --cores '0,1,2,3' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_this_work_threads_t4_n20-24-26'",
+    "noise_before": {
+      "utc": "2026-11-13T08:51:36Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        7.01,
+        3.42,
+        2.23
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.29,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T08:52:32Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        4.78,
+        3.38,
+        2.29
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.29,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "full_lcpc_orig_threads_t2_n20-24-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_lcpc_orig_threads_t2_n20-24-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T08:52:33Z",
+    "end_utc": "2026-11-13T09:00:44Z",
+    "duration_s": 491,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 2 --runs 5 --warmup 1 --cores '0,1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_lcpc_orig_threads_t2_n20-24-26'",
+    "noise_before": {
+      "utc": "2026-11-13T08:52:33Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        4.78,
+        3.38,
+        2.29
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.29,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T09:00:44Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        2.0,
+        2.25,
+        2.15
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 2.31,
+      "node_running_jobs": 1
+    }
+  }
+]

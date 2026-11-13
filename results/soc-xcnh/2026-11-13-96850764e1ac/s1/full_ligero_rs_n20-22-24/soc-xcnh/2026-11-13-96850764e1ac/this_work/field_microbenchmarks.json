@@ -1,0 +1,122 @@
+[
+  {
+    "field": "Mont127",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 460733,
+      "ns_per_op": 9.21466
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 89775,
+      "ns_per_op": 1.7955
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 170035,
+      "ns_per_op": 3.4007
+    },
+    "session_id": "s1",
+    "session_seed": "734942862",
+    "stage": "20261113T045218Z_A",
+    "block_id": "full_ligero_rs_n20-22-24",
+    "block_status": "ok",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "freq_is_nominal": false
+  },
+  {
+    "field": "Mers127",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 215684,
+      "ns_per_op": 4.31368
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 79280,
+      "ns_per_op": 1.5856
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 30315,
+      "ns_per_op": 0.6063
+    },
+    "session_id": "s1",
+    "session_seed": "734942862",
+    "stage": "20261113T045218Z_A",
+    "block_id": "full_ligero_rs_n20-22-24",
+    "block_status": "ok",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "freq_is_nominal": false
+  },
+  {
+    "field": "Fp2M61",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 205759,
+      "ns_per_op": 4.11518
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 79530,
+      "ns_per_op": 1.5906
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 24277,
+      "ns_per_op": 0.48554
+    },
+    "session_id": "s1",
+    "session_seed": "734942862",
+    "stage": "20261113T045218Z_A",
+    "block_id": "full_ligero_rs_n20-22-24",
+    "block_status": "ok",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "freq_is_nominal": false
+  },
+  {
+    "field": "Ft127",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 353492,
+      "ns_per_op": 7.06984
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 84928,
+      "ns_per_op": 1.69856
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 173591,
+      "ns_per_op": 3.47182
+    },
+    "session_id": "s1",
+    "session_seed": "734942862",
+    "stage": "20261113T045218Z_A",
+    "block_id": "full_ligero_rs_n20-22-24",
+    "block_status": "ok",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "freq_is_nominal": false
+  }
+]

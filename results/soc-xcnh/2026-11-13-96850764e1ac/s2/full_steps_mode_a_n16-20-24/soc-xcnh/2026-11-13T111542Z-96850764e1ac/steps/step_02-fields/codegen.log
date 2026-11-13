@@ -1,0 +1,4 @@
+[INFO] Inspecting /home/z/zhangjp/rbd/target/xcnh-s2/cargo/workspace-step_02-fields/release/lcpc-bench (detected arch: x86_64)...
+  Result: PASS | Hot kernels checked: 4 | Violations: 0 | Vector arithmetic: 0 | Vector moves: 7
+[INFO] JSON report written to /home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_steps_mode_a_n16-20-24/soc-xcnh/2026-11-13T111542Z-96850764e1ac/steps/step_02-fields/codegen_report.json
+[INFO] Listing written to /home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_steps_mode_a_n16-20-24/soc-xcnh/2026-11-13T111542Z-96850764e1ac/steps/step_02-fields/disassembly.txt

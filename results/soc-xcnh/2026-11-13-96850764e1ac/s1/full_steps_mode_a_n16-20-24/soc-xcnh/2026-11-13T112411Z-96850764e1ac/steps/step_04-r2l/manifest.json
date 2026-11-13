@@ -1,0 +1,17 @@
+{
+  "schema_version": "steps-tag-manifest-v1",
+  "harness_version": "steps-driver-v1",
+  "tag": "step/04-r2l",
+  "commit": "650763a060dbd60f7e05ce5407173988512fa9b4",
+  "commit_subject": "R2L evaluation with transposed graph storage; runtime code parameters",
+  "step_index": 4,
+  "session_id": "2026-11-13T112411Z-96850764e1ac",
+  "detected_api_stage": "runtime-unsliced",
+  "run_class": "campaign",
+  "watermark": null,
+  "workspace_tests": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_steps_mode_a_n16-20-24/soc-xcnh/2026-11-13T112411Z-96850764e1ac/steps/step_04-r2l/workspace-tests.log",
+  "codegen_report": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_steps_mode_a_n16-20-24/soc-xcnh/2026-11-13T112411Z-96850764e1ac/steps/step_04-r2l/codegen_report.json",
+  "codegen_note": null,
+  "modes_run": "a",
+  "mode_a_field": "Mont127"
+}

@@ -1,0 +1,244 @@
+   Compiling lcpc-2d v0.1.1 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_08-threads-wfz60r/lcpc-2d)
+   Compiling lcpc-fields v0.1.1 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_08-threads-wfz60r/lcpc-fields)
+   Compiling lcpc-test-fields v0.1.0 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_08-threads-wfz60r/lcpc-test-fields)
+   Compiling lcpc-brakedown-pc v0.1.1 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_08-threads-wfz60r/lcpc-brakedown-pc)
+   Compiling lcpc-bench v0.1.0 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_08-threads-wfz60r/bench)
+   Compiling lcpc-spielman-oracle v0.1.0 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_08-threads-wfz60r/lcpc-spielman-oracle)
+   Compiling lcpc-ligero-pc v0.1.1 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_08-threads-wfz60r/lcpc-ligero-pc)
+   Compiling lcpc-oracle-tests v0.1.0 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_08-threads-wfz60r/lcpc-oracle-tests)
+    Finished `release` profile [optimized] target(s) in 1m 57s
+     Running unittests src/lib.rs (/home/z/zhangjp/rbd/target/xcnh-s1/cargo/workspace-step_08-threads/release/deps/lcpc_2d-382f5f449ba4b03f)
+
+running 7 tests
+test tests::commit ... ok
+test tests::end_to_end ... ok
+test tests::end_to_end_two_proofs ... ok
+test tests::eval_outer ... ok
+test tests::log2 ... ok
+test tests::merkleize ... ok
+test tests::open_column ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/home/z/zhangjp/rbd/target/xcnh-s1/cargo/workspace-step_08-threads/release/deps/lcpc_bench-09c61523bc23ff29)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/bench_encode.rs (/home/z/zhangjp/rbd/target/xcnh-s1/cargo/workspace-step_08-threads/release/deps/bench_encode-185db36ab2a24a21)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/bench_fields.rs (/home/z/zhangjp/rbd/target/xcnh-s1/cargo/workspace-step_08-threads/release/deps/bench_fields-cbcd8c624a593004)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/bench_pcs.rs (/home/z/zhangjp/rbd/target/xcnh-s1/cargo/workspace-step_08-threads/release/deps/bench_pcs-c7a704f832b6379b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (/home/z/zhangjp/rbd/target/xcnh-s1/cargo/workspace-step_08-threads/release/deps/lcpc_bench-aaab3e541dcda858)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/home/z/zhangjp/rbd/target/xcnh-s1/cargo/workspace-step_08-threads/release/deps/lcpc_brakedown_pc-5e9b51751dfaf3e7)
+
+running 30 tests
+test graph::tests::counting_sort_matches_naive_transpose ... ok
+test graph::tests::rejects_out_of_range_right_index - should panic ... ok
+test graph::tests::variable_degree_csc ... ok
+test matgen::tests::simd_spielman_dims_small ... ok
+test tests::batched_col_major_encode_matches_per_row_reference ... ok
+test tests::col_opens ... ok
+test tests::end_to_end_one_proof ... ok
+test tests::end_to_end_one_proof_ml ... ................................................................
+ok
+test tests::end_to_end_two_proofs ... ok
+test tests::golden_vectors_bit_exact_with_lcpc_orig ... ok
+test tests::prove_verify_size_bench ... ignored
+test tests::rough_bench ... ignored
+test tests::runtime_lcpc_params_match_compile_time_spec ... ok
+test tests::simd_spielman_mode_encodes_and_commits ... ok
+test tests::sprs_playground ... ok
+test tests::test_autotune_slices_empirical ... ok
+test tests::test_cache_detection_sanity ... ok
+test tests::test_end_to_end_fp2m61_with_proof_serde ... ok
+test tests::test_end_to_end_lazy_fields ... ok
+test tests::test_matgen_encode ... ok
+test tests::test_mont127_vs_ft127_matgen_encode_and_pcs_bit_exact ... ok
+test tests::test_pcs_commit_with_slicing ... ok
+test tests::test_pcs_commit_with_threads ... ok
+test tests::test_pinning_respects_core_list ... ok
+test tests::test_pool_lifecycle ... ok
+test tests::test_sense_reversing_barrier_ordering ... ok
+test tests::test_slice_invariance_all_fields_and_modes ... ok
+test tests::test_thread_invariance_all_fields_and_modes ... ok
+test tests::test_threading_flakiness_50x_loop ... ok
+test tests::test_worst_case_accumulation_and_fold ... ok
+
+test result: ok. 28 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 1.77s
+
+     Running unittests src/lib.rs (/home/z/zhangjp/rbd/target/xcnh-s1/cargo/workspace-step_08-threads/release/deps/lcpc_fields-be6acf7579062412)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/fields_test.rs (/home/z/zhangjp/rbd/target/xcnh-s1/cargo/workspace-step_08-threads/release/deps/fields_test-f59e1c50a04c5a44)
+
+running 14 tests
+test fp2m61_axioms ... ok
+test fp2m61_column_kernels_match_scalar_oracle ... ok
+test fp2m61_constants_and_properties ... ok
+test fp2m61_differential_vs_bigint ... ok
+test fp2m61_max_accumulator_fill_and_boundaries ... ok
+test fp2m61_simd_spielman_test_vectors_and_encoding ... ok
+test mers127_constants_match_bigint ... ok
+test mers127_max_accumulator_fill_and_boundaries ... ok
+test mont127_and_mers127_axioms ... ok
+test mont127_and_mers127_differential_vs_bigint ... ok
+test mont127_constants_match_bigint ... ok
+test mont127_differential_vs_ft127_plan02_sec4_4 ... ok
+test mont127_max_accumulator_fill_and_boundaries ... ok
+test non_inlined_column_kernels_match_scalar_oracle ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running unittests src/lib.rs (/home/z/zhangjp/rbd/target/xcnh-s1/cargo/workspace-step_08-threads/release/deps/lcpc_ligero_pc-78c4b140128a3ab2)
+
+running 9 tests
+test tests::col_opens ... ok
+test tests::end_to_end ... ok
+test tests::end_to_end_one_proof_ml ... ................................................................
+ok
+test tests::end_to_end_two_proofs ... ok
+test tests::get_dims ... ok
+test tests::proof_sizes ... ignored
+test tests::prove_verify_size_bench ... ignored
+test tests::rate ... ok
+test tests::rough_bench ... ignored
+
+test result: ok. 6 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/original_lcpc.rs (/home/z/zhangjp/rbd/target/xcnh-s1/cargo/workspace-step_08-threads/release/deps/original_lcpc-950a0a73271cc3d4)
+
+running 3 tests
+test fork_fields_match_original_lcpc_mode_a ... ok
+test fork_r2l_graphs_are_transposed_original_graphs ... ok
+test fork_runtime_params_match_original_lcpc_mode_a ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.12s
+
+     Running tests/simd_spielman_tv.rs (/home/z/zhangjp/rbd/target/xcnh-s1/cargo/workspace-step_08-threads/release/deps/simd_spielman_tv-189e4a0ecba6de7b)
+
+running 18 tests
+test fork_tv_brakedown_extension_n12 ... ok
+test fork_tv_brakedown_extension_n14 ... ok
+test fork_tv_brakedown_extension_n16 ... ok
+test fork_tv_brakedown_mersenne_n12 ... ok
+test fork_tv_brakedown_mersenne_n14 ... ok
+test fork_tv_brakedown_mersenne_n16 ... ok
+test fork_tv_brakedown_montgomery_n12 ... ok
+test fork_tv_brakedown_montgomery_n14 ... ok
+test fork_tv_brakedown_montgomery_n16 ... ok
+test fork_tv_orion_extension_n12 ... ok
+test fork_tv_orion_extension_n14 ... ok
+test fork_tv_orion_extension_n16 ... ok
+test fork_tv_orion_mersenne_n12 ... ok
+test fork_tv_orion_mersenne_n14 ... ok
+test fork_tv_orion_mersenne_n16 ... ok
+test fork_tv_orion_montgomery_n12 ... ok
+test fork_tv_orion_montgomery_n14 ... ok
+test fork_tv_orion_montgomery_n16 ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+     Running unittests src/lib.rs (/home/z/zhangjp/rbd/target/xcnh-s1/cargo/workspace-step_08-threads/release/deps/lcpc_spielman_oracle-82302bec5eb03065)
+
+running 23 tests
+test tests::test_fp2m61_high_degree_fold_exercised ... ok
+test tests::test_glibc_random_matches_libc ... ok
+test tests::test_linearity_and_systematic_prefix ... ok
+test tests::test_missing_tv_dir_returns_none ... ok
+test tests::test_simd_spielman_dimensions_and_transpose ... ok
+test tests::tv_brakedown_extension_n12 ... ok
+test tests::tv_brakedown_extension_n14 ... ok
+test tests::tv_brakedown_extension_n16 ... ok
+test tests::tv_brakedown_mersenne_n12 ... ok
+test tests::tv_brakedown_mersenne_n14 ... ok
+test tests::tv_brakedown_mersenne_n16 ... ok
+test tests::tv_brakedown_montgomery_n12 ... ok
+test tests::tv_brakedown_montgomery_n14 ... ok
+test tests::tv_brakedown_montgomery_n16 ... ok
+test tests::tv_orion_extension_n12 ... ok
+test tests::tv_orion_extension_n14 ... ok
+test tests::tv_orion_extension_n16 ... ok
+test tests::tv_orion_mersenne_n12 ... ok
+test tests::tv_orion_mersenne_n14 ... ok
+test tests::tv_orion_mersenne_n16 ... ok
+test tests::tv_orion_montgomery_n12 ... ok
+test tests::tv_orion_montgomery_n14 ... ok
+test tests::tv_orion_montgomery_n16 ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running unittests src/lib.rs (/home/z/zhangjp/rbd/target/xcnh-s1/cargo/workspace-step_08-threads/release/deps/lcpc_test_fields-85652cc34d0ee2a5)
+
+running 2 tests
+test fft::tests::roots_of_unity ... ok
+test fft::tests::roundtrip ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+   Doc-tests lcpc_2d
+
+running 1 test
+test lcpc-2d/src/macros.rs - macros::def_labels (line 15) ... ignored
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lcpc_bench
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lcpc_brakedown_pc
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lcpc_fields
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lcpc_ligero_pc
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lcpc_spielman_oracle
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lcpc_test_fields
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

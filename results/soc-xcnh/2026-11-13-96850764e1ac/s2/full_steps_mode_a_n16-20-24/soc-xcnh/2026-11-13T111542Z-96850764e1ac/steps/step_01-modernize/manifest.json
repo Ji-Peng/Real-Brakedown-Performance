@@ -1,0 +1,17 @@
+{
+  "schema_version": "steps-tag-manifest-v1",
+  "harness_version": "steps-driver-v1",
+  "tag": "step/01-modernize",
+  "commit": "b05b33fb5bd983790e0230eecee51147bc281212",
+  "commit_subject": "Modernize: current dependencies, stable toolchain, stable bench harness",
+  "step_index": 1,
+  "session_id": "2026-11-13T111542Z-96850764e1ac",
+  "detected_api_stage": "rowwise",
+  "run_class": "campaign",
+  "watermark": null,
+  "workspace_tests": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_steps_mode_a_n16-20-24/soc-xcnh/2026-11-13T111542Z-96850764e1ac/steps/step_01-modernize/workspace-tests.log",
+  "codegen_report": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_steps_mode_a_n16-20-24/soc-xcnh/2026-11-13T111542Z-96850764e1ac/steps/step_01-modernize/codegen_report.json",
+  "codegen_note": "no hot-kernel symbols matched the checker's patterns; scalar codegen is not established for this step",
+  "modes_run": "a",
+  "mode_a_field": "Ft127"
+}

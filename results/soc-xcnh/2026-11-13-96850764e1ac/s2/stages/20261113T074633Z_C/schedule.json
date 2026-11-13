@@ -1,0 +1,182 @@
+{
+  "profile": "full",
+  "session_id": "s2",
+  "stage": "20261113T074633Z_C",
+  "stage_label": "C",
+  "stage_started_utc": "2026-11-13T07:46:33Z",
+  "seed": 381900449,
+  "arguments": {
+    "blocks": "^full_slice_sweep",
+    "logn": "20,24,26",
+    "warmup": "1",
+    "lcpc_variants": "as-published-as-is,fork-flags-portable",
+    "tags": null,
+    "multi_cores": "0,1,2,3,4,5,6,7",
+    "single_core": "1"
+  },
+  "total_blocks": 18,
+  "blocks": [
+    {
+      "id": "full_slice_sweep_s4_t8_n20-24-26",
+      "description": "E5: Slice sweep s=4 Mont127 T=8",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 8 --slices 4 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s4_t8_n20-24-26'",
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s4_t8_n20-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_slice_sweep_s16_t8_n20-24-26",
+      "description": "E5: Slice sweep s=16 Mont127 T=8",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 8 --slices 16 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s16_t8_n20-24-26'",
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s16_t8_n20-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_slice_sweep_s16_t1_n20-24-26",
+      "description": "E5: Slice sweep s=16 Mont127 T=1",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 1 --slices 16 --runs 5 --warmup 1 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s16_t1_n20-24-26'",
+      "threads": 1,
+      "cores": "1",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s16_t1_n20-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_slice_sweep_s32_t1_n20-24-26",
+      "description": "E5: Slice sweep s=32 Mont127 T=1",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 1 --slices 32 --runs 5 --warmup 1 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s32_t1_n20-24-26'",
+      "threads": 1,
+      "cores": "1",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s32_t1_n20-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_slice_sweep_s2_t8_n20-24-26",
+      "description": "E5: Slice sweep s=2 Mont127 T=8",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 8 --slices 2 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s2_t8_n20-24-26'",
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s2_t8_n20-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_slice_sweep_s1_t8_n20-24-26",
+      "description": "E5: Slice sweep s=1 Mont127 T=8",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 8 --slices 1 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s1_t8_n20-24-26'",
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s1_t8_n20-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_slice_sweep_s128_t8_n20-24-26",
+      "description": "E5: Slice sweep s=128 Mont127 T=8",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 8 --slices 128 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s128_t8_n20-24-26'",
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s128_t8_n20-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_slice_sweep_s256_t1_n20-24-26",
+      "description": "E5: Slice sweep s=256 Mont127 T=1",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 1 --slices 256 --runs 5 --warmup 1 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s256_t1_n20-24-26'",
+      "threads": 1,
+      "cores": "1",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s256_t1_n20-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_slice_sweep_s128_t1_n20-24-26",
+      "description": "E5: Slice sweep s=128 Mont127 T=1",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 1 --slices 128 --runs 5 --warmup 1 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s128_t1_n20-24-26'",
+      "threads": 1,
+      "cores": "1",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s128_t1_n20-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_slice_sweep_s64_t8_n20-24-26",
+      "description": "E5: Slice sweep s=64 Mont127 T=8",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 8 --slices 64 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s64_t8_n20-24-26'",
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s64_t8_n20-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_slice_sweep_s4_t1_n20-24-26",
+      "description": "E5: Slice sweep s=4 Mont127 T=1",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 1 --slices 4 --runs 5 --warmup 1 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s4_t1_n20-24-26'",
+      "threads": 1,
+      "cores": "1",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s4_t1_n20-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_slice_sweep_s2_t1_n20-24-26",
+      "description": "E5: Slice sweep s=2 Mont127 T=1",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 1 --slices 2 --runs 5 --warmup 1 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s2_t1_n20-24-26'",
+      "threads": 1,
+      "cores": "1",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s2_t1_n20-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_slice_sweep_s32_t8_n20-24-26",
+      "description": "E5: Slice sweep s=32 Mont127 T=8",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 8 --slices 32 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s32_t8_n20-24-26'",
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s32_t8_n20-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_slice_sweep_s256_t8_n20-24-26",
+      "description": "E5: Slice sweep s=256 Mont127 T=8",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 8 --slices 256 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s256_t8_n20-24-26'",
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s256_t8_n20-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_slice_sweep_s64_t1_n20-24-26",
+      "description": "E5: Slice sweep s=64 Mont127 T=1",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 1 --slices 64 --runs 5 --warmup 1 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s64_t1_n20-24-26'",
+      "threads": 1,
+      "cores": "1",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s64_t1_n20-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_slice_sweep_s8_t1_n20-24-26",
+      "description": "E5: Slice sweep s=8 Mont127 T=1",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 1 --slices 8 --runs 5 --warmup 1 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s8_t1_n20-24-26'",
+      "threads": 1,
+      "cores": "1",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s8_t1_n20-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_slice_sweep_s8_t8_n20-24-26",
+      "description": "E5: Slice sweep s=8 Mont127 T=8",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 8 --slices 8 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s8_t8_n20-24-26'",
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s8_t8_n20-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_slice_sweep_s1_t1_n20-24-26",
+      "description": "E5: Slice sweep s=1 Mont127 T=1",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26 --threads 1 --slices 1 --runs 5 --warmup 1 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s1_t1_n20-24-26'",
+      "threads": 1,
+      "cores": "1",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_slice_sweep_s1_t1_n20-24-26",
+      "siblings": []
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "profile": "full",
+  "session_id": "s2",
+  "stage": "20261113T085320Z_T28",
+  "stage_label": "T28",
+  "stage_started_utc": "2026-11-13T08:53:20Z",
+  "seed": 3706619,
+  "arguments": {
+    "blocks": "^full_(this_work|lcpc_orig)_threads_t[0-9]+$",
+    "logn": "28",
+    "warmup": "1",
+    "lcpc_variants": "as-published-as-is,fork-flags-portable",
+    "tags": null,
+    "multi_cores": "0,1,2,3,4,5,6,7",
+    "single_core": "1"
+  },
+  "total_blocks": 8,
+  "blocks": [
+    {
+      "id": "full_lcpc_orig_threads_t2_n28",
+      "description": "E6: Thread scaling Original LCPC T=2",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 28 --threads 2 --runs 5 --warmup 1 --cores '0,1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_lcpc_orig_threads_t2_n28'",
+      "threads": 2,
+      "cores": "0,1",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_lcpc_orig_threads_t2_n28",
+      "siblings": [
+        "full_lcpc_orig_threads_t2_n20-24-26"
+      ]
+    },
+    {
+      "id": "full_lcpc_orig_threads_t4_n28",
+      "description": "E6: Thread scaling Original LCPC T=4",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 28 --threads 4 --runs 5 --warmup 1 --cores '0,1,2,3' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_lcpc_orig_threads_t4_n28'",
+      "threads": 4,
+      "cores": "0,1,2,3",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_lcpc_orig_threads_t4_n28",
+      "siblings": [
+        "full_lcpc_orig_threads_t4_n20-24-26"
+      ]
+    },
+    {
+      "id": "full_this_work_threads_t2_n28",
+      "description": "E6: Thread scaling This Work T=2",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 28 --threads 2 --runs 5 --warmup 1 --cores '0,1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_this_work_threads_t2_n28'",
+      "threads": 2,
+      "cores": "0,1",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_this_work_threads_t2_n28",
+      "siblings": [
+        "full_this_work_threads_t2_n20-24-26"
+      ]
+    },
+    {
+      "id": "full_lcpc_orig_threads_t8_n28",
+      "description": "E6: Thread scaling Original LCPC T=8",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 28 --threads 8 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_lcpc_orig_threads_t8_n28'",
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_lcpc_orig_threads_t8_n28",
+      "siblings": [
+        "full_lcpc_orig_threads_t8_n20-24-26"
+      ]
+    },
+    {
+      "id": "full_this_work_threads_t1_n28",
+      "description": "E6: Thread scaling This Work T=1",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 28 --threads 1 --runs 5 --warmup 1 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_this_work_threads_t1_n28'",
+      "threads": 1,
+      "cores": "1",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_this_work_threads_t1_n28",
+      "siblings": [
+        "full_this_work_threads_t1_n20-24-26"
+      ]
+    },
+    {
+      "id": "full_this_work_threads_t8_n28",
+      "description": "E6: Thread scaling This Work T=8",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 28 --threads 8 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_this_work_threads_t8_n28'",
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_this_work_threads_t8_n28",
+      "siblings": [
+        "full_this_work_threads_t8_n20-24-26"
+      ]
+    },
+    {
+      "id": "full_lcpc_orig_threads_t1_n28",
+      "description": "E6: Thread scaling Original LCPC T=1",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 28 --threads 1 --runs 5 --warmup 1 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_lcpc_orig_threads_t1_n28'",
+      "threads": 1,
+      "cores": "1",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_lcpc_orig_threads_t1_n28",
+      "siblings": [
+        "full_lcpc_orig_threads_t1_n20-24-26"
+      ]
+    },
+    {
+      "id": "full_this_work_threads_t4_n28",
+      "description": "E6: Thread scaling This Work T=4",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 28 --threads 4 --runs 5 --warmup 1 --cores '0,1,2,3' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_this_work_threads_t4_n28'",
+      "threads": 4,
+      "cores": "0,1,2,3",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_this_work_threads_t4_n28",
+      "siblings": [
+        "full_this_work_threads_t4_n20-24-26"
+      ]
+    }
+  ]
+}

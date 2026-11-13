@@ -1,0 +1,6 @@
+   Compiling num-integer v0.1.47
+   Compiling ndarray v0.17.2
+   Compiling sprs v0.11.6
+   Compiling lcpc-brakedown-pc v0.1.1 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_02-fields-a0NErl/lcpc-brakedown-pc)
+   Compiling lcpc-bench v0.1.0 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_02-fields-a0NErl/bench)
+    Finished `release` profile [optimized] target(s) in 18.08s

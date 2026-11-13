@@ -1,0 +1,80 @@
+{
+  "status": "complete",
+  "failure_reason": null,
+  "skip_reason": null,
+  "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+  "params_patch_sha256": "d9cf97f0347fbb6b41d96397f6be9e3d7b604381471ef901e5ba61e9d7806fb6",
+  "selected_cpu": "EPYC",
+  "threads": 1,
+  "logN": [
+    28
+  ],
+  "runs": 5,
+  "warmup": 1,
+  "measurement_method": "one process per case (graph generated once); warm-up + timed encodings in-process, each on fresh random input, timed individually; warm-up encodings excluded",
+  "benchmark_cores": "1",
+  "coordinator_shares_worker_core": false,
+  "correctness_test_cores": "0-19",
+  "fields": [
+    "mersenne"
+  ],
+  "shapes": [
+    "brakedown",
+    "orion"
+  ],
+  "verifier_benchmark": "Montgomery, single thread",
+  "slice_mode": "table",
+  "single_slice_override": null,
+  "custom_slice_table": null,
+  "effective_slice_counts_by_benchmark": {
+    "brakedown-mersenne-N28-T1-run-01": 8,
+    "verifier-brakedown-montgomery-N28-T1-run-01": 1
+  },
+  "cxx": "g++",
+  "cxx_wrapper_override": null,
+  "extra_include_override": "/home/z/zhangjp/rbd/deps/boost_1_86_0",
+  "cxx_include_env": {
+    "CPLUS_INCLUDE_PATH": "/home/z/zhangjp/rbd/deps/boost_1_86_0"
+  },
+  "upstream_compile_flags": "-march=native -O3 -funroll-loops -Wno-uninitialized -mavx512f -mavx512vl -mavx512dq; -Wall -faligned-new -g; -lstdc++; SELECTED_CPU compile definition",
+  "cmake_configuration": {
+    "test_poly_sizes": [
+      12,
+      14,
+      16
+    ],
+    "test_thread_variants": [
+      2,
+      4,
+      8,
+      16
+    ],
+    "benchmark_poly_sizes": [
+      28
+    ],
+    "benchmark_thread_variant": 1,
+    "target_definitions": [
+      "SELECTED_CPU=EPYC",
+      "BRAKEDOWN=0 or BRAKEDOWN=1 per matrix shape",
+      "POLY_SIZE=per executable logN",
+      "THREADS=per executable thread variant"
+    ]
+  },
+  "output_dir": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mers127_t1_n28",
+  "max_orion_logn": 26,
+  "process_resource_tool": "/usr/bin/time",
+  "upstream_tests": {
+    "status": "passed-reused-marker",
+    "marker": "upstream-tests-passed-xcnh2-7b399dbfecc406c79349015f1e21accc4def1be7-d9cf97f0347fbb6b41d96397f6be9e3d7b604381471ef901e5ba61e9d7806fb6-79df6bf096936454.log",
+    "log_sha256": "beac63f7eba0c898c73e9adc5c9c8b43b8fd2b64b8dd901833708d498be000e8"
+  },
+  "session_id": "s2",
+  "session_seed": "316206685",
+  "stage": "20261113T114422Z_B",
+  "block_id": "full_simd_spielman_mers127_t1_n28",
+  "block_status": "ok",
+  "freq_before_mhz": "4133.150",
+  "freq_after_mhz": "2101.797",
+  "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+  "freq_is_nominal": false
+}

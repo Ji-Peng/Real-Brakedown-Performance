@@ -1,0 +1,6 @@
+   Compiling lcpc-2d v0.1.1 (/home/z/zhangjp/rbd/target/xcnh-s2/worktrees/wt-step_08-threads-L7K8WJ/lcpc-2d)
+   Compiling lcpc-fields v0.1.1 (/home/z/zhangjp/rbd/target/xcnh-s2/worktrees/wt-step_08-threads-L7K8WJ/lcpc-fields)
+   Compiling lcpc-test-fields v0.1.0 (/home/z/zhangjp/rbd/target/xcnh-s2/worktrees/wt-step_08-threads-L7K8WJ/lcpc-test-fields)
+   Compiling lcpc-brakedown-pc v0.1.1 (/home/z/zhangjp/rbd/target/xcnh-s2/worktrees/wt-step_08-threads-L7K8WJ/lcpc-brakedown-pc)
+   Compiling lcpc-bench v0.1.0 (/home/z/zhangjp/rbd/target/xcnh-s2/worktrees/wt-step_08-threads-L7K8WJ/bench)
+    Finished `release` profile [optimized] target(s) in 23.60s

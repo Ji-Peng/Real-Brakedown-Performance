@@ -1,0 +1,101 @@
+{
+  "profile": "full",
+  "session_id": "s2",
+  "stage": "20261113T054815Z_S",
+  "stage_label": "S",
+  "stage_started_utc": "2026-11-13T05:48:15Z",
+  "seed": 302477455,
+  "arguments": {
+    "blocks": "^full_simd_spielman",
+    "logn": "16,18,20,22,24,26",
+    "warmup": "1",
+    "lcpc_variants": "as-published-as-is,fork-flags-portable",
+    "tags": null,
+    "multi_cores": "0,1,2,3,4,5,6,7",
+    "single_core": "1"
+  },
+  "total_blocks": 9,
+  "blocks": [
+    {
+      "id": "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+      "description": "E2: SIMD-Spielman AVX-512 fp2m61 7 workers + coordinator on 8 cores (logN 16..28)",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field fp2m61 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 7 --warmup 1 --runs 5 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26'",
+      "threads": 7,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_simd_spielman_mers127_t8_n16-18-20-22-24-26",
+      "description": "E2: SIMD-Spielman AVX-512 mers127 T=8 (logN 16..28)",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field mers127 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 8 --warmup 1 --runs 5 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mers127_t8_n16-18-20-22-24-26'",
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mers127_t8_n16-18-20-22-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_simd_spielman_mont127_t1_n16-18-20-22-24-26",
+      "description": "E2: SIMD-Spielman AVX-512 mont127 T=1 (logN 16..28)",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field mont127 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 1 --warmup 1 --runs 5 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mont127_t1_n16-18-20-22-24-26'",
+      "threads": 1,
+      "cores": "1",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mont127_t1_n16-18-20-22-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_simd_spielman_mont127_t7_n16-18-20-22-24-26",
+      "description": "E2: SIMD-Spielman AVX-512 mont127 7 workers + coordinator on 8 cores (logN 16..28)",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field mont127 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 7 --warmup 1 --runs 5 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mont127_t7_n16-18-20-22-24-26'",
+      "threads": 7,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mont127_t7_n16-18-20-22-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_simd_spielman_mers127_t1_n16-18-20-22-24-26",
+      "description": "E2: SIMD-Spielman AVX-512 mers127 T=1 (logN 16..28)",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field mers127 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 1 --warmup 1 --runs 5 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mers127_t1_n16-18-20-22-24-26'",
+      "threads": 1,
+      "cores": "1",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mers127_t1_n16-18-20-22-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_simd_spielman_mers127_t7_n16-18-20-22-24-26",
+      "description": "E2: SIMD-Spielman AVX-512 mers127 7 workers + coordinator on 8 cores (logN 16..28)",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field mers127 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 7 --warmup 1 --runs 5 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mers127_t7_n16-18-20-22-24-26'",
+      "threads": 7,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mers127_t7_n16-18-20-22-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_simd_spielman_mont127_t8_n16-18-20-22-24-26",
+      "description": "E2: SIMD-Spielman AVX-512 mont127 T=8 (logN 16..28)",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field mont127 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 8 --warmup 1 --runs 5 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mont127_t8_n16-18-20-22-24-26'",
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mont127_t8_n16-18-20-22-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+      "description": "E2: SIMD-Spielman AVX-512 fp2m61 T=8 (logN 16..28)",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field fp2m61 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 8 --warmup 1 --runs 5 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26'",
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+      "siblings": []
+    },
+    {
+      "id": "full_simd_spielman_fp2m61_t1_n16-18-20-22-24-26",
+      "description": "E2: SIMD-Spielman AVX-512 fp2m61 T=1 (logN 16..28)",
+      "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field fp2m61 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 1 --warmup 1 --runs 5 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_fp2m61_t1_n16-18-20-22-24-26'",
+      "threads": 1,
+      "cores": "1",
+      "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_fp2m61_t1_n16-18-20-22-24-26",
+      "siblings": []
+    }
+  ]
+}

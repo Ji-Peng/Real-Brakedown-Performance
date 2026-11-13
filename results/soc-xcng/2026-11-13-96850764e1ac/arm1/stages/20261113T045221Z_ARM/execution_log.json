@@ -1,0 +1,174 @@
+[
+  {
+    "block_id": "arm_this_work_t1_n18-22-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcng/2026-11-13-96850764e1ac/arm1/arm_this_work_t1_n18-22-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T04:52:28Z",
+    "end_utc": "2026-11-13T05:08:23Z",
+    "duration_s": 955,
+    "core_for_frequency": "1",
+    "freq_before_mhz": "3000.000",
+    "freq_after_mhz": "3000.000",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 1 --runs 5 --warmup 1 --slices adaptive --cores '1' --host 'soc-xcng' --out '/home/z/zhangjp/rbd/code/results/soc-xcng/2026-11-13-96850764e1ac/arm1/arm_this_work_t1_n18-22-26'",
+    "noise_before": {
+      "utc": "2026-11-13T04:52:28Z",
+      "node": "xcng1",
+      "loadavg_1_5_15": [
+        0.15,
+        0.03,
+        0.01
+      ],
+      "node_cpu_alloc": 20,
+      "job_cpus_on_node": 20,
+      "node_cpu_total": 128,
+      "node_cpu_load": 0.0,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T05:08:23Z",
+      "node": "xcng1",
+      "loadavg_1_5_15": [
+        1.02,
+        1.0,
+        0.69
+      ],
+      "node_cpu_alloc": 20,
+      "job_cpus_on_node": 20,
+      "node_cpu_total": 128,
+      "node_cpu_load": 0.99,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "arm_this_work_t8_n18-22-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcng/2026-11-13-96850764e1ac/arm1/arm_this_work_t8_n18-22-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T05:08:24Z",
+    "end_utc": "2026-11-13T05:09:58Z",
+    "duration_s": 94,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "3000.000",
+    "freq_after_mhz": "3000.000",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 8 --runs 5 --warmup 1 --slices adaptive --cores '0,1,2,3,4,5,6,7' --host 'soc-xcng' --out '/home/z/zhangjp/rbd/code/results/soc-xcng/2026-11-13-96850764e1ac/arm1/arm_this_work_t8_n18-22-26'",
+    "noise_before": {
+      "utc": "2026-11-13T05:08:24Z",
+      "node": "xcng1",
+      "loadavg_1_5_15": [
+        1.02,
+        1.0,
+        0.69
+      ],
+      "node_cpu_alloc": 20,
+      "job_cpus_on_node": 20,
+      "node_cpu_total": 128,
+      "node_cpu_load": 0.99,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T05:09:58Z",
+      "node": "xcng1",
+      "loadavg_1_5_15": [
+        4.77,
+        2.23,
+        1.16
+      ],
+      "node_cpu_alloc": 20,
+      "job_cpus_on_node": 20,
+      "node_cpu_total": 128,
+      "node_cpu_load": 0.99,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "arm_lcpc_orig_t8_n18-22-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcng/2026-11-13-96850764e1ac/arm1/arm_lcpc_orig_t8_n18-22-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T05:10:01Z",
+    "end_utc": "2026-11-13T05:17:05Z",
+    "duration_s": 424,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "3000.000",
+    "freq_after_mhz": "3000.000",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 8 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcng' --out '/home/z/zhangjp/rbd/code/results/soc-xcng/2026-11-13-96850764e1ac/arm1/arm_lcpc_orig_t8_n18-22-26'",
+    "noise_before": {
+      "utc": "2026-11-13T05:10:01Z",
+      "node": "xcng1",
+      "loadavg_1_5_15": [
+        4.46,
+        2.21,
+        1.16
+      ],
+      "node_cpu_alloc": 20,
+      "job_cpus_on_node": 20,
+      "node_cpu_total": 128,
+      "node_cpu_load": 0.99,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T05:17:05Z",
+      "node": "xcng1",
+      "loadavg_1_5_15": [
+        6.54,
+        4.97,
+        2.8
+      ],
+      "node_cpu_alloc": 20,
+      "job_cpus_on_node": 20,
+      "node_cpu_total": 128,
+      "node_cpu_load": 3.83,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "arm_lcpc_orig_t1_n18-22-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcng/2026-11-13-96850764e1ac/arm1/arm_lcpc_orig_t1_n18-22-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T05:17:05Z",
+    "end_utc": "2026-11-13T05:48:25Z",
+    "duration_s": 1880,
+    "core_for_frequency": "1",
+    "freq_before_mhz": "3000.000",
+    "freq_after_mhz": "3000.000",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 1 --runs 5 --warmup 1 --cores '1' --host 'soc-xcng' --out '/home/z/zhangjp/rbd/code/results/soc-xcng/2026-11-13-96850764e1ac/arm1/arm_lcpc_orig_t1_n18-22-26'",
+    "noise_before": {
+      "utc": "2026-11-13T05:17:05Z",
+      "node": "xcng1",
+      "loadavg_1_5_15": [
+        6.54,
+        4.97,
+        2.8
+      ],
+      "node_cpu_alloc": 20,
+      "job_cpus_on_node": 20,
+      "node_cpu_total": 128,
+      "node_cpu_load": 3.83,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T05:48:26Z",
+      "node": "xcng1",
+      "loadavg_1_5_15": [
+        1.0,
+        1.0,
+        1.21
+      ],
+      "node_cpu_alloc": 20,
+      "job_cpus_on_node": 20,
+      "node_cpu_total": 128,
+      "node_cpu_load": 1.0,
+      "node_running_jobs": 1
+    }
+  }
+]

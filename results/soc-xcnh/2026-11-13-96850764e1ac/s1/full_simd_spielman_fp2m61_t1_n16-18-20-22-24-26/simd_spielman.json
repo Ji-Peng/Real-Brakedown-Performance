@@ -1,0 +1,112 @@
+{
+  "status": "complete",
+  "failure_reason": null,
+  "skip_reason": null,
+  "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+  "params_patch_sha256": "d9cf97f0347fbb6b41d96397f6be9e3d7b604381471ef901e5ba61e9d7806fb6",
+  "selected_cpu": "EPYC",
+  "threads": 1,
+  "logN": [
+    16,
+    18,
+    20,
+    22,
+    24,
+    26
+  ],
+  "runs": 5,
+  "warmup": 1,
+  "measurement_method": "one process per case (graph generated once); warm-up + timed encodings in-process, each on fresh random input, timed individually; warm-up encodings excluded",
+  "benchmark_cores": "1",
+  "coordinator_shares_worker_core": false,
+  "correctness_test_cores": "0-19",
+  "fields": [
+    "extension"
+  ],
+  "shapes": [
+    "brakedown",
+    "orion"
+  ],
+  "verifier_benchmark": "Montgomery, single thread",
+  "slice_mode": "table",
+  "single_slice_override": null,
+  "custom_slice_table": null,
+  "effective_slice_counts_by_benchmark": {
+    "brakedown-extension-N16-T1-run-01": 1,
+    "brakedown-extension-N18-T1-run-01": 1,
+    "brakedown-extension-N20-T1-run-01": 2,
+    "brakedown-extension-N22-T1-run-01": 8,
+    "brakedown-extension-N24-T1-run-01": 32,
+    "brakedown-extension-N26-T1-run-01": 128,
+    "orion-extension-N16-T1-run-01": 1,
+    "orion-extension-N18-T1-run-01": 1,
+    "orion-extension-N20-T1-run-01": 2,
+    "orion-extension-N22-T1-run-01": 8,
+    "orion-extension-N24-T1-run-01": 16,
+    "orion-extension-N26-T1-run-01": 16,
+    "verifier-brakedown-montgomery-N16-T1-run-01": 1,
+    "verifier-brakedown-montgomery-N18-T1-run-01": 1,
+    "verifier-brakedown-montgomery-N20-T1-run-01": 1,
+    "verifier-brakedown-montgomery-N22-T1-run-01": 1,
+    "verifier-brakedown-montgomery-N24-T1-run-01": 1,
+    "verifier-brakedown-montgomery-N26-T1-run-01": 1,
+    "verifier-orion-montgomery-N16-T1-run-01": 1,
+    "verifier-orion-montgomery-N18-T1-run-01": 1,
+    "verifier-orion-montgomery-N20-T1-run-01": 1,
+    "verifier-orion-montgomery-N22-T1-run-01": 1,
+    "verifier-orion-montgomery-N24-T1-run-01": 1,
+    "verifier-orion-montgomery-N26-T1-run-01": 1
+  },
+  "cxx": "g++",
+  "cxx_wrapper_override": null,
+  "extra_include_override": "/home/z/zhangjp/rbd/deps/boost_1_86_0",
+  "cxx_include_env": {
+    "CPLUS_INCLUDE_PATH": "/home/z/zhangjp/rbd/deps/boost_1_86_0"
+  },
+  "upstream_compile_flags": "-march=native -O3 -funroll-loops -Wno-uninitialized -mavx512f -mavx512vl -mavx512dq; -Wall -faligned-new -g; -lstdc++; SELECTED_CPU compile definition",
+  "cmake_configuration": {
+    "test_poly_sizes": [
+      12,
+      14,
+      16
+    ],
+    "test_thread_variants": [
+      2,
+      4,
+      8,
+      16
+    ],
+    "benchmark_poly_sizes": [
+      16,
+      18,
+      20,
+      22,
+      24,
+      26
+    ],
+    "benchmark_thread_variant": 1,
+    "target_definitions": [
+      "SELECTED_CPU=EPYC",
+      "BRAKEDOWN=0 or BRAKEDOWN=1 per matrix shape",
+      "POLY_SIZE=per executable logN",
+      "THREADS=per executable thread variant"
+    ]
+  },
+  "output_dir": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_simd_spielman_fp2m61_t1_n16-18-20-22-24-26",
+  "max_orion_logn": 26,
+  "process_resource_tool": "/usr/bin/time",
+  "upstream_tests": {
+    "status": "passed-reused-marker",
+    "marker": "upstream-tests-passed-xcnh1-7b399dbfecc406c79349015f1e21accc4def1be7-d9cf97f0347fbb6b41d96397f6be9e3d7b604381471ef901e5ba61e9d7806fb6-79df6bf096936454.log",
+    "log_sha256": "beac63f7eba0c898c73e9adc5c9c8b43b8fd2b64b8dd901833708d498be000e8"
+  },
+  "session_id": "s1",
+  "session_seed": "347803660",
+  "stage": "20261113T054754Z_S",
+  "block_id": "full_simd_spielman_fp2m61_t1_n16-18-20-22-24-26",
+  "block_status": "ok",
+  "freq_before_mhz": "2101.797",
+  "freq_after_mhz": "2101.797",
+  "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+  "freq_is_nominal": false
+}

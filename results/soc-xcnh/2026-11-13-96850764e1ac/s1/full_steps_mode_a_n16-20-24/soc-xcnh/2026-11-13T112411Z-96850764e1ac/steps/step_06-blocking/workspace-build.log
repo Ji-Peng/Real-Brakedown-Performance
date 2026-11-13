@@ -1,0 +1,6 @@
+   Compiling lcpc-2d v0.1.1 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_06-blocking-aypsvC/lcpc-2d)
+   Compiling lcpc-fields v0.1.1 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_06-blocking-aypsvC/lcpc-fields)
+   Compiling lcpc-test-fields v0.1.0 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_06-blocking-aypsvC/lcpc-test-fields)
+   Compiling lcpc-brakedown-pc v0.1.1 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_06-blocking-aypsvC/lcpc-brakedown-pc)
+   Compiling lcpc-bench v0.1.0 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_06-blocking-aypsvC/bench)
+    Finished `release` profile [optimized] target(s) in 18.84s

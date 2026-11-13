@@ -1,0 +1,17 @@
+{
+  "schema_version": "steps-tag-manifest-v1",
+  "harness_version": "steps-driver-v1",
+  "tag": "step/02-fields",
+  "commit": "6ab6bb802348ff0a3d0620f0f5d2073b704be064",
+  "commit_subject": "Fields: lcpc-fields crate with LazyField trait, Mont127, Mers127, Fp2M61",
+  "step_index": 2,
+  "session_id": "2026-11-13T104421Z-96850764e1ac",
+  "detected_api_stage": "rowwise",
+  "run_class": "campaign",
+  "watermark": null,
+  "workspace_tests": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_steps_mode_b_n16-20-24/soc-xcnh/2026-11-13T104421Z-96850764e1ac/steps/step_02-fields/workspace-tests.log",
+  "codegen_report": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_steps_mode_b_n16-20-24/soc-xcnh/2026-11-13T104421Z-96850764e1ac/steps/step_02-fields/codegen_report.json",
+  "codegen_note": "non-strict check (pre-runtime API); 4 hot-kernel symbols matched",
+  "modes_run": "b",
+  "mode_a_field": null
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": "steps-tag-manifest-v1",
+  "harness_version": "steps-driver-v1",
+  "tag": "step/06-blocking",
+  "commit": "643d38b7d57b8184c2e6a45e584f1c789155bb2c",
+  "commit_subject": "Multi-edge blocking in the R2L lazy kernels",
+  "step_index": 6,
+  "session_id": "2026-11-13T105237Z-96850764e1ac",
+  "detected_api_stage": "runtime-unsliced",
+  "run_class": "campaign",
+  "watermark": null,
+  "workspace_tests": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_steps_mode_b_n16-20-24/soc-xcnh/2026-11-13T105237Z-96850764e1ac/steps/step_06-blocking/workspace-tests.log",
+  "codegen_report": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_steps_mode_b_n16-20-24/soc-xcnh/2026-11-13T105237Z-96850764e1ac/steps/step_06-blocking/codegen_report.json",
+  "codegen_note": null,
+  "modes_run": "b",
+  "mode_a_field": null
+}

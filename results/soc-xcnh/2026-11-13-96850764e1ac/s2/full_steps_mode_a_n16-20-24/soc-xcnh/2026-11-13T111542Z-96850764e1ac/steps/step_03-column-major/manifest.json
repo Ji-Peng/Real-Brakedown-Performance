@@ -1,0 +1,17 @@
+{
+  "schema_version": "steps-tag-manifest-v1",
+  "harness_version": "steps-driver-v1",
+  "tag": "step/03-column-major",
+  "commit": "eae56d1ec681c4eb08c38133e87d96ace9721de3",
+  "commit_subject": "Column-major batched encoding",
+  "step_index": 3,
+  "session_id": "2026-11-13T111542Z-96850764e1ac",
+  "detected_api_stage": "batched",
+  "run_class": "campaign",
+  "watermark": null,
+  "workspace_tests": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_steps_mode_a_n16-20-24/soc-xcnh/2026-11-13T111542Z-96850764e1ac/steps/step_03-column-major/workspace-tests.log",
+  "codegen_report": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_steps_mode_a_n16-20-24/soc-xcnh/2026-11-13T111542Z-96850764e1ac/steps/step_03-column-major/codegen_report.json",
+  "codegen_note": "non-strict check (pre-runtime API); 14 hot-kernel symbols matched",
+  "modes_run": "a",
+  "mode_a_field": "Mont127"
+}

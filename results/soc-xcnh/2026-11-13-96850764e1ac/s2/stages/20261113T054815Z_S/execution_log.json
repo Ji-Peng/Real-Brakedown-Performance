@@ -1,0 +1,389 @@
+[
+  {
+    "block_id": "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T05:48:22Z",
+    "end_utc": "2026-11-13T06:11:25Z",
+    "duration_s": 1383,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field fp2m61 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 7 --warmup 1 --runs 5 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26'",
+    "noise_before": {
+      "utc": "2026-11-13T05:48:22Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.06,
+        1.68,
+        1.87
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 2.07,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T06:11:25Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.0,
+        1.26,
+        1.55
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.38,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "full_simd_spielman_mers127_t8_n16-18-20-22-24-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mers127_t8_n16-18-20-22-24-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T06:11:25Z",
+    "end_utc": "2026-11-13T06:23:39Z",
+    "duration_s": 734,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "4135.775",
+    "freq_after_mhz": "4132.030",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field mers127 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 8 --warmup 1 --runs 5 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mers127_t8_n16-18-20-22-24-26'",
+    "noise_before": {
+      "utc": "2026-11-13T06:11:25Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.0,
+        1.26,
+        1.55
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.38,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T06:23:40Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.01,
+        1.3,
+        1.55
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.35,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "full_simd_spielman_mont127_t1_n16-18-20-22-24-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mont127_t1_n16-18-20-22-24-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T06:23:40Z",
+    "end_utc": "2026-11-13T06:35:45Z",
+    "duration_s": 725,
+    "core_for_frequency": "1",
+    "freq_before_mhz": "4132.909",
+    "freq_after_mhz": "4132.441",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field mont127 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 1 --warmup 1 --runs 5 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mont127_t1_n16-18-20-22-24-26'",
+    "noise_before": {
+      "utc": "2026-11-13T06:23:40Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.01,
+        1.3,
+        1.55
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.35,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T06:35:45Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.0,
+        1.15,
+        1.44
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.27,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "full_simd_spielman_mont127_t7_n16-18-20-22-24-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mont127_t7_n16-18-20-22-24-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T06:35:45Z",
+    "end_utc": "2026-11-13T06:47:23Z",
+    "duration_s": 698,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "4132.321",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field mont127 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 7 --warmup 1 --runs 5 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mont127_t7_n16-18-20-22-24-26'",
+    "noise_before": {
+      "utc": "2026-11-13T06:35:45Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.0,
+        1.15,
+        1.44
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.27,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T06:47:23Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.0,
+        1.25,
+        1.48
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.32,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "full_simd_spielman_mers127_t1_n16-18-20-22-24-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mers127_t1_n16-18-20-22-24-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T06:47:23Z",
+    "end_utc": "2026-11-13T06:59:20Z",
+    "duration_s": 717,
+    "core_for_frequency": "1",
+    "freq_before_mhz": "4132.235",
+    "freq_after_mhz": "4129.963",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field mers127 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 1 --warmup 1 --runs 5 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mers127_t1_n16-18-20-22-24-26'",
+    "noise_before": {
+      "utc": "2026-11-13T06:47:23Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.0,
+        1.25,
+        1.48
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.32,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T06:59:20Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.0,
+        1.15,
+        1.42
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.29,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "full_simd_spielman_mers127_t7_n16-18-20-22-24-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mers127_t7_n16-18-20-22-24-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T06:59:20Z",
+    "end_utc": "2026-11-13T07:10:59Z",
+    "duration_s": 699,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "4132.383",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field mers127 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 7 --warmup 1 --runs 5 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mers127_t7_n16-18-20-22-24-26'",
+    "noise_before": {
+      "utc": "2026-11-13T06:59:20Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.0,
+        1.15,
+        1.42
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.29,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T07:10:59Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.0,
+        1.24,
+        1.46
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.33,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "full_simd_spielman_mont127_t8_n16-18-20-22-24-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mont127_t8_n16-18-20-22-24-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T07:10:59Z",
+    "end_utc": "2026-11-13T07:22:54Z",
+    "duration_s": 715,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "4130.917",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field mont127 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 8 --warmup 1 --runs 5 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_mont127_t8_n16-18-20-22-24-26'",
+    "noise_before": {
+      "utc": "2026-11-13T07:10:59Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.0,
+        1.24,
+        1.46
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.33,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T07:22:54Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.01,
+        1.32,
+        1.54
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.32,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T07:22:54Z",
+    "end_utc": "2026-11-13T07:34:06Z",
+    "duration_s": 672,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field fp2m61 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 8 --warmup 1 --runs 5 --cores '0,1,2,3,4,5,6,7' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_fp2m61_t8_n16-18-20-22-24-26'",
+    "noise_before": {
+      "utc": "2026-11-13T07:22:54Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.01,
+        1.32,
+        1.54
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.32,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T07:34:06Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.01,
+        1.32,
+        1.57
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.41,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "full_simd_spielman_fp2m61_t1_n16-18-20-22-24-26",
+    "out": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_fp2m61_t1_n16-18-20-22-24-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-13T07:34:06Z",
+    "end_utc": "2026-11-13T07:46:32Z",
+    "duration_s": 746,
+    "core_for_frequency": "1",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "4123.187",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "moved_previous_to": null,
+    "cmd": "'/home/z/zhangjp/rbd/code/reproduce/simd_spielman.sh' --field fp2m61 --max-orion-logn 26 --logN 16,18,20,22,24,26 --threads 1 --warmup 1 --runs 5 --cores '1' --host 'soc-xcnh' --out '/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_simd_spielman_fp2m61_t1_n16-18-20-22-24-26'",
+    "noise_before": {
+      "utc": "2026-11-13T07:34:06Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.01,
+        1.32,
+        1.57
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.41,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-13T07:46:32Z",
+      "node": "xcnh2",
+      "loadavg_1_5_15": [
+        1.0,
+        1.13,
+        1.43
+      ],
+      "node_cpu_alloc": 40,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 1.14,
+      "node_running_jobs": 1
+    }
+  }
+]

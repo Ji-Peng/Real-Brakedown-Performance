@@ -1,0 +1,17 @@
+{
+  "schema_version": "steps-tag-manifest-v1",
+  "harness_version": "steps-driver-v1",
+  "tag": "step/05-lazy",
+  "commit": "25c2248ecf121fd9e3f6147c97d54bd4f89f3b36",
+  "commit_subject": "Lazy reduction across graph edges via LazyField accumulators",
+  "step_index": 5,
+  "session_id": "2026-11-13T104421Z-96850764e1ac",
+  "detected_api_stage": "runtime-unsliced",
+  "run_class": "campaign",
+  "watermark": null,
+  "workspace_tests": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_steps_mode_b_n16-20-24/soc-xcnh/2026-11-13T104421Z-96850764e1ac/steps/step_05-lazy/workspace-tests.log",
+  "codegen_report": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_steps_mode_b_n16-20-24/soc-xcnh/2026-11-13T104421Z-96850764e1ac/steps/step_05-lazy/codegen_report.json",
+  "codegen_note": null,
+  "modes_run": "b",
+  "mode_a_field": null
+}

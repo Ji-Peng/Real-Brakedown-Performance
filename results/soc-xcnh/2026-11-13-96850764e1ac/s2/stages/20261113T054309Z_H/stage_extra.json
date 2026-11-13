@@ -1,0 +1,25 @@
+{
+  "stage": "20261113T054309Z_H",
+  "stage_label": "H",
+  "stage_started_utc": "2026-11-13T05:43:09Z",
+  "profile": "full",
+  "session_id": "s2",
+  "seed": 84136000,
+  "instance": "xcnh2",
+  "arguments": {
+    "blocks": "^full_lcpc_orig_mode_a_t[18]$",
+    "logn": "20,24",
+    "warmup": "1",
+    "lcpc_variants": "as-published-portable,fork-flags-as-is",
+    "tags": null,
+    "multi_cores": "0,1,2,3,4,5,6,7",
+    "single_core": "1"
+  },
+  "arguments_string": "profile=full blocks=^full_lcpc_orig_mode_a_t[18]$ logn=20,24 warmup=1 lcpc_variants=as-published-portable,fork-flags-as-is tags= seed=84136000",
+  "block_ids": [
+    "full_lcpc_orig_mode_a_t8_n20-24",
+    "full_lcpc_orig_mode_a_t1_n20-24"
+  ],
+  "any_block_failed": false,
+  "note": "benchmark_parameters.logN/warmup/threads describe the stage filters; per-block values are in schedule.json and each block's manifest"
+}

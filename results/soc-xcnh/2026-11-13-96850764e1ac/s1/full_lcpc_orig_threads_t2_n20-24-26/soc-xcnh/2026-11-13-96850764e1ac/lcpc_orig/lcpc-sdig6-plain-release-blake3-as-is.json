@@ -1,0 +1,509 @@
+[
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "lcpc-original-upstream",
+    "upstream_commit": "f0e2116001af5a1bbf39481535f837d6a25772e8",
+    "driver_version": "0.1.0",
+    "hash_algorithm": "BLAKE3-256",
+    "hash_crate_version": "1.8.7",
+    "hash_mode": "as-is-default-features",
+    "field": "Ft127",
+    "params": "lcpc-sdig6",
+    "log_n": 20,
+    "seed": 5495324220345960789,
+    "threads": 2,
+    "cores": "0,1",
+    "warmup": 1,
+    "runs": 5,
+    "dimensions": {
+      "coefficient_count": 1048576,
+      "n_rows": 1024,
+      "n_per_row": 1024,
+      "n_cols": 1762
+    },
+    "recursion_depth": 3,
+    "level_parameters": [
+      {
+        "n_i": 1024,
+        "m_i": 244,
+        "c_n": 12,
+        "n_i_prime": 420,
+        "m_i_prime": 318,
+        "d_n": 25
+      },
+      {
+        "n_i": 244,
+        "m_i": 59,
+        "c_n": 16,
+        "n_i_prime": 102,
+        "m_i_prime": 74,
+        "d_n": 40
+      },
+      {
+        "n_i": 59,
+        "m_i": 15,
+        "c_n": 12,
+        "n_i_prime": 26,
+        "m_i_prime": 17,
+        "d_n": 17
+      }
+    ],
+    "setup_ns": {
+      "graph_sampling_and_encoding_init_ns": 1702302,
+      "input_generation_and_row_buffer_init_ns": 25426566,
+      "verifier_encoding_init_ns": 1648611
+    },
+    "peak_rss_bytes": 343392256,
+    "proof_size_bytes": 63283400,
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          252931145,
+          252859697,
+          253612340,
+          254479104,
+          252637033
+        ],
+        "summary": {
+          "min_ns": 252637033,
+          "q1_ns": 252859697,
+          "median_ns": 252931145,
+          "q3_ns": 253612340,
+          "max_ns": 254479104,
+          "mean_ns": 253303863.8
+        }
+      },
+      "hash_matrix_decomposition": {
+        "samples_ns": [
+          24799852,
+          24897078,
+          24685710,
+          24883458,
+          24691539
+        ],
+        "summary": {
+          "min_ns": 24685710,
+          "q1_ns": 24691539,
+          "median_ns": 24799852,
+          "q3_ns": 24883458,
+          "max_ns": 24897078,
+          "mean_ns": 24791527.4
+        }
+      },
+      "commit_total": {
+        "samples_ns": [
+          283260829,
+          283820782,
+          277441792,
+          277202913,
+          277469664
+        ],
+        "summary": {
+          "min_ns": 277202913,
+          "q1_ns": 277441792,
+          "median_ns": 277469664,
+          "q3_ns": 283260829,
+          "max_ns": 283820782,
+          "mean_ns": 279839196
+        }
+      },
+      "prove": {
+        "samples_ns": [
+          25119463,
+          29918656,
+          23776432,
+          23470552,
+          23769401
+        ],
+        "summary": {
+          "min_ns": 23470552,
+          "q1_ns": 23769401,
+          "median_ns": 23776432,
+          "q3_ns": 25119463,
+          "max_ns": 29918656,
+          "mean_ns": 25210900.8
+        }
+      },
+      "verify": {
+        "samples_ns": [
+          105611438,
+          105517417,
+          107110334,
+          110254886,
+          105564507
+        ],
+        "summary": {
+          "min_ns": 105517417,
+          "q1_ns": 105564507,
+          "median_ns": 105611438,
+          "q3_ns": 107110334,
+          "max_ns": 110254886,
+          "mean_ns": 106811716.4
+        }
+      }
+    },
+    "correctness": {
+      "direct_encoder_root_matches_commit": true,
+      "proof_verification_passed": true,
+      "verified_evaluation_hex": "be553ae668309aec1d0f3633db58cb34"
+    },
+    "hash_decomposition_includes_scratch_allocation": true,
+    "build_variant": "as-published-as-is",
+    "effective_rustflags": "",
+    "session_id": "s1",
+    "session_seed": "571485040",
+    "stage": "20261113T082406Z_T",
+    "block_id": "full_lcpc_orig_threads_t2_n20-24-26",
+    "block_status": "ok",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "freq_is_nominal": false
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "lcpc-original-upstream",
+    "upstream_commit": "f0e2116001af5a1bbf39481535f837d6a25772e8",
+    "driver_version": "0.1.0",
+    "hash_algorithm": "BLAKE3-256",
+    "hash_crate_version": "1.8.7",
+    "hash_mode": "as-is-default-features",
+    "field": "Ft127",
+    "params": "lcpc-sdig6",
+    "log_n": 24,
+    "seed": 5495324220345960793,
+    "threads": 2,
+    "cores": "0,1",
+    "warmup": 1,
+    "runs": 5,
+    "dimensions": {
+      "coefficient_count": 16777216,
+      "n_rows": 4096,
+      "n_per_row": 4096,
+      "n_cols": 7046
+    },
+    "recursion_depth": 4,
+    "level_parameters": [
+      {
+        "n_i": 4096,
+        "m_i": 975,
+        "c_n": 11,
+        "n_i_prime": 1677,
+        "m_i_prime": 1273,
+        "d_n": 22
+      },
+      {
+        "n_i": 975,
+        "m_i": 233,
+        "c_n": 12,
+        "n_i_prime": 401,
+        "m_i_prime": 301,
+        "d_n": 25
+      },
+      {
+        "n_i": 233,
+        "m_i": 56,
+        "c_n": 17,
+        "n_i_prime": 97,
+        "m_i_prime": 71,
+        "d_n": 41
+      },
+      {
+        "n_i": 56,
+        "m_i": 14,
+        "c_n": 11,
+        "n_i_prime": 25,
+        "m_i_prime": 16,
+        "d_n": 16
+      }
+    ],
+    "setup_ns": {
+      "graph_sampling_and_encoding_init_ns": 5642512,
+      "input_generation_and_row_buffer_init_ns": 411723697,
+      "verifier_encoding_init_ns": 5779238
+    },
+    "peak_rss_bytes": 2457559040,
+    "proof_size_bytes": 248297016,
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          3587241045,
+          3565738691,
+          3556792524,
+          3574941133,
+          3588468275
+        ],
+        "summary": {
+          "min_ns": 3556792524,
+          "q1_ns": 3565738691,
+          "median_ns": 3574941133,
+          "q3_ns": 3587241045,
+          "max_ns": 3588468275,
+          "mean_ns": 3574636333.6
+        }
+      },
+      "hash_matrix_decomposition": {
+        "samples_ns": [
+          399472738,
+          399033736,
+          398770570,
+          399165104,
+          398891843
+        ],
+        "summary": {
+          "min_ns": 398770570,
+          "q1_ns": 398891843,
+          "median_ns": 399033736,
+          "q3_ns": 399165104,
+          "max_ns": 399472738,
+          "mean_ns": 399066798.2
+        }
+      },
+      "commit_total": {
+        "samples_ns": [
+          4043944430,
+          4092276030,
+          4085374569,
+          4089664590,
+          4090497638
+        ],
+        "summary": {
+          "min_ns": 4043944430,
+          "q1_ns": 4085374569,
+          "median_ns": 4089664590,
+          "q3_ns": 4090497638,
+          "max_ns": 4092276030,
+          "mean_ns": 4080351451.4
+        }
+      },
+      "prove": {
+        "samples_ns": [
+          338238882,
+          348178851,
+          323654584,
+          323351678,
+          323098096
+        ],
+        "summary": {
+          "min_ns": 323098096,
+          "q1_ns": 323351678,
+          "median_ns": 323654584,
+          "q3_ns": 338238882,
+          "max_ns": 348178851,
+          "mean_ns": 331304418.2
+        }
+      },
+      "verify": {
+        "samples_ns": [
+          414390524,
+          412277504,
+          411959495,
+          411907136,
+          412207088
+        ],
+        "summary": {
+          "min_ns": 411907136,
+          "q1_ns": 411959495,
+          "median_ns": 412207088,
+          "q3_ns": 412277504,
+          "max_ns": 414390524,
+          "mean_ns": 412548349.4
+        }
+      }
+    },
+    "correctness": {
+      "direct_encoder_root_matches_commit": true,
+      "proof_verification_passed": true,
+      "verified_evaluation_hex": "d4960187a251582acbc4158b94c1791d"
+    },
+    "hash_decomposition_includes_scratch_allocation": true,
+    "build_variant": "as-published-as-is",
+    "effective_rustflags": "",
+    "session_id": "s1",
+    "session_seed": "571485040",
+    "stage": "20261113T082406Z_T",
+    "block_id": "full_lcpc_orig_threads_t2_n20-24-26",
+    "block_status": "ok",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "freq_is_nominal": false
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "lcpc-original-upstream",
+    "upstream_commit": "f0e2116001af5a1bbf39481535f837d6a25772e8",
+    "driver_version": "0.1.0",
+    "hash_algorithm": "BLAKE3-256",
+    "hash_crate_version": "1.8.7",
+    "hash_mode": "as-is-default-features",
+    "field": "Ft127",
+    "params": "lcpc-sdig6",
+    "log_n": 26,
+    "seed": 5495324220345960795,
+    "threads": 2,
+    "cores": "0,1",
+    "warmup": 1,
+    "runs": 5,
+    "dimensions": {
+      "coefficient_count": 67108864,
+      "n_rows": 8192,
+      "n_per_row": 8192,
+      "n_cols": 14091
+    },
+    "recursion_depth": 5,
+    "level_parameters": [
+      {
+        "n_i": 8192,
+        "m_i": 1950,
+        "c_n": 11,
+        "n_i_prime": 3354,
+        "m_i_prime": 2545,
+        "d_n": 21
+      },
+      {
+        "n_i": 1950,
+        "m_i": 465,
+        "c_n": 11,
+        "n_i_prime": 800,
+        "m_i_prime": 604,
+        "d_n": 23
+      },
+      {
+        "n_i": 465,
+        "m_i": 111,
+        "c_n": 14,
+        "n_i_prime": 191,
+        "m_i_prime": 144,
+        "d_n": 31
+      },
+      {
+        "n_i": 111,
+        "m_i": 27,
+        "c_n": 18,
+        "n_i_prime": 47,
+        "m_i_prime": 33,
+        "d_n": 29
+      },
+      {
+        "n_i": 27,
+        "m_i": 7,
+        "c_n": 7,
+        "n_i_prime": 13,
+        "m_i_prime": 7,
+        "d_n": 7
+      }
+    ],
+    "setup_ns": {
+      "graph_sampling_and_encoding_init_ns": 10496516,
+      "input_generation_and_row_buffer_init_ns": 1635990239,
+      "verifier_encoding_init_ns": 11249670
+    },
+    "peak_rss_bytes": 9205575680,
+    "proof_size_bytes": 494731504,
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          13758524416,
+          13656642202,
+          13647170087,
+          13647028355,
+          13660080289
+        ],
+        "summary": {
+          "min_ns": 13647028355,
+          "q1_ns": 13647170087,
+          "median_ns": 13656642202,
+          "q3_ns": 13660080289,
+          "max_ns": 13758524416,
+          "mean_ns": 13673889069.8
+        }
+      },
+      "hash_matrix_decomposition": {
+        "samples_ns": [
+          1610308664,
+          1607735952,
+          1608301912,
+          1610939522,
+          1608440300
+        ],
+        "summary": {
+          "min_ns": 1607735952,
+          "q1_ns": 1608301912,
+          "median_ns": 1608440300,
+          "q3_ns": 1610308664,
+          "max_ns": 1610939522,
+          "mean_ns": 1609145270
+        }
+      },
+      "commit_total": {
+        "samples_ns": [
+          15626705749,
+          15742765290,
+          15742973249,
+          15763477993,
+          15769401306
+        ],
+        "summary": {
+          "min_ns": 15626705749,
+          "q1_ns": 15742765290,
+          "median_ns": 15742973249,
+          "q3_ns": 15763477993,
+          "max_ns": 15769401306,
+          "mean_ns": 15729064717.4
+        }
+      },
+      "prove": {
+        "samples_ns": [
+          1437007951,
+          1450627817,
+          1412325146,
+          1413421355,
+          1416994452
+        ],
+        "summary": {
+          "min_ns": 1412325146,
+          "q1_ns": 1413421355,
+          "median_ns": 1416994452,
+          "q3_ns": 1437007951,
+          "max_ns": 1450627817,
+          "mean_ns": 1426075344.2
+        }
+      },
+      "verify": {
+        "samples_ns": [
+          832427765,
+          831898168,
+          830959365,
+          830905994,
+          835158874
+        ],
+        "summary": {
+          "min_ns": 830905994,
+          "q1_ns": 830959365,
+          "median_ns": 831898168,
+          "q3_ns": 832427765,
+          "max_ns": 835158874,
+          "mean_ns": 832270033.2
+        }
+      }
+    },
+    "correctness": {
+      "direct_encoder_root_matches_commit": true,
+      "proof_verification_passed": true,
+      "verified_evaluation_hex": "6ea2683fdca6bba3c53d56b1a3f50663"
+    },
+    "hash_decomposition_includes_scratch_allocation": true,
+    "build_variant": "as-published-as-is",
+    "effective_rustflags": "",
+    "session_id": "s1",
+    "session_seed": "571485040",
+    "stage": "20261113T082406Z_T",
+    "block_id": "full_lcpc_orig_threads_t2_n20-24-26",
+    "block_status": "ok",
+    "freq_before_mhz": "2101.797",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "freq_is_nominal": false
+  }
+]

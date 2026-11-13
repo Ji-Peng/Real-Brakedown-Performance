@@ -1,0 +1,17 @@
+{
+  "schema_version": "steps-tag-manifest-v1",
+  "harness_version": "steps-driver-v1",
+  "tag": "HEAD",
+  "commit": "96850764e1ac72e18fd045ebdc21222c145f0fca",
+  "commit_subject": "cleanup(comments): drop cloud-host examples from comments",
+  "step_index": 10,
+  "session_id": "2026-11-13T105237Z-96850764e1ac",
+  "detected_api_stage": "runtime-adaptive",
+  "run_class": "campaign",
+  "watermark": null,
+  "workspace_tests": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_steps_mode_b_n16-20-24/soc-xcnh/2026-11-13T105237Z-96850764e1ac/steps/HEAD/workspace-tests.log",
+  "codegen_report": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s1/full_steps_mode_b_n16-20-24/soc-xcnh/2026-11-13T105237Z-96850764e1ac/steps/HEAD/codegen_report.json",
+  "codegen_note": null,
+  "modes_run": "b",
+  "mode_a_field": null
+}

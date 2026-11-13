@@ -1,0 +1,6 @@
+   Compiling lcpc-2d v0.1.1 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_07-slicing-Q0uDAu/lcpc-2d)
+   Compiling lcpc-fields v0.1.1 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_07-slicing-Q0uDAu/lcpc-fields)
+   Compiling lcpc-test-fields v0.1.0 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_07-slicing-Q0uDAu/lcpc-test-fields)
+   Compiling lcpc-brakedown-pc v0.1.1 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_07-slicing-Q0uDAu/lcpc-brakedown-pc)
+   Compiling lcpc-bench v0.1.0 (/home/z/zhangjp/rbd/target/xcnh-s1/worktrees/wt-step_07-slicing-Q0uDAu/bench)
+    Finished `release` profile [optimized] target(s) in 18.95s

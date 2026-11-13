@@ -1,0 +1,17 @@
+{
+  "schema_version": "steps-tag-manifest-v1",
+  "harness_version": "steps-driver-v1",
+  "tag": "step/08-threads",
+  "commit": "285c01c261d7cd046173dab26d17b576182e96cc",
+  "commit_subject": "Expander-level multithreading with a persistent pinned worker pool",
+  "step_index": 8,
+  "session_id": "2026-11-13T104421Z-96850764e1ac",
+  "detected_api_stage": "runtime-adaptive",
+  "run_class": "campaign",
+  "watermark": null,
+  "workspace_tests": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_steps_mode_b_n16-20-24/soc-xcnh/2026-11-13T104421Z-96850764e1ac/steps/step_08-threads/workspace-tests.log",
+  "codegen_report": "/home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_steps_mode_b_n16-20-24/soc-xcnh/2026-11-13T104421Z-96850764e1ac/steps/step_08-threads/codegen_report.json",
+  "codegen_note": null,
+  "modes_run": "b",
+  "mode_a_field": null
+}

@@ -1,0 +1,4 @@
+[INFO] Inspecting /home/z/zhangjp/rbd/target/xcnh-s2/cargo/workspace-step_01-modernize/release/lcpc-bench (detected arch: x86_64)...
+  Result: NO_HOT_KERNELS | Hot kernels checked: 0 | Violations: 0 | Vector arithmetic: 0 | Vector moves: 0
+[INFO] JSON report written to /home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_steps_mode_b_n16-20-24/soc-xcnh/2026-11-13T104421Z-96850764e1ac/steps/step_01-modernize/codegen_report.json
+[INFO] Listing written to /home/z/zhangjp/rbd/code/results/soc-xcnh/2026-11-13-96850764e1ac/s2/full_steps_mode_b_n16-20-24/soc-xcnh/2026-11-13T104421Z-96850764e1ac/steps/step_01-modernize/disassembly.txt

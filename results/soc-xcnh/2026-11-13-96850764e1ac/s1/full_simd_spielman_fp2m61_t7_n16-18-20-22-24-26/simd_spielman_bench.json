@@ -1,0 +1,1650 @@
+[
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "brakedown",
+    "status": "ok",
+    "error": null,
+    "omission_reason": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 16,
+    "seed": 76128,
+    "threads": 7,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 1,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 65536,
+      "n_rows": 256,
+      "n_per_row": 256,
+      "n_cols": 440
+    },
+    "recursion_depth": 3,
+    "level_parameters": [
+      {
+        "n_i": 256,
+        "m_i": 60,
+        "c_n": 10,
+        "n_i_prime": 103,
+        "m_i_prime": 81,
+        "d_n": 20,
+        "precode_edges": 2560,
+        "postcode_edges": 2060,
+        "total_edges": 4620
+      },
+      {
+        "n_i": 60,
+        "m_i": 14,
+        "c_n": 10,
+        "n_i_prime": 24,
+        "m_i_prime": 19,
+        "d_n": 20,
+        "precode_edges": 600,
+        "postcode_edges": 480,
+        "total_edges": 1080
+      },
+      {
+        "n_i": 14,
+        "m_i": 3,
+        "c_n": 10,
+        "n_i_prime": 3,
+        "m_i_prime": 7,
+        "d_n": 20,
+        "precode_edges": 140,
+        "postcode_edges": 60,
+        "total_edges": 200
+      }
+    ],
+    "total_graph_edges": 5900,
+    "total_edge_row_macs": 1510400,
+    "ns_per_mac": 0.1661811440677966,
+    "cycles_per_mac": null,
+    "setup_ns": {
+      "graph_generation_and_process_overhead_ns": 28496000
+    },
+    "process_wall_ns": 30000000,
+    "setup_ns_resolution_ns": 10000000,
+    "setup_ns_floor_ns": 100000000,
+    "setup_ns_below_floor": true,
+    "setup_ns_method": "GNU time elapsed wall clock of the benchmark process minus the sum of its printed encode samples (warm-up and timed); includes process start, graph generation, input generation and output",
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          250000,
+          251000,
+          251000,
+          252000,
+          252000
+        ],
+        "summary": {
+          "min_ns": 250000,
+          "q1_ns": 251000,
+          "median_ns": 251000.0,
+          "q3_ns": 252000,
+          "iqr_ns": 1000,
+          "max_ns": 252000,
+          "mean_ns": 251200.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": null,
+      "proof_verifies": null,
+      "evaluation_hex": null,
+      "not_applicable_reason": "encoder-only baseline without commit/proof",
+      "upstream_test_suite": "passed-this-run"
+    },
+    "peak_rss_bytes": 4202496,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "347803660",
+    "stage": "20261113T054754Z_S",
+    "block_id": "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+    "block_status": "ok",
+    "freq_before_mhz": "4125.936",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "freq_is_nominal": false
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "brakedown",
+    "status": "ok",
+    "error": null,
+    "omission_reason": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 18,
+    "seed": 76128,
+    "threads": 7,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 1,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 262144,
+      "n_rows": 512,
+      "n_per_row": 512,
+      "n_cols": 880
+    },
+    "recursion_depth": 3,
+    "level_parameters": [
+      {
+        "n_i": 512,
+        "m_i": 121,
+        "c_n": 10,
+        "n_i_prime": 208,
+        "m_i_prime": 160,
+        "d_n": 20,
+        "precode_edges": 5120,
+        "postcode_edges": 4160,
+        "total_edges": 9280
+      },
+      {
+        "n_i": 121,
+        "m_i": 28,
+        "c_n": 10,
+        "n_i_prime": 48,
+        "m_i_prime": 39,
+        "d_n": 20,
+        "precode_edges": 1210,
+        "postcode_edges": 960,
+        "total_edges": 2170
+      },
+      {
+        "n_i": 28,
+        "m_i": 6,
+        "c_n": 10,
+        "n_i_prime": 6,
+        "m_i_prime": 14,
+        "d_n": 20,
+        "precode_edges": 280,
+        "postcode_edges": 120,
+        "total_edges": 400
+      }
+    ],
+    "total_graph_edges": 11850,
+    "total_edge_row_macs": 6067200,
+    "ns_per_mac": 0.14652558016877637,
+    "cycles_per_mac": null,
+    "setup_ns": {
+      "graph_generation_and_process_overhead_ns": 114646000
+    },
+    "process_wall_ns": 120000000,
+    "setup_ns_resolution_ns": 10000000,
+    "setup_ns_floor_ns": 100000000,
+    "setup_ns_below_floor": false,
+    "setup_ns_method": "GNU time elapsed wall clock of the benchmark process minus the sum of its printed encode samples (warm-up and timed); includes process start, graph generation, input generation and output",
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          887000,
+          887000,
+          889000,
+          890000,
+          891000
+        ],
+        "summary": {
+          "min_ns": 887000,
+          "q1_ns": 887000,
+          "median_ns": 889000.0,
+          "q3_ns": 890000,
+          "iqr_ns": 3000,
+          "max_ns": 891000,
+          "mean_ns": 888800.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": null,
+      "proof_verifies": null,
+      "evaluation_hex": null,
+      "not_applicable_reason": "encoder-only baseline without commit/proof",
+      "upstream_test_suite": "passed-this-run"
+    },
+    "peak_rss_bytes": 8388608,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "347803660",
+    "stage": "20261113T054754Z_S",
+    "block_id": "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+    "block_status": "ok",
+    "freq_before_mhz": "4125.936",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "freq_is_nominal": false
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "brakedown",
+    "status": "ok",
+    "error": null,
+    "omission_reason": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 20,
+    "seed": 76128,
+    "threads": 7,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 2,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 1048576,
+      "n_rows": 1024,
+      "n_per_row": 1024,
+      "n_cols": 1761
+    },
+    "recursion_depth": 4,
+    "level_parameters": [
+      {
+        "n_i": 1024,
+        "m_i": 243,
+        "c_n": 10,
+        "n_i_prime": 417,
+        "m_i_prime": 320,
+        "d_n": 20,
+        "precode_edges": 10240,
+        "postcode_edges": 8340,
+        "total_edges": 18580
+      },
+      {
+        "n_i": 243,
+        "m_i": 57,
+        "c_n": 10,
+        "n_i_prime": 98,
+        "m_i_prime": 76,
+        "d_n": 20,
+        "precode_edges": 2430,
+        "postcode_edges": 1960,
+        "total_edges": 4390
+      },
+      {
+        "n_i": 57,
+        "m_i": 13,
+        "c_n": 10,
+        "n_i_prime": 22,
+        "m_i_prime": 19,
+        "d_n": 20,
+        "precode_edges": 570,
+        "postcode_edges": 440,
+        "total_edges": 1010
+      },
+      {
+        "n_i": 13,
+        "m_i": 3,
+        "c_n": 10,
+        "n_i_prime": 3,
+        "m_i_prime": 6,
+        "d_n": 20,
+        "precode_edges": 130,
+        "postcode_edges": 60,
+        "total_edges": 190
+      }
+    ],
+    "total_graph_edges": 24170,
+    "total_edge_row_macs": 24750080,
+    "ns_per_mac": 0.14052479830368225,
+    "cycles_per_mac": null,
+    "setup_ns": {
+      "graph_generation_and_process_overhead_ns": 238988000
+    },
+    "process_wall_ns": 260000000,
+    "setup_ns_resolution_ns": 10000000,
+    "setup_ns_floor_ns": 100000000,
+    "setup_ns_below_floor": false,
+    "setup_ns_method": "GNU time elapsed wall clock of the benchmark process minus the sum of its printed encode samples (warm-up and timed); includes process start, graph generation, input generation and output",
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          3475000,
+          3477000,
+          3478000,
+          3484000,
+          3504000
+        ],
+        "summary": {
+          "min_ns": 3475000,
+          "q1_ns": 3477000,
+          "median_ns": 3478000.0,
+          "q3_ns": 3484000,
+          "iqr_ns": 7000,
+          "max_ns": 3504000,
+          "mean_ns": 3483600.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": null,
+      "proof_verifies": null,
+      "evaluation_hex": null,
+      "not_applicable_reason": "encoder-only baseline without commit/proof",
+      "upstream_test_suite": "passed-this-run"
+    },
+    "peak_rss_bytes": 37748736,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "347803660",
+    "stage": "20261113T054754Z_S",
+    "block_id": "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+    "block_status": "ok",
+    "freq_before_mhz": "4125.936",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "freq_is_nominal": false
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "brakedown",
+    "status": "ok",
+    "error": null,
+    "omission_reason": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 22,
+    "seed": 76128,
+    "threads": 7,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 8,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 4194304,
+      "n_rows": 2048,
+      "n_per_row": 2048,
+      "n_cols": 3522
+    },
+    "recursion_depth": 4,
+    "level_parameters": [
+      {
+        "n_i": 2048,
+        "m_i": 487,
+        "c_n": 10,
+        "n_i_prime": 837,
+        "m_i_prime": 637,
+        "d_n": 20,
+        "precode_edges": 20480,
+        "postcode_edges": 16740,
+        "total_edges": 37220
+      },
+      {
+        "n_i": 487,
+        "m_i": 115,
+        "c_n": 10,
+        "n_i_prime": 197,
+        "m_i_prime": 153,
+        "d_n": 20,
+        "precode_edges": 4870,
+        "postcode_edges": 3940,
+        "total_edges": 8810
+      },
+      {
+        "n_i": 115,
+        "m_i": 27,
+        "c_n": 10,
+        "n_i_prime": 46,
+        "m_i_prime": 36,
+        "d_n": 20,
+        "precode_edges": 1150,
+        "postcode_edges": 920,
+        "total_edges": 2070
+      },
+      {
+        "n_i": 27,
+        "m_i": 6,
+        "c_n": 10,
+        "n_i_prime": 6,
+        "m_i_prime": 13,
+        "d_n": 20,
+        "precode_edges": 270,
+        "postcode_edges": 120,
+        "total_edges": 390
+      }
+    ],
+    "total_graph_edges": 48490,
+    "total_edge_row_macs": 99307520,
+    "ns_per_mac": 0.1367771544390596,
+    "cycles_per_mac": null,
+    "setup_ns": {
+      "graph_generation_and_process_overhead_ns": 278527000
+    },
+    "process_wall_ns": 360000000,
+    "setup_ns_resolution_ns": 10000000,
+    "setup_ns_floor_ns": 100000000,
+    "setup_ns_below_floor": false,
+    "setup_ns_method": "GNU time elapsed wall clock of the benchmark process minus the sum of its printed encode samples (warm-up and timed); includes process start, graph generation, input generation and output",
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          13567000,
+          13583000,
+          13583000,
+          13592000,
+          13605000
+        ],
+        "summary": {
+          "min_ns": 13567000,
+          "q1_ns": 13583000,
+          "median_ns": 13583000.0,
+          "q3_ns": 13592000,
+          "iqr_ns": 9000,
+          "max_ns": 13605000,
+          "mean_ns": 13586000.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": null,
+      "proof_verifies": null,
+      "evaluation_hex": null,
+      "not_applicable_reason": "encoder-only baseline without commit/proof",
+      "upstream_test_suite": "passed-this-run"
+    },
+    "peak_rss_bytes": 142606336,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "347803660",
+    "stage": "20261113T054754Z_S",
+    "block_id": "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+    "block_status": "ok",
+    "freq_before_mhz": "4125.936",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "freq_is_nominal": false
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "brakedown",
+    "status": "ok",
+    "error": null,
+    "omission_reason": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 24,
+    "seed": 76128,
+    "threads": 7,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 32,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 16777216,
+      "n_rows": 4096,
+      "n_per_row": 4096,
+      "n_cols": 7045
+    },
+    "recursion_depth": 4,
+    "level_parameters": [
+      {
+        "n_i": 4096,
+        "m_i": 974,
+        "c_n": 10,
+        "n_i_prime": 1675,
+        "m_i_prime": 1274,
+        "d_n": 20,
+        "precode_edges": 40960,
+        "postcode_edges": 33500,
+        "total_edges": 74460
+      },
+      {
+        "n_i": 974,
+        "m_i": 231,
+        "c_n": 10,
+        "n_i_prime": 397,
+        "m_i_prime": 304,
+        "d_n": 20,
+        "precode_edges": 9740,
+        "postcode_edges": 7940,
+        "total_edges": 17680
+      },
+      {
+        "n_i": 231,
+        "m_i": 54,
+        "c_n": 10,
+        "n_i_prime": 92,
+        "m_i_prime": 74,
+        "d_n": 20,
+        "precode_edges": 2310,
+        "postcode_edges": 1840,
+        "total_edges": 4150
+      },
+      {
+        "n_i": 54,
+        "m_i": 12,
+        "c_n": 10,
+        "n_i_prime": 12,
+        "m_i_prime": 26,
+        "d_n": 20,
+        "precode_edges": 540,
+        "postcode_edges": 240,
+        "total_edges": 780
+      }
+    ],
+    "total_graph_edges": 97070,
+    "total_edge_row_macs": 397598720,
+    "ns_per_mac": 0.13404218202714535,
+    "cycles_per_mac": null,
+    "setup_ns": {
+      "graph_generation_and_process_overhead_ns": 439564000
+    },
+    "process_wall_ns": 760000000,
+    "setup_ns_resolution_ns": 10000000,
+    "setup_ns_floor_ns": 100000000,
+    "setup_ns_below_floor": false,
+    "setup_ns_method": "GNU time elapsed wall clock of the benchmark process minus the sum of its printed encode samples (warm-up and timed); includes process start, graph generation, input generation and output",
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          53290000,
+          53292000,
+          53295000,
+          53370000,
+          53794000
+        ],
+        "summary": {
+          "min_ns": 53290000,
+          "q1_ns": 53292000,
+          "median_ns": 53295000.0,
+          "q3_ns": 53370000,
+          "iqr_ns": 78000,
+          "max_ns": 53794000,
+          "mean_ns": 53408200.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": null,
+      "proof_verifies": null,
+      "evaluation_hex": null,
+      "not_applicable_reason": "encoder-only baseline without commit/proof",
+      "upstream_test_suite": "passed-this-run"
+    },
+    "peak_rss_bytes": 553648128,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "347803660",
+    "stage": "20261113T054754Z_S",
+    "block_id": "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+    "block_status": "ok",
+    "freq_before_mhz": "4125.936",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "freq_is_nominal": false
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "brakedown",
+    "status": "ok",
+    "error": null,
+    "omission_reason": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 26,
+    "seed": 76128,
+    "threads": 7,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 128,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 67108864,
+      "n_rows": 8192,
+      "n_per_row": 8192,
+      "n_cols": 14090
+    },
+    "recursion_depth": 5,
+    "level_parameters": [
+      {
+        "n_i": 8192,
+        "m_i": 1949,
+        "c_n": 10,
+        "n_i_prime": 3352,
+        "m_i_prime": 2546,
+        "d_n": 20,
+        "precode_edges": 81920,
+        "postcode_edges": 67040,
+        "total_edges": 148960
+      },
+      {
+        "n_i": 1949,
+        "m_i": 463,
+        "c_n": 10,
+        "n_i_prime": 796,
+        "m_i_prime": 607,
+        "d_n": 20,
+        "precode_edges": 19490,
+        "postcode_edges": 15920,
+        "total_edges": 35410
+      },
+      {
+        "n_i": 463,
+        "m_i": 110,
+        "c_n": 10,
+        "n_i_prime": 189,
+        "m_i_prime": 144,
+        "d_n": 20,
+        "precode_edges": 4630,
+        "postcode_edges": 3780,
+        "total_edges": 8410
+      },
+      {
+        "n_i": 110,
+        "m_i": 26,
+        "c_n": 10,
+        "n_i_prime": 44,
+        "m_i_prime": 35,
+        "d_n": 20,
+        "precode_edges": 1100,
+        "postcode_edges": 880,
+        "total_edges": 1980
+      },
+      {
+        "n_i": 26,
+        "m_i": 6,
+        "c_n": 10,
+        "n_i_prime": 6,
+        "m_i_prime": 12,
+        "d_n": 20,
+        "precode_edges": 260,
+        "postcode_edges": 120,
+        "total_edges": 380
+      }
+    ],
+    "total_graph_edges": 195140,
+    "total_edge_row_macs": 1598586880,
+    "ns_per_mac": 0.14518948134992826,
+    "cycles_per_mac": null,
+    "setup_ns": {
+      "graph_generation_and_process_overhead_ns": 1083419000
+    },
+    "process_wall_ns": 2480000000,
+    "setup_ns_resolution_ns": 10000000,
+    "setup_ns_floor_ns": 100000000,
+    "setup_ns_below_floor": false,
+    "setup_ns_method": "GNU time elapsed wall clock of the benchmark process minus the sum of its printed encode samples (warm-up and timed); includes process start, graph generation, input generation and output",
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          231949000,
+          232050000,
+          232098000,
+          233618000,
+          234750000
+        ],
+        "summary": {
+          "min_ns": 231949000,
+          "q1_ns": 232050000,
+          "median_ns": 232098000.0,
+          "q3_ns": 233618000,
+          "iqr_ns": 1568000,
+          "max_ns": 234750000,
+          "mean_ns": 232893000.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": null,
+      "proof_verifies": null,
+      "evaluation_hex": null,
+      "not_applicable_reason": "encoder-only baseline without commit/proof",
+      "upstream_test_suite": "passed-this-run"
+    },
+    "peak_rss_bytes": 2179280896,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "347803660",
+    "stage": "20261113T054754Z_S",
+    "block_id": "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+    "block_status": "ok",
+    "freq_before_mhz": "4125.936",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "freq_is_nominal": false
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "orion",
+    "status": "ok",
+    "error": null,
+    "omission_reason": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 16,
+    "seed": 76128,
+    "threads": 7,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 1,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 65536,
+      "n_rows": 128,
+      "n_per_row": 512,
+      "n_cols": 880
+    },
+    "recursion_depth": 3,
+    "level_parameters": [
+      {
+        "n_i": 512,
+        "m_i": 121,
+        "c_n": 10,
+        "n_i_prime": 208,
+        "m_i_prime": 160,
+        "d_n": 20,
+        "precode_edges": 5120,
+        "postcode_edges": 4160,
+        "total_edges": 9280
+      },
+      {
+        "n_i": 121,
+        "m_i": 28,
+        "c_n": 10,
+        "n_i_prime": 48,
+        "m_i_prime": 39,
+        "d_n": 20,
+        "precode_edges": 1210,
+        "postcode_edges": 960,
+        "total_edges": 2170
+      },
+      {
+        "n_i": 28,
+        "m_i": 6,
+        "c_n": 10,
+        "n_i_prime": 6,
+        "m_i_prime": 14,
+        "d_n": 20,
+        "precode_edges": 280,
+        "postcode_edges": 120,
+        "total_edges": 400
+      }
+    ],
+    "total_graph_edges": 11850,
+    "total_edge_row_macs": 1516800,
+    "ns_per_mac": 0.15097573839662448,
+    "cycles_per_mac": null,
+    "setup_ns": {
+      "graph_generation_and_process_overhead_ns": 28628000
+    },
+    "process_wall_ns": 30000000,
+    "setup_ns_resolution_ns": 10000000,
+    "setup_ns_floor_ns": 100000000,
+    "setup_ns_below_floor": true,
+    "setup_ns_method": "GNU time elapsed wall clock of the benchmark process minus the sum of its printed encode samples (warm-up and timed); includes process start, graph generation, input generation and output",
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          227000,
+          227000,
+          229000,
+          229000,
+          230000
+        ],
+        "summary": {
+          "min_ns": 227000,
+          "q1_ns": 227000,
+          "median_ns": 229000.0,
+          "q3_ns": 229000,
+          "iqr_ns": 2000,
+          "max_ns": 230000,
+          "mean_ns": 228400.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": null,
+      "proof_verifies": null,
+      "evaluation_hex": null,
+      "not_applicable_reason": "encoder-only baseline without commit/proof",
+      "upstream_test_suite": "passed-this-run"
+    },
+    "peak_rss_bytes": 4227072,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "347803660",
+    "stage": "20261113T054754Z_S",
+    "block_id": "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+    "block_status": "ok",
+    "freq_before_mhz": "4125.936",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "freq_is_nominal": false
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "orion",
+    "status": "ok",
+    "error": null,
+    "omission_reason": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 18,
+    "seed": 76128,
+    "threads": 7,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 1,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 262144,
+      "n_rows": 128,
+      "n_per_row": 2048,
+      "n_cols": 3522
+    },
+    "recursion_depth": 4,
+    "level_parameters": [
+      {
+        "n_i": 2048,
+        "m_i": 487,
+        "c_n": 10,
+        "n_i_prime": 837,
+        "m_i_prime": 637,
+        "d_n": 20,
+        "precode_edges": 20480,
+        "postcode_edges": 16740,
+        "total_edges": 37220
+      },
+      {
+        "n_i": 487,
+        "m_i": 115,
+        "c_n": 10,
+        "n_i_prime": 197,
+        "m_i_prime": 153,
+        "d_n": 20,
+        "precode_edges": 4870,
+        "postcode_edges": 3940,
+        "total_edges": 8810
+      },
+      {
+        "n_i": 115,
+        "m_i": 27,
+        "c_n": 10,
+        "n_i_prime": 46,
+        "m_i_prime": 36,
+        "d_n": 20,
+        "precode_edges": 1150,
+        "postcode_edges": 920,
+        "total_edges": 2070
+      },
+      {
+        "n_i": 27,
+        "m_i": 6,
+        "c_n": 10,
+        "n_i_prime": 6,
+        "m_i_prime": 13,
+        "d_n": 20,
+        "precode_edges": 270,
+        "postcode_edges": 120,
+        "total_edges": 390
+      }
+    ],
+    "total_graph_edges": 48490,
+    "total_edge_row_macs": 6206720,
+    "ns_per_mac": 0.12969813363580118,
+    "cycles_per_mac": null,
+    "setup_ns": {
+      "graph_generation_and_process_overhead_ns": 125140000
+    },
+    "process_wall_ns": 130000000,
+    "setup_ns_resolution_ns": 10000000,
+    "setup_ns_floor_ns": 100000000,
+    "setup_ns_below_floor": false,
+    "setup_ns_method": "GNU time elapsed wall clock of the benchmark process minus the sum of its printed encode samples (warm-up and timed); includes process start, graph generation, input generation and output",
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          803000,
+          804000,
+          805000,
+          809000,
+          811000
+        ],
+        "summary": {
+          "min_ns": 803000,
+          "q1_ns": 804000,
+          "median_ns": 805000.0,
+          "q3_ns": 809000,
+          "iqr_ns": 5000,
+          "max_ns": 811000,
+          "mean_ns": 806400.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": null,
+      "proof_verifies": null,
+      "evaluation_hex": null,
+      "not_applicable_reason": "encoder-only baseline without commit/proof",
+      "upstream_test_suite": "passed-this-run"
+    },
+    "peak_rss_bytes": 16777216,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "347803660",
+    "stage": "20261113T054754Z_S",
+    "block_id": "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+    "block_status": "ok",
+    "freq_before_mhz": "4125.936",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "freq_is_nominal": false
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "orion",
+    "status": "ok",
+    "error": null,
+    "omission_reason": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 20,
+    "seed": 76128,
+    "threads": 7,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 2,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 1048576,
+      "n_rows": 128,
+      "n_per_row": 8192,
+      "n_cols": 14090
+    },
+    "recursion_depth": 5,
+    "level_parameters": [
+      {
+        "n_i": 8192,
+        "m_i": 1949,
+        "c_n": 10,
+        "n_i_prime": 3352,
+        "m_i_prime": 2546,
+        "d_n": 20,
+        "precode_edges": 81920,
+        "postcode_edges": 67040,
+        "total_edges": 148960
+      },
+      {
+        "n_i": 1949,
+        "m_i": 463,
+        "c_n": 10,
+        "n_i_prime": 796,
+        "m_i_prime": 607,
+        "d_n": 20,
+        "precode_edges": 19490,
+        "postcode_edges": 15920,
+        "total_edges": 35410
+      },
+      {
+        "n_i": 463,
+        "m_i": 110,
+        "c_n": 10,
+        "n_i_prime": 189,
+        "m_i_prime": 144,
+        "d_n": 20,
+        "precode_edges": 4630,
+        "postcode_edges": 3780,
+        "total_edges": 8410
+      },
+      {
+        "n_i": 110,
+        "m_i": 26,
+        "c_n": 10,
+        "n_i_prime": 44,
+        "m_i_prime": 35,
+        "d_n": 20,
+        "precode_edges": 1100,
+        "postcode_edges": 880,
+        "total_edges": 1980
+      },
+      {
+        "n_i": 26,
+        "m_i": 6,
+        "c_n": 10,
+        "n_i_prime": 6,
+        "m_i_prime": 12,
+        "d_n": 20,
+        "precode_edges": 260,
+        "postcode_edges": 120,
+        "total_edges": 380
+      }
+    ],
+    "total_graph_edges": 195140,
+    "total_edge_row_macs": 24977920,
+    "ns_per_mac": 0.14120471200163984,
+    "cycles_per_mac": null,
+    "setup_ns": {
+      "graph_generation_and_process_overhead_ns": 328944000
+    },
+    "process_wall_ns": 350000000,
+    "setup_ns_resolution_ns": 10000000,
+    "setup_ns_floor_ns": 100000000,
+    "setup_ns_below_floor": false,
+    "setup_ns_method": "GNU time elapsed wall clock of the benchmark process minus the sum of its printed encode samples (warm-up and timed); includes process start, graph generation, input generation and output",
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          3434000,
+          3467000,
+          3527000,
+          3533000,
+          3552000
+        ],
+        "summary": {
+          "min_ns": 3434000,
+          "q1_ns": 3467000,
+          "median_ns": 3527000.0,
+          "q3_ns": 3533000,
+          "iqr_ns": 66000,
+          "max_ns": 3552000,
+          "mean_ns": 3502600.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": null,
+      "proof_verifies": null,
+      "evaluation_hex": null,
+      "not_applicable_reason": "encoder-only baseline without commit/proof",
+      "upstream_test_suite": "passed-this-run"
+    },
+    "peak_rss_bytes": 65351680,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "347803660",
+    "stage": "20261113T054754Z_S",
+    "block_id": "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+    "block_status": "ok",
+    "freq_before_mhz": "4125.936",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "freq_is_nominal": false
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "orion",
+    "status": "ok",
+    "error": null,
+    "omission_reason": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 22,
+    "seed": 76128,
+    "threads": 7,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 8,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 4194304,
+      "n_rows": 128,
+      "n_per_row": 32768,
+      "n_cols": 56360
+    },
+    "recursion_depth": 6,
+    "level_parameters": [
+      {
+        "n_i": 32768,
+        "m_i": 7798,
+        "c_n": 10,
+        "n_i_prime": 13412,
+        "m_i_prime": 10180,
+        "d_n": 20,
+        "precode_edges": 327680,
+        "postcode_edges": 268240,
+        "total_edges": 595920
+      },
+      {
+        "n_i": 7798,
+        "m_i": 1855,
+        "c_n": 10,
+        "n_i_prime": 3190,
+        "m_i_prime": 2424,
+        "d_n": 20,
+        "precode_edges": 77980,
+        "postcode_edges": 63800,
+        "total_edges": 141780
+      },
+      {
+        "n_i": 1855,
+        "m_i": 441,
+        "c_n": 10,
+        "n_i_prime": 758,
+        "m_i_prime": 577,
+        "d_n": 20,
+        "precode_edges": 18550,
+        "postcode_edges": 15160,
+        "total_edges": 33710
+      },
+      {
+        "n_i": 441,
+        "m_i": 104,
+        "c_n": 10,
+        "n_i_prime": 178,
+        "m_i_prime": 139,
+        "d_n": 20,
+        "precode_edges": 4410,
+        "postcode_edges": 3560,
+        "total_edges": 7970
+      },
+      {
+        "n_i": 104,
+        "m_i": 24,
+        "c_n": 10,
+        "n_i_prime": 41,
+        "m_i_prime": 33,
+        "d_n": 20,
+        "precode_edges": 1040,
+        "postcode_edges": 820,
+        "total_edges": 1860
+      },
+      {
+        "n_i": 24,
+        "m_i": 5,
+        "c_n": 10,
+        "n_i_prime": 5,
+        "m_i_prime": 12,
+        "d_n": 20,
+        "precode_edges": 240,
+        "postcode_edges": 100,
+        "total_edges": 340
+      }
+    ],
+    "total_graph_edges": 781580,
+    "total_edge_row_macs": 100042240,
+    "ns_per_mac": 0.22597454835077663,
+    "cycles_per_mac": null,
+    "setup_ns": {
+      "graph_generation_and_process_overhead_ns": 1514320000
+    },
+    "process_wall_ns": 1650000000,
+    "setup_ns_resolution_ns": 10000000,
+    "setup_ns_floor_ns": 100000000,
+    "setup_ns_below_floor": false,
+    "setup_ns_method": "GNU time elapsed wall clock of the benchmark process minus the sum of its printed encode samples (warm-up and timed); includes process start, graph generation, input generation and output",
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          22570000,
+          22578000,
+          22607000,
+          22618000,
+          22634000
+        ],
+        "summary": {
+          "min_ns": 22570000,
+          "q1_ns": 22578000,
+          "median_ns": 22607000.0,
+          "q3_ns": 22618000,
+          "iqr_ns": 40000,
+          "max_ns": 22634000,
+          "mean_ns": 22601400.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": null,
+      "proof_verifies": null,
+      "evaluation_hex": null,
+      "not_applicable_reason": "encoder-only baseline without commit/proof",
+      "upstream_test_suite": "passed-this-run"
+    },
+    "peak_rss_bytes": 241106944,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "347803660",
+    "stage": "20261113T054754Z_S",
+    "block_id": "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+    "block_status": "ok",
+    "freq_before_mhz": "4125.936",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "freq_is_nominal": false
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "orion",
+    "status": "ok",
+    "error": null,
+    "omission_reason": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 24,
+    "seed": 76128,
+    "threads": 7,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 16,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 16777216,
+      "n_rows": 128,
+      "n_per_row": 131072,
+      "n_cols": 225443
+    },
+    "recursion_depth": 7,
+    "level_parameters": [
+      {
+        "n_i": 131072,
+        "m_i": 31195,
+        "c_n": 10,
+        "n_i_prime": 53655,
+        "m_i_prime": 40716,
+        "d_n": 20,
+        "precode_edges": 1310720,
+        "postcode_edges": 1073100,
+        "total_edges": 2383820
+      },
+      {
+        "n_i": 31195,
+        "m_i": 7424,
+        "c_n": 10,
+        "n_i_prime": 12769,
+        "m_i_prime": 9691,
+        "d_n": 20,
+        "precode_edges": 311950,
+        "postcode_edges": 255380,
+        "total_edges": 567330
+      },
+      {
+        "n_i": 7424,
+        "m_i": 1766,
+        "c_n": 10,
+        "n_i_prime": 3037,
+        "m_i_prime": 2308,
+        "d_n": 20,
+        "precode_edges": 74240,
+        "postcode_edges": 60740,
+        "total_edges": 134980
+      },
+      {
+        "n_i": 1766,
+        "m_i": 420,
+        "c_n": 10,
+        "n_i_prime": 722,
+        "m_i_prime": 549,
+        "d_n": 20,
+        "precode_edges": 17660,
+        "postcode_edges": 14440,
+        "total_edges": 32100
+      },
+      {
+        "n_i": 420,
+        "m_i": 99,
+        "c_n": 10,
+        "n_i_prime": 170,
+        "m_i_prime": 132,
+        "d_n": 20,
+        "precode_edges": 4200,
+        "postcode_edges": 3400,
+        "total_edges": 7600
+      },
+      {
+        "n_i": 99,
+        "m_i": 23,
+        "c_n": 10,
+        "n_i_prime": 39,
+        "m_i_prime": 32,
+        "d_n": 20,
+        "precode_edges": 990,
+        "postcode_edges": 780,
+        "total_edges": 1770
+      },
+      {
+        "n_i": 23,
+        "m_i": 5,
+        "c_n": 10,
+        "n_i_prime": 5,
+        "m_i_prime": 11,
+        "d_n": 20,
+        "precode_edges": 230,
+        "postcode_edges": 100,
+        "total_edges": 330
+      }
+    ],
+    "total_graph_edges": 3127930,
+    "total_edge_row_macs": 400375040,
+    "ns_per_mac": 0.38693221235769343,
+    "cycles_per_mac": null,
+    "setup_ns": {
+      "graph_generation_and_process_overhead_ns": 19309516000
+    },
+    "process_wall_ns": 20240000000,
+    "setup_ns_resolution_ns": 10000000,
+    "setup_ns_floor_ns": 100000000,
+    "setup_ns_below_floor": false,
+    "setup_ns_method": "GNU time elapsed wall clock of the benchmark process minus the sum of its printed encode samples (warm-up and timed); includes process start, graph generation, input generation and output",
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          154612000,
+          154855000,
+          154918000,
+          155046000,
+          155645000
+        ],
+        "summary": {
+          "min_ns": 154612000,
+          "q1_ns": 154855000,
+          "median_ns": 154918000.0,
+          "q3_ns": 155046000,
+          "iqr_ns": 191000,
+          "max_ns": 155645000,
+          "mean_ns": 155015200.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": null,
+      "proof_verifies": null,
+      "evaluation_hex": null,
+      "not_applicable_reason": "encoder-only baseline without commit/proof",
+      "upstream_test_suite": "passed-this-run"
+    },
+    "peak_rss_bytes": 954105856,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "347803660",
+    "stage": "20261113T054754Z_S",
+    "block_id": "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+    "block_status": "ok",
+    "freq_before_mhz": "4125.936",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "freq_is_nominal": false
+  },
+  {
+    "schema_version": "lcpc-bench-v1",
+    "implementation": "simd-spielman",
+    "driver_version": "simd-spielman-upstream-wrapper",
+    "upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "hash_algorithm": "none",
+    "hash_crate_version": "none",
+    "hash_mode": "none",
+    "shape": "orion",
+    "status": "ok",
+    "error": null,
+    "omission_reason": null,
+    "field": "Fp2M61",
+    "params": "simd-spielman",
+    "log_n": 26,
+    "seed": 76128,
+    "threads": 7,
+    "cores": "0,1,2,3,4,5,6,7",
+    "slices": 16,
+    "slice_mode": "table",
+    "adaptive_slices": null,
+    "warmup": 1,
+    "runs": 5,
+    "cpu_mhz_before": null,
+    "cpu_mhz_after": null,
+    "dimensions": {
+      "coefficient_count": 67108864,
+      "n_rows": 128,
+      "n_per_row": 524288,
+      "n_cols": 901775
+    },
+    "recursion_depth": 8,
+    "level_parameters": [
+      {
+        "n_i": 524288,
+        "m_i": 124780,
+        "c_n": 10,
+        "n_i_prime": 214621,
+        "m_i_prime": 162866,
+        "d_n": 20,
+        "precode_edges": 5242880,
+        "postcode_edges": 4292420,
+        "total_edges": 9535300
+      },
+      {
+        "n_i": 124780,
+        "m_i": 29697,
+        "c_n": 10,
+        "n_i_prime": 51078,
+        "m_i_prime": 38763,
+        "d_n": 20,
+        "precode_edges": 1247800,
+        "postcode_edges": 1021560,
+        "total_edges": 2269360
+      },
+      {
+        "n_i": 29697,
+        "m_i": 7067,
+        "c_n": 10,
+        "n_i_prime": 12155,
+        "m_i_prime": 9226,
+        "d_n": 20,
+        "precode_edges": 296970,
+        "postcode_edges": 243100,
+        "total_edges": 540070
+      },
+      {
+        "n_i": 7067,
+        "m_i": 1681,
+        "c_n": 10,
+        "n_i_prime": 2891,
+        "m_i_prime": 2197,
+        "d_n": 20,
+        "precode_edges": 70670,
+        "postcode_edges": 57820,
+        "total_edges": 128490
+      },
+      {
+        "n_i": 1681,
+        "m_i": 400,
+        "c_n": 10,
+        "n_i_prime": 688,
+        "m_i_prime": 522,
+        "d_n": 20,
+        "precode_edges": 16810,
+        "postcode_edges": 13760,
+        "total_edges": 30570
+      },
+      {
+        "n_i": 400,
+        "m_i": 95,
+        "c_n": 10,
+        "n_i_prime": 163,
+        "m_i_prime": 125,
+        "d_n": 20,
+        "precode_edges": 4000,
+        "postcode_edges": 3260,
+        "total_edges": 7260
+      },
+      {
+        "n_i": 95,
+        "m_i": 22,
+        "c_n": 10,
+        "n_i_prime": 37,
+        "m_i_prime": 31,
+        "d_n": 20,
+        "precode_edges": 950,
+        "postcode_edges": 740,
+        "total_edges": 1690
+      },
+      {
+        "n_i": 22,
+        "m_i": 5,
+        "c_n": 10,
+        "n_i_prime": 5,
+        "m_i_prime": 10,
+        "d_n": 20,
+        "precode_edges": 220,
+        "postcode_edges": 100,
+        "total_edges": 320
+      }
+    ],
+    "total_graph_edges": 12513060,
+    "total_edge_row_macs": 1601671680,
+    "ns_per_mac": 0.5897750530245999,
+    "cycles_per_mac": null,
+    "setup_ns": {
+      "graph_generation_and_process_overhead_ns": 272267562000
+    },
+    "process_wall_ns": 277940000000,
+    "setup_ns_resolution_ns": 10000000,
+    "setup_ns_floor_ns": 100000000,
+    "setup_ns_below_floor": false,
+    "setup_ns_method": "GNU time elapsed wall clock of the benchmark process minus the sum of its printed encode samples (warm-up and timed); includes process start, graph generation, input generation and output",
+    "measurements": {
+      "encode_matrix": {
+        "samples_ns": [
+          943597000,
+          944500000,
+          944626000,
+          944626000,
+          948151000
+        ],
+        "summary": {
+          "min_ns": 943597000,
+          "q1_ns": 944500000,
+          "median_ns": 944626000.0,
+          "q3_ns": 944626000,
+          "iqr_ns": 126000,
+          "max_ns": 948151000,
+          "mean_ns": 945100000.0
+        }
+      }
+    },
+    "proof_size_bytes": null,
+    "correctness": {
+      "direct_encode_matches_commit": null,
+      "proof_verifies": null,
+      "evaluation_hex": null,
+      "not_applicable_reason": "encoder-only baseline without commit/proof",
+      "upstream_test_suite": "passed-this-run"
+    },
+    "peak_rss_bytes": 3816919040,
+    "perf_stat": null,
+    "session_id": "s1",
+    "session_seed": "347803660",
+    "stage": "20261113T054754Z_S",
+    "block_id": "full_simd_spielman_fp2m61_t7_n16-18-20-22-24-26",
+    "block_status": "ok",
+    "freq_before_mhz": "4125.936",
+    "freq_after_mhz": "2101.797",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "freq_is_nominal": false
+  }
+]

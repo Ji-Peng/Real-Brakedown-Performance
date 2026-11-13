@@ -1,0 +1,221 @@
+{
+  "schema_version": "soc-host-profile-v1",
+  "created_at_utc": "2026-11-13T09:00:44.837040+00:00",
+  "host_profile": "soc-xcnh",
+  "node_class": "xcnh",
+  "hostname": "xcnh1",
+  "slurm": {
+    "job_id": "1129094",
+    "step_id": "0",
+    "job_name": "rbd-s1",
+    "partition": "long",
+    "nodelist": "xcnh1",
+    "cpus_per_task": "20",
+    "mem_per_node_mb": "163840",
+    "cpu_freq_request": "Performance",
+    "cluster": "soc"
+  },
+  "node": {
+    "cpu_model": "AMD EPYC 9755 128-Core Processor",
+    "architecture": "x86_64",
+    "sockets": "2",
+    "cores_per_socket": "128",
+    "threads_per_core": "2",
+    "online_cpus": "0-511",
+    "numa_nodes": "2",
+    "scontrol_cpu_alloc": "40",
+    "scontrol_cpu_total": "512",
+    "scontrol_cpu_load": "2.31",
+    "scontrol_real_memory_mb": "1000000",
+    "scontrol_alloc_memory_mb": "163840",
+    "scontrol_state": "MIXED",
+    "scontrol_features": "xcnh",
+    "kernel": "7.0.0-28-generic",
+    "os_release": [
+      "PRETTY_NAME=\"Ubuntu 26.04 LTS\"",
+      "NAME=\"Ubuntu\""
+    ]
+  },
+  "noise_at_profile_load": {
+    "utc": "2026-11-13T09:00:44Z",
+    "node": "xcnh1",
+    "loadavg_1_5_15": [
+      2.0,
+      2.25,
+      2.15
+    ],
+    "node_cpu_alloc": 40,
+    "job_cpus_on_node": 40,
+    "node_cpu_total": 512,
+    "node_cpu_load": 2.31,
+    "node_running_jobs": 1
+  },
+  "core_selection": {
+    "usable_cpus_affinity": "0-19",
+    "owned_cpus_cgroup": "0-19,256-275",
+    "cgroup_cpuset_file": "/sys/fs/cgroup/system.slice/slurmstepd.scope/sABHM79KZKK100/step_0/user/task_0/cpuset.cpus.effective",
+    "l3_domains_on_node": 32,
+    "selection_rule": "first L3 domain (lowest CPU id) whose CPUs, SMT siblings included, all belong to the job's cgroup cpuset; one usable CPU per physical core, the first eight",
+    "selected_l3_domain": {
+      "shared_cpu_list": "0-7,256-263",
+      "size": "32768K",
+      "fully_owned_by_job": true
+    },
+    "benchmark_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "single_thread_core": 1,
+    "selected_physical_cores": [
+      {
+        "cpu": 0,
+        "physical_package_id": "0",
+        "core_id": "0",
+        "thread_siblings": [
+          0,
+          256
+        ],
+        "numa_node": 0
+      },
+      {
+        "cpu": 1,
+        "physical_package_id": "0",
+        "core_id": "1",
+        "thread_siblings": [
+          1,
+          257
+        ],
+        "numa_node": 0
+      },
+      {
+        "cpu": 2,
+        "physical_package_id": "0",
+        "core_id": "2",
+        "thread_siblings": [
+          2,
+          258
+        ],
+        "numa_node": 0
+      },
+      {
+        "cpu": 3,
+        "physical_package_id": "0",
+        "core_id": "3",
+        "thread_siblings": [
+          3,
+          259
+        ],
+        "numa_node": 0
+      },
+      {
+        "cpu": 4,
+        "physical_package_id": "0",
+        "core_id": "4",
+        "thread_siblings": [
+          4,
+          260
+        ],
+        "numa_node": 0
+      },
+      {
+        "cpu": 5,
+        "physical_package_id": "0",
+        "core_id": "5",
+        "thread_siblings": [
+          5,
+          261
+        ],
+        "numa_node": 0
+      },
+      {
+        "cpu": 6,
+        "physical_package_id": "0",
+        "core_id": "6",
+        "thread_siblings": [
+          6,
+          262
+        ],
+        "numa_node": 0
+      },
+      {
+        "cpu": 7,
+        "physical_package_id": "0",
+        "core_id": "7",
+        "thread_siblings": [
+          7,
+          263
+        ],
+        "numa_node": 0
+      }
+    ],
+    "spare_usable_cpus": "8-19"
+  },
+  "frequency": {
+    "boost_raw": "1",
+    "boost_note": "turbo/boost is a node setting and cannot be disabled by the job",
+    "benchmark_cpus": {
+      "0": {
+        "scaling_governor": "performance",
+        "scaling_driver": "amd-pstate-epp",
+        "scaling_cur_freq_khz": "2101797",
+        "scaling_max_freq_khz": "4122755"
+      },
+      "1": {
+        "scaling_governor": "performance",
+        "scaling_driver": "amd-pstate-epp",
+        "scaling_cur_freq_khz": "2101797",
+        "scaling_max_freq_khz": "4122755"
+      },
+      "2": {
+        "scaling_governor": "performance",
+        "scaling_driver": "amd-pstate-epp",
+        "scaling_cur_freq_khz": "2101797",
+        "scaling_max_freq_khz": "4122755"
+      },
+      "3": {
+        "scaling_governor": "performance",
+        "scaling_driver": "amd-pstate-epp",
+        "scaling_cur_freq_khz": "2101797",
+        "scaling_max_freq_khz": "4122755"
+      },
+      "4": {
+        "scaling_governor": "performance",
+        "scaling_driver": "amd-pstate-epp",
+        "scaling_cur_freq_khz": "4124139",
+        "scaling_max_freq_khz": "4122755"
+      },
+      "5": {
+        "scaling_governor": "performance",
+        "scaling_driver": "amd-pstate-epp",
+        "scaling_cur_freq_khz": "2101797",
+        "scaling_max_freq_khz": "4122755"
+      },
+      "6": {
+        "scaling_governor": "performance",
+        "scaling_driver": "amd-pstate-epp",
+        "scaling_cur_freq_khz": "4134995",
+        "scaling_max_freq_khz": "4122755"
+      },
+      "7": {
+        "scaling_governor": "performance",
+        "scaling_driver": "amd-pstate-epp",
+        "scaling_cur_freq_khz": "4134181",
+        "scaling_max_freq_khz": "4122755"
+      }
+    }
+  },
+  "perf": {
+    "perf_event_paranoid": 4,
+    "perf_binary": "/usr/bin/perf",
+    "available": false,
+    "status": "unavailable",
+    "note": "unavailable: kernel.perf_event_paranoid = 4 (> 2) blocks unprivileged PMU counters"
+  },
+  "avx512ifma_present": true
+}

@@ -1,0 +1,41 @@
+{
+  "stage": "20261113T074633Z_C",
+  "stage_label": "C",
+  "stage_started_utc": "2026-11-13T07:46:33Z",
+  "profile": "full",
+  "session_id": "s2",
+  "seed": 381900449,
+  "instance": "xcnh2",
+  "arguments": {
+    "blocks": "^full_slice_sweep",
+    "logn": "20,24,26",
+    "warmup": "1",
+    "lcpc_variants": "as-published-as-is,fork-flags-portable",
+    "tags": null,
+    "multi_cores": "0,1,2,3,4,5,6,7",
+    "single_core": "1"
+  },
+  "arguments_string": "profile=full blocks=^full_slice_sweep logn=20,24,26 warmup=1 lcpc_variants=as-published-as-is,fork-flags-portable tags= seed=381900449",
+  "block_ids": [
+    "full_slice_sweep_s4_t8_n20-24-26",
+    "full_slice_sweep_s16_t8_n20-24-26",
+    "full_slice_sweep_s16_t1_n20-24-26",
+    "full_slice_sweep_s32_t1_n20-24-26",
+    "full_slice_sweep_s2_t8_n20-24-26",
+    "full_slice_sweep_s1_t8_n20-24-26",
+    "full_slice_sweep_s128_t8_n20-24-26",
+    "full_slice_sweep_s256_t1_n20-24-26",
+    "full_slice_sweep_s128_t1_n20-24-26",
+    "full_slice_sweep_s64_t8_n20-24-26",
+    "full_slice_sweep_s4_t1_n20-24-26",
+    "full_slice_sweep_s2_t1_n20-24-26",
+    "full_slice_sweep_s32_t8_n20-24-26",
+    "full_slice_sweep_s256_t8_n20-24-26",
+    "full_slice_sweep_s64_t1_n20-24-26",
+    "full_slice_sweep_s8_t1_n20-24-26",
+    "full_slice_sweep_s8_t8_n20-24-26",
+    "full_slice_sweep_s1_t1_n20-24-26"
+  ],
+  "any_block_failed": false,
+  "note": "benchmark_parameters.logN/warmup/threads describe the stage filters; per-block values are in schedule.json and each block's manifest"
+}

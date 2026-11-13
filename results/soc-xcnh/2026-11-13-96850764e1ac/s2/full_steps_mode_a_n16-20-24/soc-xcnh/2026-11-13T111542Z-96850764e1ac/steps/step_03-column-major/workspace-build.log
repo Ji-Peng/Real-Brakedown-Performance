@@ -1,0 +1,6 @@
+   Compiling lcpc-2d v0.1.1 (/home/z/zhangjp/rbd/target/xcnh-s2/worktrees/wt-step_03-column-major-9dyRzx/lcpc-2d)
+   Compiling lcpc-fields v0.1.1 (/home/z/zhangjp/rbd/target/xcnh-s2/worktrees/wt-step_03-column-major-9dyRzx/lcpc-fields)
+   Compiling lcpc-brakedown-pc v0.1.1 (/home/z/zhangjp/rbd/target/xcnh-s2/worktrees/wt-step_03-column-major-9dyRzx/lcpc-brakedown-pc)
+   Compiling lcpc-test-fields v0.1.0 (/home/z/zhangjp/rbd/target/xcnh-s2/worktrees/wt-step_03-column-major-9dyRzx/lcpc-test-fields)
+   Compiling lcpc-bench v0.1.0 (/home/z/zhangjp/rbd/target/xcnh-s2/worktrees/wt-step_03-column-major-9dyRzx/bench)
+    Finished `release` profile [optimized] target(s) in 16.51s
