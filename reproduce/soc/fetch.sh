@@ -73,7 +73,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$RBD_REMOTE_ROOT$RUN$SESSION" in
-    *[!A-Za-z0-9._*?/-]*) soc_die "--run, --session and RBD_REMOTE_ROOT may contain only A-Z a-z 0-9 . _ - / * ?" ;;
+    *[!]A-Za-z0-9._*?/[-]*) soc_die "--run, --session and RBD_REMOTE_ROOT may contain only A-Z a-z 0-9 . _ - / and the glob characters * ? [ ]" ;;
 esac
 
 if [ "$LIST" -eq 1 ]; then
