@@ -32,7 +32,8 @@ Modes:
   --manifest PATH   write the node record (JSON) and print
                     'single|benchmark|allowed|domain' on stdout
   --noise           print a one-line JSON noise snapshot (load average,
-                    allocated CPUs and running jobs of this node)
+                    CPUs allocated on this node, of which this job holds
+                    job_cpus_on_node, and its running jobs)
 """
 
 import argparse
@@ -151,6 +152,7 @@ def noise_snapshot():
         "node": node,
         "loadavg_1_5_15": [float(x) for x in load.split()[:3]] if load else None,
         "node_cpu_alloc": as_int(fields.get("CPUAlloc")),
+        "job_cpus_on_node": as_int(os.environ.get("SLURM_CPUS_ON_NODE")),
         "node_cpu_total": as_int(fields.get("CPUTot")),
         "node_cpu_load": as_float(fields.get("CPULoad")),
         "node_running_jobs": len(jobs.splitlines()) if jobs is not None else None,
