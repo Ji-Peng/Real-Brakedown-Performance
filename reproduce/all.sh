@@ -87,6 +87,7 @@ EOF
 }
 
 ANY_BLOCK_FAILED=0
+SMOKE_ANALYSIS_FAILED=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --profile)
@@ -1049,12 +1050,14 @@ if [ "$PROFILE" = "smoke" ]; then
         --allow 'T12|*|This Work Arm (ms)' \
         --allow 'T12|*|Original LCPC * Arm (ms)' \
         --allow 'T12|*|Arm Speedup vs *' \
-        --check || ANY_BLOCK_FAILED=1
+        --check || SMOKE_ANALYSIS_FAILED=1
 else
     log_info "Analyse the campaign with scripts/analyze.py --selection results/selection.json --check over all selected run dirs."
 fi
 
-session_schedule end "$ANY_BLOCK_FAILED" finished || log_warn "Could not finalize $SESSION_SCHEDULE"
+STAGE_RC=0
+[ "$ANY_BLOCK_FAILED" -eq 0 ] && [ "$SMOKE_ANALYSIS_FAILED" -eq 0 ] || STAGE_RC=1
+session_schedule end "$STAGE_RC" finished || log_warn "Could not finalize $SESSION_SCHEDULE"
 SESSION_SCHEDULE_FINALIZED=1
 
 log_info "=========================================================="
@@ -1062,6 +1065,9 @@ if [ "$ANY_BLOCK_FAILED" -ne 0 ]; then
     log_error "Stage finished with FAILED blocks; see $SESSION_DIR/failed_blocks.tsv"
 else
     log_info "Stage completed: all blocks succeeded."
+fi
+if [ "$SMOKE_ANALYSIS_FAILED" -ne 0 ]; then
+    log_error "Smoke analysis (analyze.py --check) failed; see the [FAIL] list above"
 fi
 log_info "Profile:     $PROFILE"
 log_info "Session ID:  $SESSION_ID"
@@ -1072,7 +1078,4 @@ log_info "Stage files: $STAGE_DIR"
 log_info "Session schedule: $SESSION_SCHEDULE"
 log_info "=========================================================="
 
-if [ "$ANY_BLOCK_FAILED" -ne 0 ]; then
-    exit 1
-fi
-exit 0
+exit "$STAGE_RC"
