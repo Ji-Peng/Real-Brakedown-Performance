@@ -5,7 +5,7 @@
 set -eu
 
 # The repository pins rustc through rustup; load Cargo before resolving it.
-. "$HOME/.cargo/env"
+. "${CARGO_HOME:-$HOME/.cargo}/env"
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 CODE_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)

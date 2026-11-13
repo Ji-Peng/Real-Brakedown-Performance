@@ -73,7 +73,13 @@ detect_host_profile() {
     # If on local Intel i7-11700K workstation
     if [ -f /proc/cpuinfo ] && grep -q "i7-11700K" /proc/cpuinfo; then
         HOST_PROFILE="local-i7-11700k"
+        return 0
     fi
+    # SoC cluster compute nodes are named after their node class.
+    case "$(hostname -s 2>/dev/null || true)" in
+        xcnh[0-9]*) HOST_PROFILE="soc-xcnh" ;;
+        xcng[0-9]*) HOST_PROFILE="soc-xcng" ;;
+    esac
 }
 
 load_host_profile() {
@@ -99,28 +105,11 @@ load_host_profile() {
     fi
 }
 
-# Name of the machine instance, used to key per-VM evidence files (host
-# profile, first-boot manifest) so that two VMs of the same machine type never
-# overwrite each other's records. On GCP this is the instance name from the
-# guest metadata server; elsewhere the short host name. The metadata server is
-# addressed by its link-local IP (not metadata.google.internal) so that the
-# short timeout also bounds the lookup on non-GCP hosts (no DNS resolution).
+# Name of the machine (the short host name), used to key per-node evidence
+# files (host profile, first-run record) so that two nodes of the same class
+# never overwrite each other's records.
 host_instance_name() {
-    _instance=$(python3 - <<'PY' 2>/dev/null || true
-import os, urllib.request
-host = os.environ.get("GCE_METADATA_HOST", "169.254.169.254")
-req = urllib.request.Request(f"http://{host}/computeMetadata/v1/instance/name",
-                             headers={"Metadata-Flavor": "Google"})
-try:
-    with urllib.request.urlopen(req, timeout=0.3) as response:
-        print(response.read().decode("utf-8", errors="replace").strip())
-except Exception:
-    pass
-PY
-)
-    if [ -z "$_instance" ]; then
-        _instance=$(hostname -s 2>/dev/null || echo unknown-host)
-    fi
+    _instance=$(hostname -s 2>/dev/null || echo unknown-host)
     # Keep the name safe for use in file names.
     printf '%s\n' "$_instance" | tr -c 'A-Za-z0-9._\n-' '_'
 }
@@ -425,7 +414,7 @@ write_manifest() {
     MANIFEST_WARMUP="$WARMUP" \
     MANIFEST_HOST_PROFILE="$HOST_PROFILE" \
     python3 - << 'EOF'
-import os, sys, json, subprocess, glob, hashlib, platform, datetime, urllib.request
+import os, sys, json, subprocess, glob, hashlib, platform, datetime
 
 def safe_read(path):
     try:
@@ -507,25 +496,16 @@ for cd in sorted(glob.glob("/sys/devices/system/cpu/cpu[0-9]*/cache/index*")):
     cache_instances.setdefault(key, entry)
 cache_topology = list(cache_instances.values())
 
-# GCP instance identity is available from the guest metadata server. Local runs
-# keep these fields null and remain explicitly marked by their host profile.
-def gce_metadata(path):
-    host = os.environ.get("GCE_METADATA_HOST", "169.254.169.254")
-    req = urllib.request.Request(
-        f"http://{host}/computeMetadata/v1/{path}",
-        headers={"Metadata-Flavor": "Google"},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=0.3) as response:
-            return response.read().decode("utf-8", errors="replace").strip()
-    except Exception:
-        return None
-
-machine_type_raw = gce_metadata("instance/machine-type")
-zone_raw = gce_metadata("instance/zone")
+# Slurm job identity (SoC cluster). Runs outside Slurm keep these fields
+# null and remain identified by their host profile and host name.
 machine_identity = {
-    "gcp_machine_type": machine_type_raw.rsplit("/", 1)[-1] if machine_type_raw else None,
-    "gcp_zone": zone_raw.rsplit("/", 1)[-1] if zone_raw else None,
+    "hostname": platform.node().split(".")[0] or None,
+    "slurm_job_id": os.environ.get("SLURM_JOB_ID"),
+    "slurm_partition": os.environ.get("SLURM_JOB_PARTITION"),
+    "slurm_nodelist": os.environ.get("SLURM_JOB_NODELIST"),
+    "slurm_cpus_per_task": os.environ.get("SLURM_CPUS_PER_TASK"),
+    "slurm_cpu_freq_request": os.environ.get("SLURM_CPU_FREQ_REQ"),
+    "slurm_cluster": os.environ.get("SLURM_CLUSTER_NAME"),
 }
 
 # 3. Frequency and turbo state
@@ -537,10 +517,14 @@ if no_turbo is not None:
 elif amd_boost is not None:
     turbo_disabled = (amd_boost == "0")
 
+# Clock and governor of the pinned cores (on a shared node the other CPUs
+# belong to other jobs and say nothing about this run).
 cur_freqs = {}
-for cf in sorted(glob.glob("/sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_cur_freq")):
-    c = cf.split("/")[5]
-    cur_freqs[c] = safe_read(cf)
+pinned_governors = {}
+for c in expanded_cores:
+    base = f"/sys/devices/system/cpu/cpu{c}/cpufreq"
+    cur_freqs[f"cpu{c}"] = safe_read(f"{base}/scaling_cur_freq")
+    pinned_governors[f"cpu{c}"] = safe_read(f"{base}/scaling_governor")
 
 governor = safe_read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor")
 
@@ -549,6 +533,7 @@ freq_turbo_info = {
     "intel_no_turbo_raw": no_turbo,
     "amd_boost_raw": amd_boost,
     "scaling_governor": governor,
+    "scaling_governor_pinned_cores": pinned_governors,
     "scaling_cur_freq_khz": cur_freqs
 }
 

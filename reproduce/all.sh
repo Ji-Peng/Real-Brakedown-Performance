@@ -19,9 +19,11 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 CODE_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/common.sh"
-if [ -f "$HOME/.cargo/env" ]; then
+# CARGO_HOME selects a per-architecture toolchain on hosts whose home
+# directory is shared between x86-64 and aarch64 nodes (reproduce/soc/).
+if [ -f "${CARGO_HOME:-$HOME/.cargo}/env" ]; then
     # shellcheck disable=SC1091
-    . "$HOME/.cargo/env"
+    . "${CARGO_HOME:-$HOME/.cargo}/env"
 fi
 CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-"$CODE_DIR/target-harness"}
 export CARGO_TARGET_DIR
@@ -42,9 +44,9 @@ usage() {
     cat <<EOF
 Usage: $0 [--profile full|arm|smoke] [--session <id>] [--seed <int>] [options]
 
-Master campaign orchestrator for RealBrakedownPerf evaluation per plan 06 §5/§6:
-  - full:  x86-64 primary campaign (E1-E13, logN 16..28, T 1..8 on the 8-core
-           c3d-highmem-16 benchmark set, all baselines; SIMD-Spielman Orion
+Master campaign orchestrator for the RealBrakedownPerf evaluation:
+  - full:  x86-64 primary campaign (E1-E13, logN 16..28, T 1..8 on the host
+           profile's 8-core benchmark set, all baselines; SIMD-Spielman Orion
            shape up to 2^26, see simd_spielman.sh --max-orion-logn)
   - arm:   Arm portability campaign (E14: This Work + Original LCPC, logN 18,22,26, T 1,8)
   - smoke: Tiny dry-run across all targets, outputs watermarked "LOCAL SMOKE — NOT A RESULT"
@@ -179,9 +181,9 @@ export MULTI_CORES SINGLE_CORE
 
 # Auto-detect profile if not provided
 if [ -z "$PROFILE" ]; then
-    if [ "$HOST_NAME" = "gcp-c3d-highmem-16" ]; then
+    if [ "$HOST_NAME" = "soc-xcnh" ]; then
         PROFILE="full"
-    elif [ "$HOST_NAME" = "gcp-c4a-highmem-16" ]; then
+    elif [ "$HOST_NAME" = "soc-xcng" ]; then
         PROFILE="arm"
     else
         PROFILE="smoke"
@@ -249,10 +251,10 @@ if [ -n "$WATERMARK" ]; then
 fi
 log_info "=========================================================="
 
-# Per-VM evidence: keep a copy of this instance's host profile and first-boot
-# manifest with the stage, so it travels with the session's results.
+# Per-node evidence: keep a copy of this node's host profile and first-run
+# record with the stage, so it travels with the session's results.
 for _evidence in "$CODE_DIR/results/$HOST_NAME/host-profile-$INSTANCE_NAME.json" \
-                 "$CODE_DIR/results/$HOST_NAME/first-boot-manifest-$INSTANCE_NAME.json"; do
+                 "$CODE_DIR/results/$HOST_NAME/first-run-$INSTANCE_NAME.json"; do
     if [ -f "$_evidence" ]; then
         cp "$_evidence" "$STAGE_DIR/"
     fi
@@ -263,9 +265,6 @@ BLOCKS_TSV="$STAGE_DIR/blocks.tsv"
 TAG_SCRIPT="$STAGE_DIR/tag_json.py"
 SESSION_SCHEDULE="$SESSION_DIR/schedule.json"
 MOVED_TSV="$STAGE_DIR/moved_blocks.tsv"
-COPYBACK_TSV="$STAGE_DIR/copyback.tsv"
-SESSION_REL="$HOST_NAME/$RUN_ID/$SESSION_ID"
-STAGE_REL="$SESSION_REL/stages/$STAGE_TAG"
 
 # Tags the JSON records of ONE block's own output directory (never other
 # blocks' outputs), for failed blocks too, with the block id and status. The
@@ -410,7 +409,7 @@ if profile == "smoke":
         "cmd": f"'{script_dir}/this_work.sh' --params rs-ligero --field mont127 --logN 20 --threads 1 --runs 2 --warmup 1 --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_ligero_rs'"
     })
 elif profile == "arm":
-    # E14: Arm portability campaign on Google Axion (c4a-highmem-16)
+    # E14: Arm portability campaign (SoC cluster xcng, Neoverse-N1)
     # This Work + Original LCPC only; logN 18, 22, 26; T 1, 8
     blocks.append({
         "id": "arm_this_work_t1",
@@ -433,7 +432,7 @@ elif profile == "arm":
         "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 8 --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/arm_lcpc_orig_t8'"
     })
 else:
-    # full: x86-64 primary campaign (c3d-highmem-16, E1-E13, logN 16..28)
+    # full: x86-64 primary campaign (SoC cluster xcnh, E1-E13, logN 16..28)
     # E1: Headline comparison mode (a) Mont127 T=1 and T=8
     blocks.append({
         "id": "full_this_work_mode_a_t1",
@@ -455,7 +454,6 @@ else:
         "description": "E1: Original LCPC mode (a) Ft127 T=8 (logN 16..28)",
             "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26,28 --threads 8 --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_lcpc_orig_mode_a_t8'"
     })
-
     # E2: Comparison with SIMD-Spielman (mode b, Mont127, Mers127, Fp2M61)
     for field_name in ["mont127", "mers127", "fp2m61"]:
         blocks.append({
@@ -511,7 +509,7 @@ else:
         })
 
     # E6: Thread scaling T in {1, 2, 4, 8, 15} at logN 20, 24, 26, 28, limited to
-    # the physical cores the host profile exposes (c3d-highmem-16: 8 cores -> T <= 8).
+    # the physical cores the host profile exposes (8 benchmark cores -> T <= 8).
     # Block ids equal their output directory names.
     def _ncores(spec):
         n = 0
@@ -837,25 +835,14 @@ trap on_stage_exit EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-# Copy-back list for reproduce/gcp/run_session.sh (paths relative to the
-# results root): this stage's dir, the session-level files and each block's
-# output dir (with the .prev- dir an earlier run was moved to, or '-').
 TAB=$(printf '\t')
-{
-    printf 'session\t%s\n' "$SESSION_REL"
-    printf 'stage\t%s\n' "$STAGE_REL"
-    printf 'file\t%s\n' "$SESSION_REL/schedule.json"
-} > "$COPYBACK_TSV"
-if [ -n "${RBD_COPYBACK_FILE:-}" ]; then
-    printf '%s\n' "$COPYBACK_TSV" > "$RBD_COPYBACK_FILE"
-fi
 
 # Execute scheduled blocks
 TOTAL_BLOCKS=$(wc -l < "$BLOCKS_TSV" | tr -d ' ')
 CURRENT_INDEX=1
 
 # CPU frequency of the block's first pinned core. With a cpufreq driver this is
-# the observed scaling_cur_freq; without one (e.g. GCP guests) only the
+# the observed scaling_cur_freq; without one (e.g. many VM guests) only the
 # constant 'cpu MHz' of /proc/cpuinfo exists, which is a nominal value and is
 # labelled as such (freq_source / freq_is_nominal in every record).
 cpu_freq_source() {
@@ -872,6 +859,14 @@ get_cpu_freq() {
         awk '{ printf "%.3f\n", $1 / 1000 }' "/sys/devices/system/cpu/cpu$1/cpufreq/scaling_cur_freq"
     elif [ -r /proc/cpuinfo ]; then
         awk -v cpu="$1" -F: '$1 ~ /^processor/ { p = $2 + 0 } $1 ~ /^cpu MHz/ && p == cpu { gsub(/ /, "", $2); print $2; exit }' /proc/cpuinfo
+    fi
+}
+
+# Load and allocation snapshot of a shared node (host profiles that define
+# host_noise_snapshot, e.g. the SoC cluster profiles); empty elsewhere.
+noise_snapshot() {
+    if command -v host_noise_snapshot >/dev/null 2>&1; then
+        host_noise_snapshot
     fi
 }
 
@@ -904,6 +899,7 @@ while IFS="$TAB" read -r block_id block_out block_core block_desc block_cmd; do
 
     FREQ_SOURCE=$(cpu_freq_source "$block_core")
     FREQ_BEFORE=$(get_cpu_freq "$block_core")
+    NOISE_BEFORE=$(noise_snapshot)
     START_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     TIME_START=$(date -u +%s)
 
@@ -916,6 +912,7 @@ while IFS="$TAB" read -r block_id block_out block_core block_desc block_cmd; do
     TIME_END=$(date -u +%s)
     END_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     FREQ_AFTER=$(get_cpu_freq "$block_core")
+    NOISE_AFTER=$(noise_snapshot)
     DURATION=$((TIME_END - TIME_START))
 
     if [ "$BLOCK_RC" -ne 0 ]; then
@@ -939,22 +936,23 @@ while IFS="$TAB" read -r block_id block_out block_core block_desc block_cmd; do
     python3 -c '
 import json, sys
 keys = ["block_id", "out", "status", "exit_code", "start_utc", "end_utc", "duration_s",
-        "core_for_frequency", "freq_before_mhz", "freq_after_mhz", "freq_source", "moved_previous_to", "cmd"]
+        "core_for_frequency", "freq_before_mhz", "freq_after_mhz", "freq_source", "moved_previous_to", "cmd",
+        "noise_before", "noise_after"]
 entry = dict(zip(keys, sys.argv[2:]))
 entry["exit_code"] = int(entry["exit_code"])
 entry["duration_s"] = int(entry["duration_s"])
 entry["moved_previous_to"] = entry["moved_previous_to"] or None
+for key in ("noise_before", "noise_after"):
+    try:
+        entry[key] = json.loads(entry.get(key) or "null")
+    except ValueError:
+        entry[key] = {"raw": entry[key]}
 with open(sys.argv[1], "a", encoding="utf-8") as f:
     f.write(json.dumps(entry) + "\n")
 ' "$EXECUTION_LOG_JSONL" "$block_id" "$block_out" "$BLOCK_STATUS" "$BLOCK_RC" "$START_UTC" "$END_UTC" \
-        "$DURATION" "$block_core" "$FREQ_BEFORE" "$FREQ_AFTER" "$FREQ_SOURCE" "$BLOCK_PREV" "$block_cmd" || \
+        "$DURATION" "$block_core" "$FREQ_BEFORE" "$FREQ_AFTER" "$FREQ_SOURCE" "$BLOCK_PREV" "$block_cmd" \
+        "$NOISE_BEFORE" "$NOISE_AFTER" || \
         log_warn "Could not append block '$block_id' to $EXECUTION_LOG_JSONL"
-
-    _block_exists=0
-    [ -d "$block_out" ] && _block_exists=1
-    _prev_rel=-
-    [ -z "$BLOCK_PREV" ] || _prev_rel="$SESSION_REL/$(basename "$BLOCK_PREV")"
-    printf 'block\t%s\t%s\t%s\n' "$SESSION_REL/$block_id" "$_prev_rel" "$_block_exists" >> "$COPYBACK_TSV"
 
     CURRENT_INDEX=$((CURRENT_INDEX + 1))
 done < "$BLOCKS_TSV"
@@ -1042,9 +1040,6 @@ else
     log_info "Analyse the campaign with scripts/analyze.py --selection results/selection.json --check over all selected run dirs."
 fi
 
-if [ -f "$SESSION_DIR/failed_blocks.tsv" ]; then
-    printf 'file\t%s\n' "$SESSION_REL/failed_blocks.tsv" >> "$COPYBACK_TSV"
-fi
 session_schedule end "$ANY_BLOCK_FAILED" finished || log_warn "Could not finalize $SESSION_SCHEDULE"
 SESSION_SCHEDULE_FINALIZED=1
 

@@ -6,7 +6,7 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 . "$SCRIPT_DIR/common.sh"
-. "$HOME/.cargo/env"
+. "${CARGO_HOME:-$HOME/.cargo}/env"
 parse_args "$@"
 
 if [ "$PARAMS" != "lcpc-sdig6" ] && [ "$PARAMS" != "lcpc-sdig3" ]; then

@@ -7,7 +7,7 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/common.sh"
-. "$HOME/.cargo/env"
+. "${CARGO_HOME:-$HOME/.cargo}/env"
 parse_args "$@"
 
 for tool in cargo rustc taskset python3 sha256sum; do
