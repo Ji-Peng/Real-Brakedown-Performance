@@ -1,0 +1,44 @@
+% Copyright 2026 RealBrakedownPerf Authors. Licensed under Apache-2.0.
+% Standalone LaTeX report template instantiated by reproduce/report.sh.
+\documentclass[10pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1.6cm]{geometry}
+\input{paper_macros.tex}
+\graphicspath{{paper/}{analysis/plots/}}
+
+\newsavebox{\rbdbox}
+\newcommand{\fitlandscape}[1]{%
+  \sbox{\rbdbox}{#1}%
+  \ifdim\wd\rbdbox>\linewidth
+    \sbox{\rbdbox}{\resizebox{\linewidth}{!}{\usebox{\rbdbox}}}%
+  \fi
+  \ifdim\ht\rbdbox>0.80\textheight
+    \resizebox{!}{0.80\textheight}{\usebox{\rbdbox}}%
+  \else
+    \usebox{\rbdbox}%
+  \fi
+}
+
+\title{RBP-LCPC Artifact Evaluation Report}
+\author{RealBrakedownPerf Artifact}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Run Overview and Claims Summary}
+\InputIfFileExists{cover.tex}{}{\notrunbox{Cover metadata}{cover.tex missing}}
+\InputIfFileExists{claims_table.tex}{}{\notrunbox{Claims verdict summary}{claims\_table.tex missing}}
+
+\clearpage
+\section{Paper-Format Tables and Figures}\label{sec:res-pcs}
+\InputIfFileExists{paper_section.tex}{}{\notrunbox{Paper-format tables}{paper\_section.tex missing}}
+
+\clearpage
+\begin{landscape}
+\section{Complete Analysis Appendix (Tables T0--T12 and Figures F1--F3)}
+\InputIfFileExists{appendix_section.tex}{}{\notrunbox{Analysis appendix}{appendix\_section.tex missing}}
+\end{landscape}
+
+\end{document}

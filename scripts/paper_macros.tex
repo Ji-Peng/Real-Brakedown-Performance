@@ -1,0 +1,92 @@
+% Copyright 2026 RealBrakedownPerf Authors. Licensed under Apache-2.0.
+% Packages and macros for standalone compilation of paper-format tables and
+% the artifact evaluation report (reproduce/report.sh).
+
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{threeparttable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{siunitx}
+\usepackage{tabularray}
+\UseTblrLibrary{booktabs,siunitx}
+\SetTblrStyle{remark}{font=\footnotesize}
+\usepackage{xspace}
+\usepackage{graphicx}
+\usepackage{placeins}
+\usepackage{pdflscape}
+\usepackage[hidelinks]{hyperref}
+\usepackage[capitalise,nameinlink]{cleveref}
+
+\sisetup{detect-all}
+
+% Visible TODO marker (used by \papertable and \derived fallbacks).
+\newif\ifshowtodos
+\showtodostrue
+\DeclareRobustCommand{\todo}[1]{%
+  \ifshowtodos{\color{red}\textbf{[TODO:~#1]}}\fi}
+
+% Standalone citation formatting (the report compiles without a .bib file).
+\renewcommand{\cite}[1]{[\textsf{#1}]}
+
+% Visible notice box for tables/figures that were not run.
+\newcommand{\notrunbox}[2]{%
+  \par\medskip\noindent
+  \fbox{\begin{minipage}{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}
+    \textbf{#1}: \emph{Not run} (#2).
+  \end{minipage}}\par\medskip}
+
+% Copied from the paper preamble (paper/main.tex lines 60-117)
+% Software artefacts are set in sans serif.
+\newcommand{\sw}[1]{\textsf{#1}}
+% Our LCPC fork. The generated CSVs and plots call it "This Work".
+\newcommand{\thiswork}{\sw{RBP-LCPC}\xspace}
+% Upstream LCPC f0e2116 \cite{Wah21} and its build variants. The generated
+% CSVs use the names in the comments.
+\newcommand{\lcpc}{\sw{LCPC}\xspace}
+\newcommand{\lcpcpub}{\sw{LCPC-default}\xspace}   % as-published-as-is: upstream Cargo defaults
+\newcommand{\lcpcff}{\sw{LCPC-tuned}\xspace}      % fork-flags-portable: our flags and portable BLAKE3
+\newcommand{\lcpcpubport}{\sw{LCPC}\textsubscript{pub,port}\xspace}  % as-published-portable
+\newcommand{\lcpcffdflt}{\sw{LCPC}\textsubscript{ff,dflt}\xspace}    % fork-flags-as-is
+% Other implementations.
+\newcommand{\polycommit}{\sw{PolyCommit}\xspace}  % arkworks poly-commit 1eaec50 \cite{CHL24}
+\newcommand{\simdsp}{\sw{SIMD-Spielman}\xspace}   % code of \cite{KDHR26}, 7b399db \cite{KDHR26code}
+\newcommand{\blake}{BLAKE3\xspace}
+% Schemes (roman, not software).
+\newcommand{\brakedown}{Brakedown\xspace}
+\newcommand{\orion}{Orion\xspace}
+\newcommand{\ligero}{Ligero\xspace}
+% Fields.
+\newcommand{\Mont}{\sw{Mont127}\xspace}   % 127-bit prime of LCPC's Ft127, Montgomery form
+\newcommand{\Mers}{\sw{Mers127}\xspace}   % 2^127 - 1
+\newcommand{\Fptwo}{\sw{Fp2M61}\xspace}   % F_{p^2}, p = 2^61 - 1 (122-bit)
+\newcommand{\Ftlcpc}{\sw{Ft127}\xspace}   % LCPC's ff_derive field (test oracle in the fork)
+% The two Spielman-code instantiations.
+\newcommand{\lcpccode}{LCPC code\xspace}            % LCPC's SdigCode6 parameters (CSV: mode a)
+\newcommand{\simdcode}{SIMD-Spielman code\xspace}   % fixed-degree parameters of \cite{KDHR26} (CSV: mode b)
+% Benchmark machines (rebound by paper/hosts.tex in lenient fresh runs).
+\newcommand{\xmach}{\sw{Zen5}\xspace}
+\newcommand{\amach}{\sw{N1}\xspace}
+\newcommand{\vmach}{\sw{V2}\xspace}
+% Notation.
+\newcommand{\F}{\mathbb{F}}
+\newcommand{\lgN}{\ensuremath{\log_2 N}\xspace}
+\newcommand{\pow}[1]{\ensuremath{2^{#1}}\xspace}
+\newcommand{\xs}{\ensuremath{\times}\xspace}  % speedup factor: 5.46\xs
+\newcommand{\gitref}[1]{\texttt{#1}}          % commit hash or tag
+\newcommand{\code}[1]{\texttt{#1}}            % identifiers, flags, files
+\newcommand{\nsmac}{ns/MAC\xspace}
+% A full generated table of the artifact, e.g. \csvt{T6} = analysis/csv/table_T6_*.csv.
+\newcommand{\csvt}[1]{CSV~\textsf{#1}}
+
+% Compact paper tables written by scripts/paper_tables.py.
+\newcommand{\papertable}[1]{%
+  \InputIfFileExists{paper/#1.tex}{}{%
+    \par\noindent\todo{missing paper/\detokenize{#1}.tex; run scripts/paper\_tables.py}\par}}
+% Derived quantities computed by scripts/paper_tables.py.
+\newcommand{\derived}[1]{%
+  \ifcsname rbpd@#1\endcsname\csname rbpd@#1\endcsname
+  \else\todo{derived value \detokenize{#1}}\fi}
+\InputIfFileExists{paper/hosts.tex}{}{}
+\InputIfFileExists{paper/derived.tex}{}{}
