@@ -30,15 +30,22 @@ Changes made by the RealBrakedownPerf authors (2026), Apache-2.0:
   Summary: current dependencies and stable Rust; column-major batched
   encoding; R2L evaluation with transposed graphs and runtime code
   parameters; lazy reduction through the LazyField trait; multi-edge
-  blocking; LLC slicing; an expander-level worker pool; portable codegen
-  tuning.
+  blocking; LLC slicing; an expander-level worker pool with serialized
+  dispatch; portable codegen tuning; cached per-code prepared weights and
+  lazy Reed-Solomon base cases; cost-balanced threaded encoding with tiled
+  transposition and reusable scratch buffers; parallel single-pass commit
+  initialization and batched leaf/Merkle hashing; lazy linear-combination
+  hooks for proving and verification, tiled deduplicated column openings,
+  and batched verifier encodings; portable scalar ChaCha20Stream challenge
+  and graph sampling with no-clone transposition.
 - Removed upstream files: upstream's nightly #[bench] harnesses
   lcpc-brakedown-pc/src/bench.rs and lcpc-ligero-pc/src/bench.rs (replaced
   by the stable benchmark crate bench/), and upstream's local shell helpers
   scripts/microbench.sh and scripts/print_bench.sh (replaced by
   reproduce/run.sh, reproduce/test.sh, and scripts/analyze.py).
-- New files in upstream crates: lcpc-brakedown-pc/src/{cache,graph,
-  thread_pool}.rs and lcpc-test-fields/src/fft.rs (see below).
+- New files in upstream crates: lcpc-2d/src/chacha.rs,
+  lcpc-brakedown-pc/src/{cache,graph,lincomb,thread_pool}.rs, and
+  lcpc-test-fields/src/fft.rs (see below).
 - New crates and files: lcpc-fields/, lcpc-oracle-tests/,
   lcpc-spielman-oracle/, bench/, reproduce/ (including run.sh, report.sh,
   preflight.sh, fetch_deps.sh, test.sh, claims.tsv, stages.tsv, and
