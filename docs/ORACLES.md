@@ -43,12 +43,12 @@ fresh transcript initialized with the same domain and messages. The original
 digest 0.9 API is adapted to BLAKE3 1.8.7; the fork uses its portable-only
 BLAKE3 wrapper. The proof comparison covers the complete serialized proof.
 
-Run this gate from `code/` after sourcing the pinned toolchain:
+Run this gate via `reproduce/test.sh` (or directly with Cargo after running `reproduce/fetch_deps.sh`):
 
 ```sh
-. "$HOME/.cargo/env"
-export CARGO_TARGET_DIR="$(pwd)/target-oracles"
-taskset -c 0,1,3-7 cargo test -p lcpc-oracle-tests --release
+reproduce/test.sh
+# Or directly:
+cargo test -p lcpc-oracle-tests --release --locked
 ```
 
 Run Cargo from the `code/` repository root so `.cargo/config.toml` can locate

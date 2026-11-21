@@ -64,9 +64,8 @@ sh reproduce/polycommit.sh --threads 1 --cores 3 --logN 12,16 --runs 2 \
   --warmup 1 --out target-eval-polycommit/smoke
 ```
 
-The output schema is `lcpc-bench-v1`. Local smoke data is development evidence
-only. Published figures come from the SoC cluster campaign (`xcnh` nodes, see
-"Campaign on the SoC cluster" in the top-level README).
+The output schema is `lcpc-bench-v1`. The authors' measurements are archived
+under `results/soc-xcnh/` (see the top-level README).
 
 `Cargo.lock` pins the standalone driver's Git dependency and transitive crates.
 The generated build copy uses the same locked package versions with a path

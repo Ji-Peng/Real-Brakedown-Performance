@@ -69,7 +69,7 @@ The barrier enforces this using a release-acquire synchronization protocol on an
 
 4. **Bounded Spin-Yield Strategy**:
    - In the wait loop, threads execute `std::hint::spin_loop()` for up to 64 iterations before yielding CPU time slices via `std::thread::yield_now()`.
-   - This prevents priority inversion, lockup, and starvation when multiple worker threads share a physical core (such as $T = 8$ workers on the 7 available cores of the local workstation).
+   - This prevents priority inversion, lockup, and starvation when multiple worker threads share a physical core.
 
 ---
 
@@ -81,7 +81,7 @@ Worker threads are managed by [`ThreadPool`]:
 3. **Core Pinning**:
    - On Linux, worker $i$ pins itself to `cores[i % cores.len()]` via `libc::sched_setaffinity`.
    - On non-Linux or restricted container environments, pinning gracefully degrades with a logged warning.
-   - Cores are supplied explicitly (`--cores`) or derived from the process affinity mask via `libc::sched_getaffinity`. CPU 2 is never implicitly picked.
+   - Cores are supplied explicitly (`--cores`) or derived from the process affinity mask via `libc::sched_getaffinity`.
 4. **Clean Drop**: When dropped, the pool sets an atomic shutdown flag, wakes all workers via condition variable, and joins all thread handles cleanly.
 
 ---

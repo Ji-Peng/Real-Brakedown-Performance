@@ -85,29 +85,9 @@ Let us evaluate the register footprint for `Mont127` and `Fp2M61`:
 
 ---
 
-## 4. Empirical Evaluation & Selection of $B$
+## 4. Empirical Selection of $B$
 
-> [!NOTE]
-> **Measurement Notice:** The following benchmarks were conducted locally on the development machine (Intel Core i7-11700K, pinned to Core 3 via `taskset -c 3`, turbo boost disabled, single-threaded, `params = lcpc-sdig6`, 10 runs, 2 warmups). These numbers are **direction-only engineering measurements** intended solely to guide the choice of the compile-time constant $B$; they are not published benchmark numbers.
-
-### Median Matrix Encoding Time (`encode_matrix`)
-
-| Field | $\log_2(N)$ | $B = 1$ (unblocked lazy) | $B = 2$ | $B = 4$ | Speedup ($B=4$ vs $B=1$) |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Mont127** | 16 | 10.22 ms | 9.25 ms | **8.89 ms** | **+13.0%** ($1.15\times$) |
-| **Mont127** | 18 | 31.50 ms | 28.85 ms | **27.83 ms** | **+11.7%** ($1.13\times$) |
-| **Mont127** | 20 | 122.16 ms | 112.72 ms | **109.71 ms** | **+10.2%** ($1.11\times$) |
-| **Fp2M61** | 16 | 5.76 ms | 5.47 ms | **5.29 ms** | **+8.2%** ($1.09\times$) |
-| **Fp2M61** | 18 | 19.95 ms | 18.68 ms | **18.37 ms** | **+7.9%** ($1.09\times$) |
-| **Fp2M61** | 20 | 76.82 ms | 71.81 ms | **71.71 ms** | **+6.7%** ($1.07\times$) |
-
-### Comparison with Eager R2L Baseline (`step/04-r2l`):
-- **Mont127 ($\log_2 N = 16$):** Eager was **44.4 ms** $\longrightarrow$ Blocked Lazy ($B=4$) is **8.89 ms** (**$5.0\times$ faster**).
-- **Fp2M61 ($\log_2 N = 16$):** Eager was **12.8 ms** $\longrightarrow$ Blocked Lazy ($B=4$) is **5.29 ms** (**$2.4\times$ faster**).
-
-### Analysis:
-- In all test cases and across all matrix sizes ($\log_2 N \in \{16, 18, 20\}$), **$B = 4$ consistently outperforms $B = 2$ and $B = 1$**.
-- Mont127 sees a greater relative improvement from blocking (+10.2% to +13.0%) than Fp2M61 (+6.7% to +8.2%), as Mont127's 5-limb accumulator involves wider memory transfers per load/store, making the $4\times$ reduction in store port traffic especially impactful.
+During development, single-threaded microbenchmarks across $B \in \{1, 2, 4\}$ over `Mont127` and `Fp2M61` showed that $B = 4$ consistently outperformed $B = 1$ and $B = 2$ while avoiding the severe register spilling observed at $B = 8$. Those exploratory tuning runs were performed during development and are not part of the paper's evaluation; canonical evaluation measurements live in `results/` and are reproduced via `reproduce/run.sh`.
 
 ---
 
@@ -124,7 +104,7 @@ Let us evaluate the register footprint for `Mont127` and `Fp2M61`:
 ## 6. Verification & Codegen Invariants
 
 1. **Bit-Exactness Across All Tests:**
-   - Full workspace tests run with `taskset -c 0,1,3-7 cargo test --workspace --release`.
+   - Full workspace tests run via `reproduce/test.sh` (or `cargo test --workspace --release --locked`).
    - All tests pass, including:
      - Bit-exactness against unmodified LCPC `f0e2116001af5a1bbf39481535f837d6a25772e8` (`lcpc-oracle-tests/tests/original_lcpc.rs`).
      - Bit-exactness against all 18 SIMD-Spielman test vectors (`lcpc-oracle-tests/tests/simd_spielman_tv.rs`).
