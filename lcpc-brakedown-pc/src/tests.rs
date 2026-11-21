@@ -9,7 +9,8 @@
 //
 // Modified 2026 by the RealBrakedownPerf authors (Apache-2.0, see NOTICE):
 // oracle, invariance, lazy linear-combination, encoder thread-scaling,
-// scratch-reuse, and regression tests for the fork.
+// scratch-reuse, prepared-weight, lazy Reed-Solomon, and regression tests
+// for the fork.
 // The per-commit changes are in the git history since step/00-import
 // (upstream conroi/lcpc f0e2116).
 
@@ -2407,4 +2408,247 @@ fn test_reusable_scratch_stale_data_invariance() {
     check_field::<Mont127>(0x5c2a_0001);
     check_field::<Mers127>(0x5c2a_0002);
     check_field::<Fp2M61>(0x5c2a_0003);
+}
+
+#[test]
+fn test_lazy_reed_solomon_matches_horner_all_fields() {
+    use super::encode::{
+        encode_col_major, encode_column_block_prepared, encode_row_major_slices_mt,
+        reed_solomon_column_block, reed_solomon_graph, BaseCase, ExpanderCode,
+    };
+    use super::thread_pool::{get_affinity_cores, ThreadPool};
+
+    fn check_field<F: LazyField>(seed: u64) {
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
+        let allowed = get_affinity_cores();
+        let pool4 = ThreadPool::new(4, &allowed);
+
+        // Required grid: m in {1, 2, 15, 20} (plus 36 > Fp2M61::MAX_ACCUMULATIONS to
+        // exercise intermediate folding), n_out in {1, 26, 35}, n_rows in {1, 3, 64}.
+        for &m in &[1usize, 2, 15, 20, 36] {
+            let id_idx: Vec<u32> = (0..m as u32).collect();
+            let id_w = vec![F::ONE; m];
+            let id_pre = R2lGraph::from_left_edges_fixed_degree(m, m, 1, &id_idx, &id_w);
+
+            for &n_out in &[1usize, 26, 35] {
+                let rs_graph = reed_solomon_graph::<F>(m, n_out);
+                let rs_w: Vec<F> = rs_graph.weights().iter().map(F::prepare_weight).collect();
+
+                let empty_post =
+                    R2lGraph::from_left_edges(n_out, 0, &vec![0usize; n_out + 1], &[], &[]);
+                let rs_code = ExpanderCode::from_graphs(
+                    BaseCase::ReedSolomon,
+                    vec![id_pre.clone()],
+                    vec![empty_post],
+                );
+
+                for &n_rows in &[1usize, 3, 64] {
+                    let xi: Vec<F> = (0..m * n_rows).map(|_| F::random(&mut rng)).collect();
+                    let mut expected = vec![F::ZERO; n_out * n_rows];
+                    reed_solomon_column_block(&xi, &mut expected, n_rows);
+
+                    let mut got_direct = vec![F::ONE; n_out * n_rows];
+                    encode_column_block_prepared(&rs_graph, &rs_w, &xi, &mut got_direct, n_rows);
+                    assert_eq!(
+                        got_direct,
+                        expected,
+                        "lazy RS graph mismatch for {}, m={m}, n_out={n_out}, n_rows={n_rows}",
+                        std::any::type_name::<F>()
+                    );
+
+                    // Full ExpanderCode path (single-threaded column-major and threaded sliced)
+                    let mut buf = vec![F::ONE; (m + n_out) * n_rows];
+                    buf[..m * n_rows].copy_from_slice(&xi);
+                    encode_col_major(&mut buf, n_rows, &rs_code);
+                    assert_eq!(&buf[..m * n_rows], &xi[..]);
+                    assert_eq!(
+                        &buf[m * n_rows..],
+                        &expected[..],
+                        "ExpanderCode RS mismatch for {}, m={m}, n_out={n_out}, n_rows={n_rows}",
+                        std::any::type_name::<F>()
+                    );
+
+                    if n_rows >= 3 {
+                        let n_cols = m + n_out;
+                        let mut row_major = vec![F::ONE; n_rows * n_cols];
+                        for row in 0..n_rows {
+                            for col in 0..m {
+                                row_major[row * n_cols + col] = xi[col * n_rows + row];
+                            }
+                        }
+                        encode_row_major_slices_mt(&mut row_major, n_rows, &rs_code, 2, &pool4);
+                        for row in 0..n_rows {
+                            for col in 0..n_out {
+                                assert_eq!(
+                                    row_major[row * n_cols + m + col],
+                                    expected[col * n_rows + row],
+                                    "MT ExpanderCode RS mismatch for {}, m={m}, n_out={n_out}, n_rows={n_rows}",
+                                    std::any::type_name::<F>()
+                                );
+                            }
+                        }
+                    }
+                }
+
+                // Worst-case -1 inputs at (m, n_out, n_rows = 3)
+                let xi_max = vec![-F::ONE; m * 3];
+                let mut exp_max = vec![F::ZERO; n_out * 3];
+                reed_solomon_column_block(&xi_max, &mut exp_max, 3);
+                let mut got_max = vec![F::ONE; n_out * 3];
+                encode_column_block_prepared(&rs_graph, &rs_w, &xi_max, &mut got_max, 3);
+                assert_eq!(got_max, exp_max);
+            }
+        }
+    }
+
+    check_field::<Mont127>(0x2505_0001);
+    check_field::<Mers127>(0x2505_0002);
+    check_field::<Fp2M61>(0x2505_0003);
+    check_field::<Ft127>(0x2505_0004);
+    check_field::<Ft63>(0x2505_0005);
+}
+
+#[test]
+fn test_prepared_weights_and_cloned_encoding_invariance() {
+    use super::codespec::SdigCode6;
+    use super::encode::{
+        encode, encode_col_major, encode_column_block, encode_column_block_prepared,
+        encode_column_block_range_blocked, BLOCK_FACTOR,
+    };
+    use super::thread_pool::get_affinity_cores;
+
+    fn check_field<F: LazyField>(seed: u64) {
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
+        let allowed = get_affinity_cores();
+
+        for (params, expect_rs) in [
+            (CodeParams::Lcpc(LcpcParams::of::<SdigCode6>()), true),
+            (CodeParams::SimdSpielman, false),
+        ] {
+            let enc = SpielmanEncoding::<F>::with_params(params, 64, seed)
+                .with_threads_and_cores(4, &allowed)
+                .with_slices(3);
+
+            // Derived data starts uninitialized; cloning before first encode keeps it uninitialized.
+            assert!(!enc.code().is_derived_initialized());
+            let cloned_before = enc.clone();
+            assert!(!cloned_before.code().is_derived_initialized());
+
+            let derived_first = enc.code().derived();
+            assert!(enc.code().is_derived_initialized());
+            assert_eq!(derived_first.rs.is_some(), expect_rs);
+            assert!(
+                std::ptr::eq(derived_first, enc.code().derived()),
+                "derived() must initialize at most once per ExpanderCode"
+            );
+
+            // Verify encode_column_block_prepared with derived weights equals
+            // encode_column_block and encode_column_block_range_blocked on every graph.
+            let mut graphs_and_weights: Vec<(&R2lGraph<F>, &[F])> = enc
+                .code()
+                .precodes()
+                .iter()
+                .zip(derived_first.pre.iter())
+                .chain(enc.code().postcodes().iter().zip(derived_first.post.iter()))
+                .map(|(g, w)| (g, w.as_slice()))
+                .collect();
+            if let Some((ref rs_g, ref rs_w)) = derived_first.rs {
+                graphs_and_weights.push((rs_g, rs_w.as_slice()));
+            }
+
+            for (g, w) in graphs_and_weights {
+                assert_eq!(w.len(), g.n_edges());
+                for &n_rows in &[1usize, 3, 19] {
+                    let input: Vec<F> = (0..g.n_left() * n_rows)
+                        .map(|_| F::random(&mut rng))
+                        .collect();
+                    let mut exp = vec![F::ONE; g.n_right() * n_rows];
+                    encode_column_block(g, &input, &mut exp, n_rows);
+
+                    let mut got_prep = vec![-F::ONE; g.n_right() * n_rows];
+                    encode_column_block_prepared(g, w, &input, &mut got_prep, n_rows);
+                    assert_eq!(got_prep, exp);
+
+                    let mut got_range = vec![-F::ONE; g.n_right() * n_rows];
+                    let mut scratch = vec![F::Acc::default(); n_rows];
+                    let mid = g.n_right() / 2;
+                    encode_column_block_range_blocked::<F, BLOCK_FACTOR>(
+                        g,
+                        &input,
+                        &mut got_range,
+                        n_rows,
+                        0,
+                        mid,
+                        &mut scratch,
+                    );
+                    encode_column_block_range_blocked::<F, BLOCK_FACTOR>(
+                        g,
+                        &input,
+                        &mut got_range,
+                        n_rows,
+                        mid,
+                        g.n_right(),
+                        &mut scratch,
+                    );
+                    assert_eq!(got_range, exp);
+                }
+            }
+
+            // Cloning after initialization clones the derived data and encodes identically.
+            let cloned_after = enc.clone();
+            assert!(cloned_after.code().is_derived_initialized());
+            let code_cloned = enc.code().clone();
+            assert!(code_cloned.is_derived_initialized());
+
+            let n_cols = enc.code().codeword_len();
+            let n_rows = 29usize;
+            let initial: Vec<F> = (0..n_rows * n_cols)
+                .map(|_| {
+                    let v = F::random(&mut rng);
+                    if v == F::ZERO { F::ONE } else { v }
+                })
+                .collect();
+
+            let mut out_orig = initial.clone();
+            enc.encode_rows(&mut out_orig, n_cols).unwrap();
+
+            let mut out_cloned_before = initial.clone();
+            cloned_before
+                .encode_rows(&mut out_cloned_before, n_cols)
+                .unwrap();
+            assert!(cloned_before.code().is_derived_initialized());
+            assert_eq!(out_cloned_before, out_orig);
+
+            let mut out_cloned_after = initial.clone();
+            cloned_after
+                .encode_rows(&mut out_cloned_after, n_cols)
+                .unwrap();
+            assert_eq!(out_cloned_after, out_orig);
+
+            // Also verify single-row `encode` and `encode_col_major` on `code_cloned`
+            let mut single_orig = initial[..n_cols].to_vec();
+            let mut single_cloned = single_orig.clone();
+            encode(&mut single_orig, enc.code());
+            encode(&mut single_cloned, &code_cloned);
+            assert_eq!(single_cloned, single_orig);
+            assert_eq!(single_orig, out_orig[..n_cols]);
+
+            let mut cm_orig = vec![F::ZERO; n_rows * n_cols];
+            for r in 0..n_rows {
+                for c in 0..n_cols {
+                    cm_orig[c * n_rows + r] = initial[r * n_cols + c];
+                }
+            }
+            let mut cm_cloned = cm_orig.clone();
+            encode_col_major(&mut cm_orig, n_rows, enc.code());
+            encode_col_major(&mut cm_cloned, n_rows, &code_cloned);
+            assert_eq!(cm_cloned, cm_orig);
+        }
+    }
+
+    check_field::<Mont127>(0xd321_0001);
+    check_field::<Mers127>(0xd321_0002);
+    check_field::<Fp2M61>(0xd321_0003);
+    check_field::<Ft127>(0xd321_0004);
+    check_field::<Ft63>(0xd321_0005);
 }

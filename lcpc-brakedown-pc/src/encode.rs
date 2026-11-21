@@ -11,7 +11,7 @@
 // column-major batched encoding, R2L evaluation, lazy reduction,
 // multi-edge blocking, LLC slicing, expander-level worker pool, codegen tuning,
 // tiled threaded transposes, edge-balanced right-node partitioning, reusable
-// encoding scratch.
+// encoding scratch, per-code prepared weights, lazy Reed-Solomon base case.
 // The per-commit changes are in the git history since step/00-import
 // (upstream conroi/lcpc f0e2116).
 
@@ -42,8 +42,15 @@ traffic by 4x.
 The code itself ([`ExpanderCode`]) is a list of precode/postcode graph pairs
 plus a base case. It can be sampled by [`crate::matgen`] for either
 code-parameter mode or assembled from externally sampled graphs with
-[`ExpanderCode::from_graphs`].
+[`ExpanderCode::from_graphs`]. On first encoding use, [`ExpanderCode`] computes
+and caches [`LazyField::prepare_weight`] of every graph edge weight (and, in
+[`BaseCase::ReedSolomon`] mode, a dense Vandermonde [`R2lGraph`] together with
+its prepared weights) so both expander levels and the base case run through
+[`encode_column_block_prepared`] without per-slice weight preparation or eager
+Horner steps.
 */
+
+use std::sync::OnceLock;
 
 use crate::graph::R2lGraph;
 use crate::thread_pool::{split_range, SenseReversingBarrier, ThreadPool, WorkerJob};
@@ -62,12 +69,57 @@ pub const BLOCK_FACTOR: usize = 4;
 pub enum BaseCase {
     /// LCPC (mode (a)): the last precode output (at most `baselen` elements) is a
     /// temporary, not part of the codeword; it is Reed-Solomon encoded (Vandermonde
-    /// evaluation at `x = 1, 2, ...`) into the last postcode's `n_left` positions.
+    /// evaluation at `x = 1, 2, ...`, cached as an [`R2lGraph`] and evaluated with
+    /// lazy accumulation) into the last postcode's `n_left` positions.
     ReedSolomon,
     /// SIMD-Spielman (mode (b)): the last precode output is written into the
     /// codeword and the base code is the identity, so the last postcode reads it
     /// directly (its `n_left` equals the last precode's `n_right`).
     Identity,
+}
+
+/// Prepared weights and base-case Vandermonde graph derived once from an [`ExpanderCode`].
+#[derive(Clone, Debug)]
+pub(crate) struct Derived<F> {
+    pub(crate) pre: Vec<Vec<F>>,
+    pub(crate) post: Vec<Vec<F>>,
+    pub(crate) rs: Option<(R2lGraph<F>, Vec<F>)>,
+}
+
+/// Build the right-to-left Vandermonde graph for the Reed-Solomon base case.
+///
+/// Maps `m` polynomial coefficient inputs (`0..m`) to `n_out` evaluation outputs (`0..n_out`).
+/// Output `c` has incoming edges `(j, x_c^j)` for `j` in `0..m`, where `x_c` is `F::ONE`
+/// added `c + 1` times and the powers `x_c^j` come from repeated multiplication starting
+/// at `F::ONE`, matching the canonical polynomial evaluation of [`reed_solomon_column_block`].
+pub(crate) fn reed_solomon_graph<F: Field>(m: usize, n_out: usize) -> R2lGraph<F> {
+    let n_edges = m.checked_mul(n_out).expect("RS edge count overflows usize");
+    let mut right_idx = Vec::with_capacity(n_edges);
+    let mut weights = Vec::with_capacity(n_edges);
+
+    if m > 0 && n_out > 0 {
+        let mut xs = Vec::with_capacity(n_out);
+        let mut x = F::ONE;
+        for _ in 0..n_out {
+            xs.push(x);
+            x += F::ONE;
+        }
+
+        let mut pows = vec![F::ONE; n_out];
+        for j in 0..m {
+            for c in 0..n_out {
+                right_idx.push(u32::try_from(c).expect("RS output index overflows u32"));
+                weights.push(pows[c]);
+            }
+            if j + 1 < m {
+                for (p, &xc) in pows.iter_mut().zip(xs.iter()) {
+                    *p *= xc;
+                }
+            }
+        }
+    }
+
+    R2lGraph::from_left_edges_fixed_degree(m, n_out, n_out, &right_idx, &weights)
 }
 
 /// A recursive expander code: precode/postcode graphs per level and a base case.
@@ -83,6 +135,7 @@ pub struct ExpanderCode<F> {
     precodes: Vec<R2lGraph<F>>,
     postcodes: Vec<R2lGraph<F>>,
     base: BaseCase,
+    derived: OnceLock<Derived<F>>,
 }
 
 impl<F> ExpanderCode<F> {
@@ -141,6 +194,7 @@ impl<F> ExpanderCode<F> {
             precodes,
             postcodes,
             base,
+            derived: OnceLock::new(),
         }
     }
 
@@ -172,6 +226,37 @@ impl<F> ExpanderCode<F> {
     #[inline]
     pub fn base_case(&self) -> BaseCase {
         self.base
+    }
+
+    #[inline]
+    pub(crate) fn derived(&self) -> &Derived<F>
+    where
+        F: LazyField,
+    {
+        self.derived.get_or_init(|| {
+            let prepare = |g: &R2lGraph<F>| -> Vec<F> {
+                g.weights().iter().map(F::prepare_weight).collect()
+            };
+            let pre = self.precodes.iter().map(prepare).collect();
+            let post = self.postcodes.iter().map(prepare).collect();
+            let rs = match self.base {
+                BaseCase::ReedSolomon => {
+                    let levels = self.precodes.len();
+                    let m = self.precodes[levels - 1].n_right();
+                    let n_out = self.postcodes[levels - 1].n_left();
+                    let g = reed_solomon_graph::<F>(m, n_out);
+                    let w = prepare(&g);
+                    Some((g, w))
+                }
+                BaseCase::Identity => None,
+            };
+            Derived { pre, post, rs }
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn is_derived_initialized(&self) -> bool {
+        self.derived.get().is_some()
     }
 }
 
@@ -270,17 +355,20 @@ fn encode_col_major_with_temp<F>(
     let n_cols = code.codeword_len();
     assert_eq!(buf.len(), n_cols * n_rows);
 
+    let derived = code.derived();
+
     // compute precodes all the way down (all but the last for the R-S base case)
     let n_inplace = match code.base_case() {
         BaseCase::ReedSolomon => levels - 1,
         BaseCase::Identity => levels,
     };
     let mut in_start = 0usize;
-    for precode in &precodes[..n_inplace] {
+    for (precode, pre_w) in precodes[..n_inplace].iter().zip(&derived.pre[..n_inplace]) {
         let in_end = in_start + precode.n_left();
         let (in_arr, out_arr) = buf.split_at_mut(in_end * n_rows);
-        encode_column_block(
+        encode_column_block_prepared(
             precode,
+            pre_w,
             &in_arr[in_start * n_rows..],
             &mut out_arr[..precode.n_right() * n_rows],
             n_rows,
@@ -290,44 +378,58 @@ fn encode_col_major_with_temp<F>(
 
     // base case; afterwards `in_start` is one past the last precode output and
     // `out_start` is where the deepest postcode writes
-    let (mut in_start, mut out_start) = match code.base_case() {
-        BaseCase::ReedSolomon => {
+    let (mut in_start, mut out_start) = match &derived.rs {
+        Some((rs_graph, rs_w)) => {
             // evaluate last precode into temporary column-major storage; every
-            // element of `in_arr` is written before `reed_solomon_column_block` reads it
+            // element of `in_arr` is written before the Reed-Solomon graph phase reads it
             let precode = &precodes[levels - 1];
+            let pre_w = &derived.pre[levels - 1];
             let in_end = in_start + precode.n_left();
             let need_rs = precode.n_right() * n_rows;
             if temp_rs.len() < need_rs {
                 temp_rs.resize(need_rs, F::ZERO);
             }
             let in_arr = &mut temp_rs[..need_rs];
-            encode_column_block(
+            encode_column_block_prepared(
                 precode,
+                pre_w,
                 &buf[in_start * n_rows..in_end * n_rows],
                 in_arr,
                 n_rows,
             );
 
-            // now evaluate Reed-Solomon code on the result
+            // evaluate the Reed-Solomon Vandermonde graph on the result
             let out_end = in_end + postcodes[levels - 1].n_left();
-            reed_solomon_column_block(in_arr, &mut buf[in_end * n_rows..out_end * n_rows], n_rows);
+            encode_column_block_prepared(
+                rs_graph,
+                rs_w,
+                in_arr,
+                &mut buf[in_end * n_rows..out_end * n_rows],
+                n_rows,
+            );
 
             (in_end + precode.n_right(), out_end)
         }
         // identity: the last precode output already sits in the codeword
-        BaseCase::Identity => {
+        None => {
             let end = in_start + precodes[levels - 1].n_right();
             (end, end)
         }
     };
 
-    for (precode, postcode) in precodes.iter().rev().zip(postcodes.iter().rev()) {
+    for ((precode, postcode), post_w) in precodes
+        .iter()
+        .rev()
+        .zip(postcodes.iter().rev())
+        .zip(derived.post.iter().rev())
+    {
         // move input pointer backward
         in_start -= precode.n_right();
 
         let (in_arr, out_arr) = buf.split_at_mut(out_start * n_rows);
-        encode_column_block(
+        encode_column_block_prepared(
             postcode,
+            post_w,
             &in_arr[in_start * n_rows..out_start * n_rows],
             &mut out_arr[..postcode.n_right() * n_rows],
             n_rows,
@@ -494,6 +596,7 @@ struct RowMajorSliceJob<'a, F: LazyField> {
     n_cols: usize,
     n_per_row: usize,
     code: &'a ExpanderCode<F>,
+    derived: &'a Derived<F>,
     slices: usize,
     base_r: usize,
     max_h: usize,
@@ -502,9 +605,10 @@ struct RowMajorSliceJob<'a, F: LazyField> {
 
 // Safety: the raw pointers refer to buffers exclusively borrowed by the
 // coordinator for the duration of `ThreadPool::execute`. Workers partition
-// source columns, output graph nodes, Reed-Solomon columns, and final rows into
-// disjoint ranges. Barriers separate each read/write phase, and execute waits
-// for every worker before those borrows can end.
+// source columns, output graph nodes (including the Reed-Solomon base-case
+// graph), and final rows into disjoint ranges. Barriers separate each
+// read/write phase, and execute waits for every worker before those borrows
+// can end.
 unsafe impl<'a, F: LazyField> Send for RowMajorSliceJob<'a, F> {}
 // Safety: see the partitioning and lifetime invariant above.
 unsafe impl<'a, F: LazyField> Sync for RowMajorSliceJob<'a, F> {}
@@ -513,6 +617,7 @@ impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
     fn run(&self, tid: usize, num_threads: usize, barrier: &SenseReversingBarrier) {
         let precodes = self.code.precodes();
         let postcodes = self.code.postcodes();
+        let derived = self.derived;
         let levels = precodes.len();
         let n_inplace = match self.code.base_case() {
             BaseCase::ReedSolomon => levels - 1,
@@ -560,7 +665,7 @@ impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
 
             // 2. Collaborative expander evaluation on slice_buf
             let mut in_start = 0usize;
-            for precode in &precodes[..n_inplace] {
+            for (precode, pre_w) in precodes[..n_inplace].iter().zip(&derived.pre[..n_inplace]) {
                 let in_end = in_start + precode.n_left();
                 let out_start = in_end;
                 let (r_start_node, r_end_node) = split_right_nodes(precode, tid, num_threads);
@@ -576,6 +681,7 @@ impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
                     );
                     encode_column_block_range_shard::<F, BLOCK_FACTOR>(
                         precode,
+                        pre_w,
                         in_slice,
                         out_slice,
                         h,
@@ -590,9 +696,10 @@ impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
             }
 
             // Base case
-            let (mut in_start, mut out_start) = match self.code.base_case() {
-                BaseCase::ReedSolomon => {
+            let (mut in_start, mut out_start) = match &derived.rs {
+                Some((rs_graph, rs_w)) => {
                     let precode = &precodes[levels - 1];
+                    let pre_w = &derived.pre[levels - 1];
                     let in_end = in_start + precode.n_left();
                     let (r_start_node, r_end_node) = split_right_nodes(precode, tid, num_threads);
 
@@ -607,6 +714,7 @@ impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
                         );
                         encode_column_block_range_shard::<F, BLOCK_FACTOR>(
                             precode,
+                            pre_w,
                             in_slice,
                             out_slice,
                             h,
@@ -617,32 +725,43 @@ impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
                     }
                     barrier.wait();
 
-                    let out_end = in_end + postcodes[levels - 1].n_left();
-                    let n_rs_out = postcodes[levels - 1].n_left();
-                    let (c_start_rs, c_end_rs) = split_range(n_rs_out, tid, num_threads);
+                    let out_end = in_end + rs_graph.n_right();
+                    let (r_start_rs, r_end_rs) = split_right_nodes(rs_graph, tid, num_threads);
 
                     unsafe {
                         let in_rs = std::slice::from_raw_parts(self.temp_rs, precode.n_right() * h);
                         let out_rs = std::slice::from_raw_parts_mut(
-                            slice_buf.add((in_end + c_start_rs) * h),
-                            (c_end_rs - c_start_rs) * h,
+                            slice_buf.add((in_end + r_start_rs) * h),
+                            (r_end_rs - r_start_rs) * h,
                         );
-                        reed_solomon_column_block_range_shard(
-                            in_rs, out_rs, h, c_start_rs, c_end_rs,
+                        encode_column_block_range_shard::<F, BLOCK_FACTOR>(
+                            rs_graph,
+                            rs_w,
+                            in_rs,
+                            out_rs,
+                            h,
+                            r_start_rs,
+                            r_end_rs,
+                            &mut scratch,
                         );
                     }
                     barrier.wait();
 
                     (in_end + precode.n_right(), out_end)
                 }
-                BaseCase::Identity => {
+                None => {
                     let end = in_start + precodes[levels - 1].n_right();
                     (end, end)
                 }
             };
 
             // Postcodes (bottom-up)
-            for (precode, postcode) in precodes.iter().rev().zip(postcodes.iter().rev()) {
+            for ((precode, postcode), post_w) in precodes
+                .iter()
+                .rev()
+                .zip(postcodes.iter().rev())
+                .zip(derived.post.iter().rev())
+            {
                 in_start -= precode.n_right();
                 let (r_start_node, r_end_node) = split_right_nodes(postcode, tid, num_threads);
 
@@ -657,6 +776,7 @@ impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
                     );
                     encode_column_block_range_shard::<F, BLOCK_FACTOR>(
                         postcode,
+                        post_w,
                         in_slice,
                         out_slice,
                         h,
@@ -779,6 +899,10 @@ pub fn encode_row_major_slices_mt_with<F: LazyField>(
         scratch.temp_rs.resize(need_rs, F::ZERO);
     }
 
+    // Build derived prepared weights and base-case graph once before launching workers
+    // so worker threads only read `&Derived<F>`.
+    let derived = code.derived();
+
     let job = RowMajorSliceJob {
         comm: comm.as_mut_ptr(),
         buf: scratch.buf.as_mut_ptr(),
@@ -786,6 +910,7 @@ pub fn encode_row_major_slices_mt_with<F: LazyField>(
         n_cols,
         n_per_row,
         code,
+        derived,
         slices: s,
         base_r,
         max_h,
@@ -820,6 +945,7 @@ pub fn encode_col_major_sliced<F: LazyField>(
     let s = effective_s.clamp(1, n_rows);
     let base_r = n_rows / s;
 
+    let mut temp_rs = Vec::new();
     let mut offset = 0;
     for slice_idx in 0..s {
         let r_start = slice_idx * base_r;
@@ -833,7 +959,7 @@ pub fn encode_col_major_sliced<F: LazyField>(
             continue;
         }
         let slice_len = n_cols * h;
-        encode_col_major(&mut buf[offset..offset + slice_len], h, code);
+        encode_col_major_with_temp(&mut buf[offset..offset + slice_len], h, code, &mut temp_rs);
         offset += slice_len;
     }
 }
@@ -843,6 +969,7 @@ struct ColMajorSlicedJob<'a, F: LazyField> {
     n_rows: usize,
     n_cols: usize,
     code: &'a ExpanderCode<F>,
+    derived: &'a Derived<F>,
     slices: usize,
     base_r: usize,
     max_h: usize,
@@ -851,8 +978,9 @@ struct ColMajorSlicedJob<'a, F: LazyField> {
 
 // Safety: the raw pointers refer to buffers exclusively borrowed by the
 // coordinator for the duration of `ThreadPool::execute`. Workers partition
-// output graph nodes into disjoint ranges, and barriers separate graph levels
-// and slices. The coordinator waits for every worker before the borrows end.
+// output graph nodes (including the Reed-Solomon base-case graph) into
+// disjoint ranges, and barriers separate graph levels and slices. The
+// coordinator waits for every worker before the borrows end.
 unsafe impl<'a, F: LazyField> Send for ColMajorSlicedJob<'a, F> {}
 // Safety: see the partitioning and lifetime invariant above.
 unsafe impl<'a, F: LazyField> Sync for ColMajorSlicedJob<'a, F> {}
@@ -861,6 +989,7 @@ impl<'a, F: LazyField> WorkerJob for ColMajorSlicedJob<'a, F> {
     fn run(&self, tid: usize, num_threads: usize, barrier: &SenseReversingBarrier) {
         let precodes = self.code.precodes();
         let postcodes = self.code.postcodes();
+        let derived = self.derived;
         let levels = precodes.len();
         let n_inplace = match self.code.base_case() {
             BaseCase::ReedSolomon => levels - 1,
@@ -887,7 +1016,7 @@ impl<'a, F: LazyField> WorkerJob for ColMajorSlicedJob<'a, F> {
 
             // Precodes
             let mut in_start = 0usize;
-            for precode in &precodes[..n_inplace] {
+            for (precode, pre_w) in precodes[..n_inplace].iter().zip(&derived.pre[..n_inplace]) {
                 let in_end = in_start + precode.n_left();
                 let out_start = in_end;
                 let (r_start_node, r_end_node) = split_right_nodes(precode, tid, num_threads);
@@ -903,6 +1032,7 @@ impl<'a, F: LazyField> WorkerJob for ColMajorSlicedJob<'a, F> {
                     );
                     encode_column_block_range_shard::<F, BLOCK_FACTOR>(
                         precode,
+                        pre_w,
                         in_slice,
                         out_slice,
                         h,
@@ -917,9 +1047,10 @@ impl<'a, F: LazyField> WorkerJob for ColMajorSlicedJob<'a, F> {
             }
 
             // Base case
-            let (mut in_start, mut out_start) = match self.code.base_case() {
-                BaseCase::ReedSolomon => {
+            let (mut in_start, mut out_start) = match &derived.rs {
+                Some((rs_graph, rs_w)) => {
                     let precode = &precodes[levels - 1];
+                    let pre_w = &derived.pre[levels - 1];
                     let in_end = in_start + precode.n_left();
                     let (r_start_node, r_end_node) = split_right_nodes(precode, tid, num_threads);
 
@@ -934,6 +1065,7 @@ impl<'a, F: LazyField> WorkerJob for ColMajorSlicedJob<'a, F> {
                         );
                         encode_column_block_range_shard::<F, BLOCK_FACTOR>(
                             precode,
+                            pre_w,
                             in_slice,
                             out_slice,
                             h,
@@ -944,32 +1076,43 @@ impl<'a, F: LazyField> WorkerJob for ColMajorSlicedJob<'a, F> {
                     }
                     barrier.wait();
 
-                    let out_end = in_end + postcodes[levels - 1].n_left();
-                    let n_rs_out = postcodes[levels - 1].n_left();
-                    let (c_start_rs, c_end_rs) = split_range(n_rs_out, tid, num_threads);
+                    let out_end = in_end + rs_graph.n_right();
+                    let (r_start_rs, r_end_rs) = split_right_nodes(rs_graph, tid, num_threads);
 
                     unsafe {
                         let in_rs = std::slice::from_raw_parts(self.temp_rs, precode.n_right() * h);
                         let out_rs = std::slice::from_raw_parts_mut(
-                            slice_buf.add((in_end + c_start_rs) * h),
-                            (c_end_rs - c_start_rs) * h,
+                            slice_buf.add((in_end + r_start_rs) * h),
+                            (r_end_rs - r_start_rs) * h,
                         );
-                        reed_solomon_column_block_range_shard(
-                            in_rs, out_rs, h, c_start_rs, c_end_rs,
+                        encode_column_block_range_shard::<F, BLOCK_FACTOR>(
+                            rs_graph,
+                            rs_w,
+                            in_rs,
+                            out_rs,
+                            h,
+                            r_start_rs,
+                            r_end_rs,
+                            &mut scratch,
                         );
                     }
                     barrier.wait();
 
                     (in_end + precode.n_right(), out_end)
                 }
-                BaseCase::Identity => {
+                None => {
                     let end = in_start + precodes[levels - 1].n_right();
                     (end, end)
                 }
             };
 
             // Postcodes
-            for (precode, postcode) in precodes.iter().rev().zip(postcodes.iter().rev()) {
+            for ((precode, postcode), post_w) in precodes
+                .iter()
+                .rev()
+                .zip(postcodes.iter().rev())
+                .zip(derived.post.iter().rev())
+            {
                 in_start -= precode.n_right();
                 let (r_start_node, r_end_node) = split_right_nodes(postcode, tid, num_threads);
 
@@ -984,6 +1127,7 @@ impl<'a, F: LazyField> WorkerJob for ColMajorSlicedJob<'a, F> {
                     );
                     encode_column_block_range_shard::<F, BLOCK_FACTOR>(
                         postcode,
+                        post_w,
                         in_slice,
                         out_slice,
                         h,
@@ -1042,11 +1186,16 @@ pub fn encode_col_major_sliced_mt<F: LazyField>(
         Vec::new()
     };
 
+    // Build derived prepared weights and base-case graph once before launching workers
+    // so worker threads only read `&Derived<F>`.
+    let derived = code.derived();
+
     let job = ColMajorSlicedJob {
         buf: buf.as_mut_ptr(),
         n_rows,
         n_cols,
         code,
+        derived,
         slices: s,
         base_r,
         max_h,
@@ -1140,34 +1289,32 @@ pub fn autotune_slices_with_pool<F: LazyField>(
     best_s
 }
 
-/// Evaluate one expander graph on a column block, right to left (gather) with
-/// unreduced lazy accumulation and multi-edge register blocking.
+/// Evaluate one expander graph on a column block using weights pre-transformed
+/// with [`LazyField::prepare_weight`], right to left (gather) with unreduced
+/// lazy accumulation and multi-edge register blocking.
 ///
-/// `input` holds `graph.n_left()` columns and `output` holds `graph.n_right()`
-/// columns, each of `n_rows` contiguous elements. Output column `r` is
-/// overwritten with `sum w * input[l]` over the incoming edges `(l, w)` of `r`,
-/// element-wise across the column; a right node without edges gets zeros.
+/// `weights` must hold `graph.n_edges()` prepared weights in `graph.weights()`
+/// edge order. `input` holds `graph.n_left()` columns and `output` holds
+/// `graph.n_right()` columns, each of `n_rows` contiguous elements. Output
+/// column `r` is overwritten with `sum w * input[l]` over the incoming edges
+/// `(l, w)` of `r`, element-wise across the column; a right node without edges
+/// gets zeros.
 ///
 /// Kept out of line so that `scripts/check_codegen.py` can find and disassemble
-/// it (one symbol per field, e.g. `encode_column_block::<Mont127>`).
+/// it via the `encode_column_block` symbol pattern.
 #[inline(never)]
-pub fn encode_column_block<F>(graph: &R2lGraph<F>, input: &[F], output: &mut [F], n_rows: usize)
-where
-    F: LazyField,
-{
-    encode_column_block_blocked::<F, BLOCK_FACTOR>(graph, input, output, n_rows);
-}
-
-#[inline(always)]
-fn encode_column_block_blocked<F: LazyField, const B: usize>(
+pub fn encode_column_block_prepared<F: LazyField>(
     graph: &R2lGraph<F>,
+    weights: &[F],
     input: &[F],
     output: &mut [F],
     n_rows: usize,
 ) {
+    assert!(n_rows > 0);
     let mut scratch = vec![F::Acc::default(); n_rows];
-    encode_column_block_range_blocked::<F, B>(
+    encode_column_block_range_shard::<F, BLOCK_FACTOR>(
         graph,
+        weights,
         input,
         output,
         n_rows,
@@ -1177,11 +1324,32 @@ fn encode_column_block_blocked<F: LazyField, const B: usize>(
     );
 }
 
+/// Evaluate one expander graph on a column block, right to left (gather) with
+/// unreduced lazy accumulation and multi-edge register blocking.
+///
+/// `input` holds `graph.n_left()` columns and `output` holds `graph.n_right()`
+/// columns, each of `n_rows` contiguous elements. Output column `r` is
+/// overwritten with `sum w * input[l]` over the incoming edges `(l, w)` of `r`,
+/// element-wise across the column; a right node without edges gets zeros.
+///
+/// Prepares a local weight vector via [`LazyField::prepare_weight`] and delegates
+/// to [`encode_column_block_prepared`]. Kept out of line so that
+/// `scripts/check_codegen.py` can find and disassemble it (one symbol per field,
+/// e.g. `encode_column_block::<Mont127>`).
+#[inline(never)]
+pub fn encode_column_block<F>(graph: &R2lGraph<F>, input: &[F], output: &mut [F], n_rows: usize)
+where
+    F: LazyField,
+{
+    let weights: Vec<F> = graph.weights().iter().map(F::prepare_weight).collect();
+    encode_column_block_prepared(graph, &weights, input, output, n_rows);
+}
+
 /// Evaluate incoming edges for a contiguous range of right nodes `[r_start, r_end)`.
 ///
 /// Output column `r` is written to `output[r * n_rows .. (r + 1) * n_rows]`.
-/// Used by single-threaded execution (r_start=0, r_end=n_right) and multithreaded
-/// worker partitions.
+/// Prepares a local weight vector from `graph.weights()` and delegates to the
+/// range shard kernel.
 #[inline(always)]
 pub fn encode_column_block_range_blocked<F: LazyField, const B: usize>(
     graph: &R2lGraph<F>,
@@ -1197,9 +1365,11 @@ pub fn encode_column_block_range_blocked<F: LazyField, const B: usize>(
     assert_eq!(output.len(), graph.n_right() * n_rows);
     assert!(r_start <= r_end && r_end <= graph.n_right());
 
+    let weights: Vec<F> = graph.weights().iter().map(F::prepare_weight).collect();
     let output_range = &mut output[r_start * n_rows..r_end * n_rows];
     encode_column_block_range_shard::<F, B>(
         graph,
+        &weights,
         input,
         output_range,
         n_rows,
@@ -1210,10 +1380,12 @@ pub fn encode_column_block_range_blocked<F: LazyField, const B: usize>(
 }
 
 /// Evaluate a contiguous right-node range into a slice containing only that
-/// range. The output slice is therefore disjoint across workers.
+/// range using pre-prepared edge `weights` (`weights.len() == graph.n_edges()`).
+/// The output slice is therefore disjoint across workers.
 #[inline(always)]
 fn encode_column_block_range_shard<F: LazyField, const B: usize>(
     graph: &R2lGraph<F>,
+    weights: &[F],
     input: &[F],
     output: &mut [F],
     n_rows: usize,
@@ -1222,15 +1394,21 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
     scratch: &mut [F::Acc],
 ) {
     assert!(n_rows > 0);
+    assert_eq!(weights.len(), graph.n_edges());
     assert_eq!(input.len(), graph.n_left() * n_rows);
     assert!(r_start <= r_end && r_end <= graph.n_right());
     assert_eq!(output.len(), (r_end - r_start) * n_rows);
     assert!(scratch.len() >= n_rows);
 
+    let row_ptr = graph.row_ptr();
+    let col_idx = graph.col_idx();
     let scratch_slice = &mut scratch[..n_rows];
 
     for (r, dst) in (r_start..r_end).zip(output.chunks_exact_mut(n_rows)) {
-        let (lefts, weights) = graph.incoming(r);
+        let edge_start = row_ptr[r] as usize;
+        let edge_end = row_ptr[r + 1] as usize;
+        let lefts = &col_idx[edge_start..edge_end];
+        let edge_weights = &weights[edge_start..edge_end];
         let num_edges = lefts.len();
         if num_edges == 0 {
             dst.fill(F::ZERO);
@@ -1244,7 +1422,7 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
         // one-edge loop below; the condition is a compile-time constant.
         if B == 4 && F::MAX_ACCUMULATIONS > 4 {
             let left_chunks = lefts.chunks_exact(4);
-            let weight_chunks = weights.chunks_exact(4);
+            let weight_chunks = edge_weights.chunks_exact(4);
 
             for (l_chunk, w_chunk) in left_chunks.zip(weight_chunks) {
                 if since_fold + 4 > F::MAX_ACCUMULATIONS {
@@ -1257,14 +1435,9 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
                 let &[l0_idx, l1_idx, l2_idx, l3_idx] = l_chunk else {
                     unreachable!()
                 };
-                let &[ref w0_raw, ref w1_raw, ref w2_raw, ref w3_raw] = w_chunk else {
+                let &[w0, w1, w2, w3] = w_chunk else {
                     unreachable!()
                 };
-
-                let w0 = F::prepare_weight(w0_raw);
-                let w1 = F::prepare_weight(w1_raw);
-                let w2 = F::prepare_weight(w2_raw);
-                let w3 = F::prepare_weight(w3_raw);
 
                 let l0 = l0_idx as usize * n_rows;
                 let l1 = l1_idx as usize * n_rows;
@@ -1289,8 +1462,8 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
             }
 
             let left_rem = lefts.chunks_exact(4).remainder();
-            let weight_rem = weights.chunks_exact(4).remainder();
-            for (&l_idx, w_raw) in left_rem.iter().zip(weight_rem.iter()) {
+            let weight_rem = edge_weights.chunks_exact(4).remainder();
+            for (&l_idx, &w) in left_rem.iter().zip(weight_rem.iter()) {
                 if since_fold >= F::MAX_ACCUMULATIONS {
                     for acc in scratch_slice.iter_mut() {
                         F::fold(acc);
@@ -1298,7 +1471,6 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
                     since_fold = 1;
                 }
 
-                let w = F::prepare_weight(w_raw);
                 let l = l_idx as usize * n_rows;
                 let src = &input[l..l + n_rows];
 
@@ -1312,7 +1484,7 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
             }
         } else if B == 2 && F::MAX_ACCUMULATIONS > 2 {
             let left_chunks = lefts.chunks_exact(2);
-            let weight_chunks = weights.chunks_exact(2);
+            let weight_chunks = edge_weights.chunks_exact(2);
 
             for (l_chunk, w_chunk) in left_chunks.zip(weight_chunks) {
                 if since_fold + 2 > F::MAX_ACCUMULATIONS {
@@ -1325,12 +1497,9 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
                 let &[l0_idx, l1_idx] = l_chunk else {
                     unreachable!()
                 };
-                let &[ref w0_raw, ref w1_raw] = w_chunk else {
+                let &[w0, w1] = w_chunk else {
                     unreachable!()
                 };
-
-                let w0 = F::prepare_weight(w0_raw);
-                let w1 = F::prepare_weight(w1_raw);
 
                 let l0 = l0_idx as usize * n_rows;
                 let l1 = l1_idx as usize * n_rows;
@@ -1349,8 +1518,8 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
             }
 
             let left_rem = lefts.chunks_exact(2).remainder();
-            let weight_rem = weights.chunks_exact(2).remainder();
-            for (&l_idx, w_raw) in left_rem.iter().zip(weight_rem.iter()) {
+            let weight_rem = edge_weights.chunks_exact(2).remainder();
+            for (&l_idx, &w) in left_rem.iter().zip(weight_rem.iter()) {
                 if since_fold >= F::MAX_ACCUMULATIONS {
                     for acc in scratch_slice.iter_mut() {
                         F::fold(acc);
@@ -1358,7 +1527,6 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
                     since_fold = 1;
                 }
 
-                let w = F::prepare_weight(w_raw);
                 let l = l_idx as usize * n_rows;
                 let src = &input[l..l + n_rows];
 
@@ -1372,7 +1540,7 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
             }
         } else {
             // Unblocked loop (B == 1, or a field with too little headroom for B)
-            for (&l_idx, w_raw) in lefts.iter().zip(weights.iter()) {
+            for (&l_idx, &w) in lefts.iter().zip(edge_weights.iter()) {
                 if since_fold >= F::MAX_ACCUMULATIONS {
                     for acc in scratch_slice.iter_mut() {
                         F::fold(acc);
@@ -1380,7 +1548,6 @@ fn encode_column_block_range_shard<F: LazyField, const B: usize>(
                     since_fold = 1;
                 }
 
-                let w = F::prepare_weight(w_raw);
                 let l = l_idx as usize * n_rows;
                 let src = &input[l..l + n_rows];
 
@@ -1497,12 +1664,18 @@ mod range_kernel_tests {
         let mut expected = vec![Mont127::ZERO; graph.n_right() * n_rows];
         encode_column_block(&graph, &input, &mut expected, n_rows);
 
+        let prepared: Vec<_> = graph
+            .weights()
+            .iter()
+            .map(Mont127::prepare_weight)
+            .collect();
         let mut actual = vec![Mont127::ZERO; graph.n_right() * n_rows];
         let mut scratch = vec![<Mont127 as LazyField>::Acc::default(); n_rows];
         let ranges = [(0, 2), (2, 2), (2, 5)];
         for (start, end) in ranges {
             encode_column_block_range_shard::<Mont127, BLOCK_FACTOR>(
                 &graph,
+                &prepared,
                 &input,
                 &mut actual[start * n_rows..end * n_rows],
                 n_rows,
