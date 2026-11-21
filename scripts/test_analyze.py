@@ -1403,11 +1403,13 @@ class ArtifactPortabilityTests(unittest.TestCase):
         self.assertIn("T5|Mont127|Reduce (ns)", a.todo_cells)
 
     def test_f2_falls_back_to_slice_sweep_adaptive_curve(self):
-        for n, s1_ms, ad_ms in ((20, 80, 60), (22, 320, 210)):
+        # At logN=20, adaptive chooses slices=1 (same slice count as explicit s=1);
+        # F2 must keep slice_mode="explicit" separate from slice_mode="adaptive".
+        for n, s1_ms, ad_ms, ad_s in ((20, 80, 79, 1), (22, 320, 210, 4)):
             self.fx.write("s1", "quick_slice_sweep_s1_t1_n20-22", f"tw/s1_n{n}.json",
                           [tw_record("s1", log_n=n, threads=1, samples=(s1_ms,) * 3, slice_mode="explicit", slices=1)])
             self.fx.write("s1", "quick_slice_sweep_sadaptive_t1_n20-22", f"tw/ad_n{n}.json",
-                          [tw_record("s1", log_n=n, threads=1, samples=(ad_ms,) * 3, slice_mode="adaptive", slices=4)])
+                          [tw_record("s1", log_n=n, threads=1, samples=(ad_ms,) * 3, slice_mode="adaptive", slices=ad_s)])
         a = self.fx.analyzer(self.fx.selection(sessions=("s1",), expected=("s1",)))
         with contextlib.redirect_stdout(io.StringIO()):
             a.generate_F2_llc_scaling()
@@ -1418,7 +1420,7 @@ class ArtifactPortabilityTests(unittest.TestCase):
             d = dict(zip(headers, r))
             by_series.setdefault(d["Series"], {})[int(d["log2(N)"])] = d["Latency (ms)"]
         self.assertEqual(by_series["Mont127 mode (a) s=1"], {20: "80.000", 22: "320.000"})
-        self.assertEqual(by_series["Mont127 mode (a) adaptive"], {20: "60.000", 22: "210.000"})
+        self.assertEqual(by_series["Mont127 mode (a) adaptive"], {20: "79.000", 22: "210.000"})
 
     def test_t0_reads_test_stamp_and_step_tags_without_this_work_blocks(self):
         # C0-only run: only <host>/tests/test-stamp.json exists.

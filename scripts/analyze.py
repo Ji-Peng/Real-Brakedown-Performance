@@ -3206,7 +3206,7 @@ class BenchmarkAnalyzer:
         series: List[Tuple[str, List[Dict], List[Dict]]] = [
             ("Mont127 mode (a) adaptive", adapt_headline, adapt_sweep),
             ("Mont127 mode (a) s=1", self.select(self.reports_this_work, family="slice_sweep", params="lcpc-sdig6",
-                                                 shape="brakedown", slices=1, threads=1), []),
+                                                 shape="brakedown", slice_mode="explicit", slices=1, threads=1), []),
         ]
         for f in ("Mont127", "Mers127", "Fp2M61"):
             series.append((f"{f} mode (b) adaptive", self.select(self.reports_this_work, family="tw_b", params="simd-spielman",
