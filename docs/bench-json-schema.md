@@ -50,7 +50,7 @@ Measurements:
 - `verifier_encode_1`: Encoding of 1 vector of length $k$.
 - `verifier_encode_2`: Encoding of 2 vectors of length $k$ (matches SIMD-Spielman 128-bit vector lane count).
 - `verifier_encode`: Alias for 2-vector verifier encoding.
-- `hash_matrix_decomposition`: Leaf and Merkle hashing of the encoded matrix.
+- `hash_matrix_decomposition`: Leaf and Merkle hashing of the encoded matrix, timed through `lcpc_2d::merkle_root` (matching `commit`'s column-wise Merkle tree construction; an untimed per-element reference hash cross-checks the root).
 - `commit_total`: Full `commit()` operation combining encoding, hashing, and tree construction.
 - `prove`: Polynomial evaluation proof generation.
 - `verify`: Verifier check of the polynomial evaluation proof.

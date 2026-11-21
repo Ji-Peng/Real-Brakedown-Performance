@@ -319,7 +319,7 @@ where
     enc.encode_rows(matrix, n_cols).expect("LCPC encode failed");
 }
 
-pub fn hash_matrix<F>(matrix: &[F], n_rows: usize, n_cols: usize) -> Output<Blake3>
+pub fn hash_matrix_reference<F>(matrix: &[F], n_rows: usize, n_cols: usize) -> Output<Blake3>
 where
     F: FieldHash + Sync,
 {
@@ -732,7 +732,7 @@ where
     }
     let encode_samples = sample_times(runs, || encode_matrix(&enc, &mut matrix, n_cols));
     let enc_summary = summarize(encode_samples);
-    let direct_root = hash_matrix::<F>(&matrix, n_rows, n_cols);
+    let direct_root = hash_matrix_reference::<F>(&matrix, n_rows, n_cols);
 
     let ns_per_mac = if total_edge_row_macs > 0 {
         enc_summary.summary.median_ns / total_edge_row_macs as f64
@@ -775,11 +775,15 @@ where
 
     // 3. Column hashing & Merkle tree decomposition
     for _ in 0..warmup {
-        let _ = hash_matrix::<F>(&matrix, n_rows, n_cols);
+        let _ = std::hint::black_box(lcpc_2d::merkle_root::<Blake3, F>(&matrix, n_rows, n_cols));
     }
+    let mut hashed_root = Output::<Blake3>::default();
     let hash_samples = sample_times(runs, || {
-        let _ = hash_matrix::<F>(&matrix, n_rows, n_cols);
+        hashed_root = std::hint::black_box(lcpc_2d::merkle_root::<Blake3, F>(&matrix, n_rows, n_cols));
     });
+    if hashed_root.as_slice() != direct_root.as_slice() {
+        return Err("merkle_root disagrees with per-element reference root".to_owned());
+    }
 
     // 4. End-to-end PCS: Commit, Prove, Verify
     let point = F::random(&mut rng);
@@ -956,7 +960,7 @@ pub fn run_ligero_rs_benchmark(
     let encode_samples = sample_times(runs, || {
         enc.encode_rows(&mut matrix, n_cols).expect("Ligero encode failed");
     });
-    let direct_root = hash_matrix::<Ft127>(&matrix, n_rows, n_cols);
+    let direct_root = hash_matrix_reference::<Ft127>(&matrix, n_rows, n_cols);
 
     let cpu_mhz_after = get_cpu_mhz();
     let peak_rss_bytes = get_peak_rss_bytes();
@@ -1149,7 +1153,7 @@ where
             .copy_from_slice(&coefficients[row * n_per_row..(row + 1) * n_per_row]);
     }
     encode_matrix(&enc, &mut matrix, n_cols);
-    let direct_root = hash_matrix::<F>(&matrix, n_rows, n_cols);
+    let direct_root = hash_matrix_reference::<F>(&matrix, n_rows, n_cols);
 
     let commit = LcCommit::<Blake3, _>::commit(&coefficients, &enc)
         .map_err(|e| format!("golden commit failed for {field_name}/{spec_name}: {e}"))?;
