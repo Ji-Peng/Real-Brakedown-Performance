@@ -53,6 +53,8 @@ DEFAULT_HOT_PATTERNS = [
     r"LazyField::reduce",
     r"mac_column",
     r"fold_column",
+    r"collapse_rows_lazy",
+    r"dot_lazy",
 ]
 
 # Version of the instruction classifier, recorded in every report so that

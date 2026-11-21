@@ -8,7 +8,7 @@
 // except according to those terms.
 //
 // Modified 2026 by the RealBrakedownPerf authors (Apache-2.0, see NOTICE):
-// oracle, invariance and regression tests for the fork.
+// oracle, invariance, lazy linear-combination, and regression tests for the fork.
 // The per-commit changes are in the git history since step/00-import
 // (upstream conroi/lcpc f0e2116).
 
@@ -1837,4 +1837,167 @@ fn test_pcs_commit_with_threads() {
         check_pcs_threads::<Mont127>(t, 4);
         check_pcs_threads::<Fp2M61>(t, 4);
     }
+}
+
+#[test]
+fn test_lazy_lincomb_kernels_all_fields() {
+    use super::lincomb::{collapse_rows_lazy, dot_lazy};
+
+    fn eager_collapse<F: Field>(
+        rows: &[F],
+        k: usize,
+        tensors: &[&[F]],
+        polys: &mut [Vec<F>],
+    ) {
+        for (tensor, poly) in tensors.iter().zip(polys.iter_mut()) {
+            for (row, w) in rows.chunks_exact(k).zip(tensor.iter()) {
+                for (p, c) in poly.iter_mut().zip(row) {
+                    *p += *c * w;
+                }
+            }
+        }
+    }
+
+    fn eager_dot<F: Field>(w: &[F], x: &[F]) -> F {
+        w.iter().zip(x.iter()).fold(F::ZERO, |acc, (wi, xi)| acc + *wi * xi)
+    }
+
+    fn check_field<F: LazyField>(seed: u64, extra_max: Option<F>) {
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
+        let enc = SpielmanEncoding::<F>::with_params(CodeParams::SimdSpielman, 32, seed);
+
+        // 1. collapse_rows_lazy vs eager reference on specified shapes, 1..=3 tensors,
+        //    with polys pre-filled with non-zero random elements.
+        for &(n_rows, k) in &[
+            (1usize, 1usize),
+            (3, 5),
+            (4, 7),
+            (5, 256),
+            (37, 300),
+            (70, 3),
+        ] {
+            let rows: Vec<F> = (0..n_rows * k).map(|_| F::random(&mut rng)).collect();
+            for nt in 1..=3 {
+                let tensor_vecs: Vec<Vec<F>> = (0..nt)
+                    .map(|_| (0..n_rows).map(|_| F::random(&mut rng)).collect())
+                    .collect();
+                let tensor_refs: Vec<&[F]> = tensor_vecs.iter().map(Vec::as_slice).collect();
+
+                let init_polys: Vec<Vec<F>> = (0..nt)
+                    .map(|_| {
+                        (0..k)
+                            .map(|_| {
+                                let v = F::random(&mut rng);
+                                if v == F::ZERO { F::ONE } else { v }
+                            })
+                            .collect()
+                    })
+                    .collect();
+
+                let mut expected = init_polys.clone();
+                eager_collapse(&rows, k, &tensor_refs, &mut expected);
+
+                let mut got_kernel = init_polys.clone();
+                collapse_rows_lazy(&rows, k, &tensor_refs, &mut got_kernel);
+                assert_eq!(
+                    got_kernel, expected,
+                    "collapse_rows_lazy mismatch for {}, n_rows={n_rows}, k={k}, nt={nt}",
+                    std::any::type_name::<F>()
+                );
+
+                let mut got_hook = init_polys;
+                enc.collapse_rows(&rows, k, &tensor_refs, &mut got_hook);
+                assert_eq!(
+                    got_hook, expected,
+                    "LcEncoding::collapse_rows mismatch for {}, n_rows={n_rows}, k={k}, nt={nt}",
+                    std::any::type_name::<F>()
+                );
+            }
+        }
+
+        // 2. dot_lazy vs eager reference on equal lengths
+        for &len in &[0usize, 1, 2, 31, 32, 33, 64, 1000] {
+            let w: Vec<F> = (0..len).map(|_| F::random(&mut rng)).collect();
+            let x: Vec<F> = (0..len).map(|_| F::random(&mut rng)).collect();
+            let expected = eager_dot(&w, &x);
+            let got = dot_lazy(&w, &x);
+            assert_eq!(
+                got, expected,
+                "dot_lazy mismatch for {}, len={len}",
+                std::any::type_name::<F>()
+            );
+        }
+
+        // 3. dot_lazy and LcEncoding::column_dots on unequal lengths (common prefix)
+        for &(lw, lx) in &[
+            (0usize, 5usize),
+            (5, 0),
+            (3, 19),
+            (19, 3),
+            (31, 50),
+            (50, 31),
+            (32, 80),
+            (80, 32),
+            (33, 65),
+            (65, 33),
+        ] {
+            let w0: Vec<F> = (0..lw).map(|_| F::random(&mut rng)).collect();
+            let w1: Vec<F> = (0..lw + 7).map(|_| F::random(&mut rng)).collect();
+            let x: Vec<F> = (0..lx).map(|_| F::random(&mut rng)).collect();
+            let exp0 = eager_dot(&w0, &x);
+            let exp1 = eager_dot(&w1, &x);
+            assert_eq!(dot_lazy(&w0, &x), exp0);
+            assert_eq!(dot_lazy(&w1, &x), exp1);
+
+            let mut out = [F::ONE, F::ONE];
+            enc.column_dots(&x, &[&w0, &w1], &mut out);
+            assert_eq!(out, [exp0, exp1]);
+        }
+
+        // 4. All inputs equal to -1 (and field-specific maximal-limb element) with 5000 rows
+        let mut worst_vals = vec![-F::ONE];
+        if let Some(m) = extra_max {
+            worst_vals.push(m);
+        }
+        for val in worst_vals {
+            let n_rows = 5000usize;
+            let k = 5usize;
+            let rows = vec![val; n_rows * k];
+            let t0 = vec![val; n_rows];
+            let t1 = vec![val; n_rows];
+            let tensors = [t0.as_slice(), t1.as_slice()];
+
+            let init = vec![vec![val; k], vec![F::ONE; k]];
+            let mut expected = init.clone();
+            eager_collapse(&rows, k, &tensors, &mut expected);
+
+            let mut got = init;
+            collapse_rows_lazy(&rows, k, &tensors, &mut got);
+            assert_eq!(
+                got, expected,
+                "5000-row worst-case collapse mismatch for {}",
+                std::any::type_name::<F>()
+            );
+
+            let dot_exp = eager_dot(&t0, &t1);
+            let dot_got = dot_lazy(&t0, &t1);
+            assert_eq!(
+                dot_got, dot_exp,
+                "5000-elem worst-case dot mismatch for {}",
+                std::any::type_name::<F>()
+            );
+        }
+    }
+
+    check_field::<Mont127>(0x1111_aaaa, None);
+    check_field::<Mers127>(0x2222_bbbb, None);
+    check_field::<Fp2M61>(
+        0x3333_cccc,
+        Some(Fp2M61::from_parts(
+            Fp2M61::MODULUS_P - 1,
+            Fp2M61::MODULUS_P - 1,
+        )),
+    );
+    check_field::<Ft127>(0x4444_dddd, None);
+    check_field::<Ft63>(0x5555_eeee, None);
 }

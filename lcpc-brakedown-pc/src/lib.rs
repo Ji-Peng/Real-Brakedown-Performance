@@ -8,8 +8,8 @@
 // except according to those terms.
 //
 // Modified 2026 by the RealBrakedownPerf authors (Apache-2.0, see NOTICE):
-// LazyField fields, batched/sliced/threaded encoding API, runtime
-// code parameters.
+// LazyField fields, batched/sliced/threaded encoding API, lazy linear-combination
+// kernels, runtime code parameters.
 // The per-commit changes are in the git history since step/00-import
 // (upstream conroi/lcpc f0e2116).
 #![deny(missing_docs)]
@@ -28,6 +28,7 @@ pub mod cache;
 pub mod codespec;
 pub mod encode;
 pub mod graph;
+pub mod lincomb;
 pub mod matgen;
 pub mod thread_pool;
 
@@ -410,6 +411,22 @@ where
 
     fn get_n_degree_tests(&self) -> usize {
         Self::n_degree_tests_for(self.n_cols)
+    }
+
+    fn collapse_rows(
+        &self,
+        rows: &[Ft],
+        n_per_row: usize,
+        tensors: &[&[Ft]],
+        polys: &mut [Vec<Ft>],
+    ) {
+        lincomb::collapse_rows_lazy(rows, n_per_row, tensors, polys);
+    }
+
+    fn column_dots(&self, col: &[Ft], tensors: &[&[Ft]], out: &mut [Ft]) {
+        for (tensor, o) in tensors.iter().zip(out.iter_mut()) {
+            *o = lincomb::dot_lazy(tensor, col);
+        }
     }
 }
 
