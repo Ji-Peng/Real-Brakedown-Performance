@@ -8,16 +8,18 @@
 // except according to those terms.
 //
 // Modified 2026 by the RealBrakedownPerf authors (Apache-2.0, see NOTICE):
-// tests updated for current dependencies, stable Rust, and parallel row collapse.
+// tests updated for current dependencies, stable Rust, parallel row collapse,
+// batched leaf hashing, merkle_root, and repeated-opening verification.
 // The per-commit changes are in the git history since step/00-import
 // (upstream conroi/lcpc f0e2116).
 
 use super::{def_labels, FieldHash, LcCommit, LcEncoding, LcEvalProof, LcRoot};
 
-use digest::Output;
+use digest::{Digest, Output};
 use ff::Field;
 use itertools::iterate;
 use lcpc_test_fields::fft::{FFTError, FFTPrecomp, FieldFFT};
+use lcpc_test_fields::ft127::Ft127;
 use lcpc_test_fields::ft63::*;
 use lcpc_test_fields::Blake3;
 use merlin::Transcript;
@@ -479,6 +481,303 @@ fn end_to_end_two_proofs() {
     .unwrap();
 
     assert_eq!(res2, eval);
+}
+
+fn check_leaf_hasher_field<F: Field + FieldHash>(seed: u64) {
+    use super::LeafHasher;
+
+    let mut rng = ChaCha20Rng::seed_from_u64(seed);
+    for &len in &[0usize, 1, 61, 62, 63, 64, 65, 123, 124, 125, 1000] {
+        let col: Vec<F> = repeat_with(|| F::random(&mut rng)).take(len).collect();
+
+        let mut reference = Blake3::new();
+        reference.update(<Output<Blake3> as Default>::default());
+        for e in &col {
+            e.digest_update(&mut reference);
+        }
+        let expected = reference.finalize();
+
+        let mut batched = LeafHasher::<Blake3>::new();
+        for e in &col {
+            batched.push(e);
+        }
+        let got = batched.finalize();
+
+        assert_eq!(got, expected, "LeafHasher mismatch for column length {len}");
+    }
+}
+
+#[test]
+fn leaf_hasher_matches_reference() {
+    use super::LeafHasher;
+
+    check_leaf_hasher_field::<Ft63>(0x1eaf_0063);
+    check_leaf_hasher_field::<Ft127>(0x1eaf_0127);
+
+    // Exercise the oversized-representation direct-update path (> 1024 bytes).
+    struct BigElem(Vec<u8>);
+    impl FieldHash for BigElem {
+        type HashRepr = Vec<u8>;
+        fn to_hash_repr(&self) -> Self::HashRepr {
+            self.0.clone()
+        }
+    }
+    let items = [
+        BigElem(vec![0x11; 16]),
+        BigElem(vec![0x22; 1500]),
+        BigElem(vec![0x33; 20]),
+        BigElem(vec![0x44; 2048]),
+    ];
+    let mut reference = Blake3::new();
+    reference.update(<Output<Blake3> as Default>::default());
+    for item in &items {
+        item.digest_update(&mut reference);
+    }
+    let mut batched = LeafHasher::<Blake3>::new();
+    for item in &items {
+        batched.push(item);
+    }
+    assert_eq!(batched.finalize(), reference.finalize());
+}
+
+#[test]
+fn merkle_root_matches_commit_and_reference() {
+    use super::{commit, merkle_root};
+
+    // Compare against LcCommit::commit root.
+    let (coeffs, rho) = random_coeffs_rho();
+    let enc = LigeroEncoding::<Ft63>::new(coeffs.len(), rho);
+    let comm = commit::<Blake3, LigeroEncoding<_>>(&coeffs, &enc).unwrap();
+    let root = merkle_root::<Blake3, Ft63>(&comm.comm, comm.n_rows, comm.n_cols);
+    assert_eq!(root, *comm.get_root().as_ref());
+
+    // Compare against a per-element reference across power-of-two and non-power-of-two column counts.
+    let mut rng = ChaCha20Rng::seed_from_u64(0x9007_1270);
+    for &(n_rows, n_cols) in &[
+        (1usize, 1usize),
+        (3, 2),
+        (5, 3),
+        (65, 15),
+        (65, 16),
+        (65, 17),
+        (10, 31),
+        (10, 32),
+        (10, 33),
+        (70, 65),
+    ] {
+        let matrix: Vec<Ft127> = repeat_with(|| Ft127::random(&mut rng))
+            .take(n_rows * n_cols)
+            .collect();
+
+        let leaf_count = n_cols.next_power_of_two();
+        let mut level: Vec<Output<Blake3>> = (0..leaf_count)
+            .map(|col| {
+                if col >= n_cols {
+                    return <Output<Blake3> as Default>::default();
+                }
+                let mut d = Blake3::new();
+                d.update(<Output<Blake3> as Default>::default());
+                for row in 0..n_rows {
+                    matrix[row * n_cols + col].digest_update(&mut d);
+                }
+                d.finalize()
+            })
+            .collect();
+        while level.len() > 1 {
+            level = level
+                .chunks_exact(2)
+                .map(|pair| {
+                    let mut d = Blake3::new();
+                    d.update(pair[0].as_slice());
+                    d.update(pair[1].as_slice());
+                    d.finalize()
+                })
+                .collect();
+        }
+        let expected = level.pop().unwrap();
+        let got = merkle_root::<Blake3, Ft127>(&matrix, n_rows, n_cols);
+        assert_eq!(got, expected, "merkle_root mismatch for {n_rows}x{n_cols}");
+    }
+}
+
+#[test]
+fn verify_rejects_tampered_repeated_opening() {
+    use super::{
+        commit, prove, verify, verify_column_path, verify_column_value, LegacyUniformUsize,
+        VerifierError,
+    };
+
+    let mut rng = ChaCha20Rng::seed_from_u64(0xded0_0001);
+    let n_per_row = 16usize;
+    let n_cols = 32usize;
+    let n_rows = 70usize;
+    let coeffs: Vec<Ft63> = repeat_with(|| Ft63::random(&mut rng))
+        .take(n_rows * n_per_row)
+        .collect();
+    let enc = LigeroEncoding::<Ft63>::new_from_dims(n_per_row, n_cols);
+    let comm = commit::<Blake3, _>(&coeffs, &enc).unwrap();
+    let root = comm.get_root();
+
+    let x = Ft63::random(&mut rng);
+    let inner_tensor: Vec<Ft63> = iterate(Ft63::ONE, |&v| v * x).take(n_per_row).collect();
+    let outer_tensor: Vec<Ft63> = {
+        let xr = x * inner_tensor.last().unwrap();
+        iterate(Ft63::ONE, |&v| v * xr).take(n_rows).collect()
+    };
+
+    let make_tr = || {
+        let mut tr = Transcript::new(b"repeated opening test");
+        tr.append_message(b"polycommit", root.as_ref());
+        tr.append_message(b"ncols", &(N_COL_OPENS as u64).to_be_bytes()[..]);
+        tr
+    };
+
+    let mut tr_prove = make_tr();
+    let pf = prove(&comm, &outer_tensor, &enc, &mut tr_prove).unwrap();
+    let mut tr_ok = make_tr();
+    verify(
+        root.as_ref(),
+        &outer_tensor,
+        &inner_tensor,
+        &pf,
+        &enc,
+        &mut tr_ok,
+    )
+    .unwrap();
+
+    // Replay the Fiat-Shamir challenges to locate a repeated opening and build
+    // the full-check reference expectation for any tampered column.
+    let mut tr_replay = make_tr();
+    let n_degree_tests = enc.get_n_degree_tests();
+    let mut rand_tensor_vec = Vec::with_capacity(n_degree_tests);
+    let mut p_random_fft = Vec::with_capacity(n_degree_tests);
+    for i in 0..n_degree_tests {
+        let mut key: <ChaCha20Rng as SeedableRng>::Seed = Default::default();
+        tr_replay.challenge_bytes(<LigeroEncoding<Ft63> as LcEncoding>::LABEL_DT, &mut key);
+        let mut deg_rng = ChaCha20Rng::from_seed(key);
+        let rand_tensor: Vec<Ft63> = repeat_with(|| Ft63::random(&mut deg_rng))
+            .take(n_rows)
+            .collect();
+        rand_tensor_vec.push(rand_tensor);
+
+        let mut tmp = pf.p_random_vec[i].clone();
+        tmp.resize(n_cols, Ft63::ZERO);
+        enc.encode(&mut tmp).unwrap();
+        p_random_fft.push(tmp);
+
+        pf.p_random_vec[i]
+            .iter()
+            .for_each(|c| c.transcript_update(&mut tr_replay, <LigeroEncoding<Ft63> as LcEncoding>::LABEL_PR));
+    }
+    pf.p_eval
+        .iter()
+        .for_each(|c| c.transcript_update(&mut tr_replay, <LigeroEncoding<Ft63> as LcEncoding>::LABEL_PE));
+
+    let mut col_key: <ChaCha20Rng as SeedableRng>::Seed = Default::default();
+    tr_replay.challenge_bytes(<LigeroEncoding<Ft63> as LcEncoding>::LABEL_CO, &mut col_key);
+    let mut cols_rng = ChaCha20Rng::from_seed(col_key);
+    let col_range = LegacyUniformUsize::new(0, n_cols);
+    let cols_to_open: Vec<usize> = repeat_with(|| col_range.sample(&mut cols_rng))
+        .take(N_COL_OPENS)
+        .collect();
+
+    let mut p_eval_fft = pf.p_eval.clone();
+    p_eval_fft.resize(n_cols, Ft63::ZERO);
+    enc.encode(&mut p_eval_fft).unwrap();
+
+    // Find the first occurrence `f` and second occurrence `k` of a repeated column.
+    let mut seen = vec![None; n_cols];
+    let mut repeated = None;
+    for (idx, &c) in cols_to_open.iter().enumerate() {
+        if let Some(first_idx) = seen[c] {
+            repeated = Some((c, first_idx, idx));
+            break;
+        }
+        seen[c] = Some(idx);
+    }
+    let (col_num, first_idx, second_idx) =
+        repeated.expect("N_COL_OPENS > n_cols guarantees a repeated column opening");
+    assert_eq!(pf.columns[first_idx].col, pf.columns[second_idx].col);
+    assert_eq!(pf.columns[first_idx].path, pf.columns[second_idx].path);
+
+    let full_check = |column: &super::LcColumn<Blake3, LigeroEncoding<Ft63>>| {
+        let mut rand = true;
+        for i in 0..n_degree_tests {
+            rand &= verify_column_value(column, &rand_tensor_vec[i], &p_random_fft[i][col_num]);
+        }
+        let eval = verify_column_value(column, &outer_tensor, &p_eval_fft[col_num]);
+        let path = verify_column_path(column, col_num, root.as_ref());
+        match (rand, eval, path) {
+            (false, _, _) => Err(VerifierError::ColumnDegree),
+            (_, false, _) => Err(VerifierError::ColumnEval),
+            (_, _, false) => Err(VerifierError::ColumnPath),
+            _ => Ok(()),
+        }
+    };
+
+    // Case 1: change one element in the second copy of the repeated opening.
+    let mut pf_bad_elem = pf.clone();
+    pf_bad_elem.columns[second_idx].col[0] += Ft63::ONE;
+    let expected_elem_err = full_check(&pf_bad_elem.columns[second_idx]).unwrap_err();
+    let mut tr_elem = make_tr();
+    let got_elem_err = verify(
+        root.as_ref(),
+        &outer_tensor,
+        &inner_tensor,
+        &pf_bad_elem,
+        &enc,
+        &mut tr_elem,
+    )
+    .unwrap_err();
+    assert_eq!(
+        std::mem::discriminant(&got_elem_err),
+        std::mem::discriminant(&expected_elem_err),
+        "expected {expected_elem_err:?}, got {got_elem_err:?}"
+    );
+
+    // Case 2: change one Merkle path entry in the second copy of the repeated opening.
+    let mut pf_bad_path = pf.clone();
+    pf_bad_path.columns[second_idx].path[0][0] ^= 0x01;
+    let expected_path_err = full_check(&pf_bad_path.columns[second_idx]).unwrap_err();
+    assert!(matches!(expected_path_err, VerifierError::ColumnPath));
+    let mut tr_path = make_tr();
+    let got_path_err = verify(
+        root.as_ref(),
+        &outer_tensor,
+        &inner_tensor,
+        &pf_bad_path,
+        &enc,
+        &mut tr_path,
+    )
+    .unwrap_err();
+    assert_eq!(
+        std::mem::discriminant(&got_path_err),
+        std::mem::discriminant(&expected_path_err),
+        "expected {expected_path_err:?}, got {got_path_err:?}"
+    );
+
+    // Case 3: tamper every copy of `col_num` identically so all repeats match `first_idx`;
+    // `first_idx` must still run the full check and reject with ColumnPath.
+    let mut pf_bad_all = pf.clone();
+    for (idx, &c) in cols_to_open.iter().enumerate() {
+        if c == col_num {
+            pf_bad_all.columns[idx].path[0][0] ^= 0x01;
+        }
+    }
+    let mut tr_all = make_tr();
+    let got_all_err = verify(
+        root.as_ref(),
+        &outer_tensor,
+        &inner_tensor,
+        &pf_bad_all,
+        &enc,
+        &mut tr_all,
+    )
+    .unwrap_err();
+    assert!(
+        matches!(got_all_err, VerifierError::ColumnPath),
+        "expected ColumnPath, got {got_all_err:?}"
+    );
 }
 
 fn random_coeffs_rho() -> (Vec<Ft63>, f64) {

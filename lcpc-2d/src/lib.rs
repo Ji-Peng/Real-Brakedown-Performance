@@ -9,7 +9,9 @@
 //
 // Modified 2026 by the RealBrakedownPerf authors (Apache-2.0, see NOTICE):
 // stable Rust and current dependencies; column-major batched encoding interface;
-// row-collapse and column inner-product hooks on LcEncoding.
+// row-collapse and column inner-product hooks on LcEncoding; batched leaf and
+// Merkle hashing, merkle_root helper, repeated-opening deduplication and
+// batched verifier encodings.
 // The per-commit changes are in the git history since step/00-import
 // (upstream conroi/lcpc f0e2116).
 #![deny(missing_docs)]
@@ -730,6 +732,81 @@ pub fn n_degree_tests(lambda: usize, len: usize, flog2: usize) -> usize {
 // parallelization limit when working on columns
 const LOG_MIN_NCOLS: usize = 5;
 
+// base-case column block width for batched leaf hashing
+const HASH_COLUMNS_BLOCK: usize = 32;
+
+// stack buffer size for batched leaf hashing (1 KiB = one BLAKE3 chunk)
+const LEAF_HASH_BUF_LEN: usize = 1024;
+
+struct LeafHasher<D: Digest> {
+    digest: D,
+    buf: [u8; LEAF_HASH_BUF_LEN],
+    len: usize,
+}
+
+impl<D: Digest> LeafHasher<D> {
+    #[inline]
+    fn new() -> Self {
+        let mut digest = D::new();
+        // column hashes start with a block of 0's of digest output length
+        let prefix = <Output<D> as Default>::default();
+        let prefix_bytes = prefix.as_ref();
+        let mut buf = [0u8; LEAF_HASH_BUF_LEN];
+        let len = if prefix_bytes.len() <= LEAF_HASH_BUF_LEN {
+            buf[..prefix_bytes.len()].copy_from_slice(prefix_bytes);
+            prefix_bytes.len()
+        } else {
+            digest.update(prefix_bytes);
+            0
+        };
+        Self { digest, buf, len }
+    }
+
+    #[inline]
+    fn push<F: FieldHash>(&mut self, e: &F) {
+        let repr = e.to_hash_repr();
+        let bytes = repr.as_ref();
+        if bytes.len() > LEAF_HASH_BUF_LEN - self.len {
+            if self.len > 0 {
+                self.digest.update(&self.buf[..self.len]);
+                self.len = 0;
+            }
+            if bytes.len() > LEAF_HASH_BUF_LEN {
+                self.digest.update(bytes);
+                return;
+            }
+        }
+        self.buf[self.len..self.len + bytes.len()].copy_from_slice(bytes);
+        self.len += bytes.len();
+    }
+
+    #[inline]
+    fn finalize(mut self) -> Output<D> {
+        if self.len > 0 {
+            self.digest.update(&self.buf[..self.len]);
+        }
+        self.digest.finalize()
+    }
+}
+
+#[inline]
+fn hash_merkle_node<D: Digest>(left: &Output<D>, right: &Output<D>) -> Output<D> {
+    let mut digest = D::new();
+    let l = left.as_ref();
+    let r = right.as_ref();
+    let n = l.len();
+    if 2 * n <= 128 {
+        let mut buf = [0u8; 128];
+        buf[..n].copy_from_slice(l);
+        buf[n..2 * n].copy_from_slice(r);
+        digest.update(&buf[..2 * n]);
+    } else {
+        digest.update(l);
+        digest.update(r);
+    }
+    digest.finalize()
+}
+
 /// Commit to a univariate polynomial whose coefficients are `coeffs` using encoding `enc`
 fn commit<D, E>(coeffs_in: &[FldT<E>], enc: &E) -> ProverResult<LcCommit<D, E>, ErrT<E>>
 where
@@ -799,6 +876,27 @@ where
     }
 }
 
+/// Compute the column-wise Merkle root of a row-major `n_rows` x `n_cols` matrix.
+///
+/// Each column is hashed in row order after a leading zero block of `D`'s output
+/// size, padded to the next power of two with default digests, and reduced into
+/// a binary Merkle tree. The resulting root matches [`LcCommit::commit`].
+pub fn merkle_root<D, F>(matrix: &[F], n_rows: usize, n_cols: usize) -> Output<D>
+where
+    D: Digest,
+    F: FieldHash + Sync,
+{
+    assert_eq!(matrix.len(), n_rows * n_cols);
+    let n_cols_np2 = n_cols.next_power_of_two();
+    let mut hashes = vec![<Output<D> as Default>::default(); 2 * n_cols_np2 - 1];
+    hash_columns::<D, F>(matrix, &mut hashes[..n_cols], n_rows, n_cols, 0);
+    let (hin, hout) = hashes.split_at_mut(n_cols_np2);
+    if !hout.is_empty() {
+        merkle_tree::<D>(hin, hout);
+    }
+    hashes.pop().unwrap()
+}
+
 fn merkleize<D, E>(comm: &mut LcCommit<D, E>)
 where
     D: Digest,
@@ -806,54 +904,46 @@ where
 {
     // step 1: hash each column of the commitment (we always reveal a full column)
     let hashes = &mut comm.hashes[..comm.n_cols];
-    hash_columns::<D, E>(&comm.comm, hashes, comm.n_rows, comm.n_cols, 0);
+    hash_columns::<D, FldT<E>>(&comm.comm, hashes, comm.n_rows, comm.n_cols, 0);
 
     // step 2: compute rest of Merkle tree
     let len_plus_one = comm.hashes.len() + 1;
     assert!(len_plus_one.is_power_of_two());
     let (hin, hout) = comm.hashes.split_at_mut(len_plus_one / 2);
-    merkle_tree::<D>(hin, hout);
+    if !hout.is_empty() {
+        merkle_tree::<D>(hin, hout);
+    }
 }
 
-fn hash_columns<D, E>(
-    comm: &[FldT<E>],
+fn hash_columns<D, F>(
+    comm: &[F],
     hashes: &mut [Output<D>],
     n_rows: usize,
     n_cols: usize,
     offset: usize,
 ) where
     D: Digest,
-    E: LcEncoding,
+    F: FieldHash + Sync,
 {
-    if hashes.len() <= (1 << LOG_MIN_NCOLS) {
-        // base case: run the computation
-        // 1. prepare the digests for each column
-        let mut digests = Vec::with_capacity(hashes.len());
-        for _ in 0..hashes.len() {
-            // column hashes start with a block of 0's
-            let mut dig = D::new();
-            dig.update(<Output<D> as Default>::default());
-            digests.push(dig);
-        }
-        // 2. for each row, update the digests for each column
-        for row in 0..n_rows {
-            for (col, digest) in digests.iter_mut().enumerate() {
-                comm[row * n_cols + offset + col].digest_update(digest);
+    hashes
+        .par_chunks_mut(HASH_COLUMNS_BLOCK)
+        .enumerate()
+        .for_each(|(block_idx, block_hashes)| {
+            let col_offset = offset + block_idx * HASH_COLUMNS_BLOCK;
+            let width = block_hashes.len();
+            let mut hashers: Vec<LeafHasher<D>> =
+                (0..width).map(|_| LeafHasher::new()).collect();
+            for row in 0..n_rows {
+                let row_start = row * n_cols + col_offset;
+                let row_slice = &comm[row_start..row_start + width];
+                for (elem, hasher) in row_slice.iter().zip(hashers.iter_mut()) {
+                    hasher.push(elem);
+                }
             }
-        }
-        // 3. finalize each digest and write the results back
-        for (col, digest) in digests.into_iter().enumerate() {
-            hashes[col] = digest.finalize();
-        }
-    } else {
-        // recursive case: split and execute in parallel
-        let half_cols = hashes.len() / 2;
-        let (lo, hi) = hashes.split_at_mut(half_cols);
-        rayon::join(
-            || hash_columns::<D, E>(comm, lo, n_rows, n_cols, offset),
-            || hash_columns::<D, E>(comm, hi, n_rows, n_cols, offset + half_cols),
-        );
-    }
+            for (dst, hasher) in block_hashes.iter_mut().zip(hashers) {
+                *dst = hasher.finalize();
+            }
+        });
 }
 
 fn merkle_tree<D>(ins: &[Output<D>], outs: &mut [Output<D>])
@@ -880,10 +970,7 @@ where
     if ins.len() <= (1 << LOG_MIN_NCOLS) {
         // base case: just compute all of the hashes
         for idx in 0..outs.len() {
-            let mut digest = D::new();
-            digest.update(ins[2 * idx].as_ref());
-            digest.update(ins[2 * idx + 1].as_ref());
-            outs[idx] = digest.finalize();
+            outs[idx] = hash_merkle_node::<D>(&ins[2 * idx], &ins[2 * idx + 1]);
         }
     } else {
         // recursive case: split and compute
@@ -971,12 +1058,23 @@ where
         return Err(VerifierError::EncodingDims);
     }
 
+    // encode all degree-test polynomials and p_eval together in one batched call
+    let n_degree_tests = enc.get_n_degree_tests();
+    let mut encoded_polys = vec![FldT::<E>::ZERO; (n_degree_tests + 1) * n_cols];
+    for i in 0..n_degree_tests {
+        let src = &proof.p_random_vec[i];
+        let copy_len = src.len().min(n_cols);
+        encoded_polys[i * n_cols..i * n_cols + copy_len].copy_from_slice(&src[..copy_len]);
+    }
+    let eval_copy_len = proof.p_eval.len().min(n_cols);
+    encoded_polys[n_degree_tests * n_cols..n_degree_tests * n_cols + eval_copy_len]
+        .copy_from_slice(&proof.p_eval[..eval_copy_len]);
+    enc.encode_rows(&mut encoded_polys, n_cols)?;
+
     // step 1: random tensor for degree test and random columns to test
     // step 1a: extract random tensor from transcript
     // we run multiple instances of this to boost soundness
-    let mut rand_tensor_vec: Vec<Vec<FldT<E>>> = Vec::new();
-    let mut p_random_fft: Vec<Vec<FldT<E>>> = Vec::new();
-    let n_degree_tests = enc.get_n_degree_tests();
+    let mut rand_tensor_vec: Vec<Vec<FldT<E>>> = Vec::with_capacity(n_degree_tests);
     for i in 0..n_degree_tests {
         let rand_tensor: Vec<FldT<E>> = {
             let mut key: <ChaCha20Rng as SeedableRng>::Seed = Default::default();
@@ -990,16 +1088,7 @@ where
 
         rand_tensor_vec.push(rand_tensor);
 
-        // step 1b: eval encoding of p_random
-        {
-            let mut tmp = Vec::with_capacity(n_cols);
-            tmp.extend_from_slice(&proof.p_random_vec[i][..]);
-            tmp.resize(n_cols, FldT::<E>::ZERO);
-            enc.encode(&mut tmp)?;
-            p_random_fft.push(tmp);
-        };
-
-        // step 1c: push p_random and p_eval into transcript
+        // step 1b: push p_random into transcript
         proof.p_random_vec[i]
             .iter()
             .for_each(|coeff| coeff.transcript_update(tr, E::LABEL_PR));
@@ -1010,7 +1099,7 @@ where
         .iter()
         .for_each(|coeff| coeff.transcript_update(tr, E::LABEL_PE));
 
-    // step 1d: extract columns to open
+    // step 1c: extract columns to open
     let cols_to_open: Vec<usize> = {
         let mut key: <ChaCha20Rng as SeedableRng>::Seed = Default::default();
         tr.challenge_bytes(E::LABEL_CO, &mut key);
@@ -1022,16 +1111,18 @@ where
             .collect()
     };
 
-    // step 2: p_eval fft for column checks
-    let p_eval_fft = {
-        let mut tmp = Vec::with_capacity(n_cols);
-        tmp.extend_from_slice(&proof.p_eval[..]);
-        tmp.resize(n_cols, FldT::<E>::ZERO);
-        enc.encode(&mut tmp)?;
-        tmp
-    };
+    // record the first opening index for each column so identical repeats can be skipped;
+    // the first opening always runs the full check, so accept/reject and error kinds are unchanged.
+    assert!(cols_to_open.len() <= u32::MAX as usize);
+    let mut first = vec![u32::MAX; n_cols];
+    for (k, &c) in cols_to_open.iter().enumerate() {
+        if first[c] == u32::MAX {
+            first[c] = k as u32;
+        }
+    }
 
-    // step 3: check p_random, p_eval, and col paths
+    // step 2: check p_random, p_eval, and col paths
+    let p_eval_fft = &encoded_polys[n_degree_tests * n_cols..];
     let mut tensors: Vec<&[FldT<E>]> = Vec::with_capacity(n_degree_tests + 1);
     for t in &rand_tensor_vec {
         tensors.push(t.as_slice());
@@ -1041,13 +1132,22 @@ where
     cols_to_open
         .par_iter()
         .zip(&proof.columns[..])
+        .enumerate()
         .try_for_each_init(
             || vec![FldT::<E>::ZERO; n_degree_tests + 1],
-            |dots, (&col_num, column)| {
+            |dots, (k, (&col_num, column))| {
+                let f = first[col_num] as usize;
+                if f != k
+                    && column.col == proof.columns[f].col
+                    && column.path == proof.columns[f].path
+                {
+                    return Ok(());
+                }
+
                 enc.column_dots(&column.col, &tensors, dots);
                 let mut rand = true;
                 for i in 0..n_degree_tests {
-                    rand &= dots[i] == p_random_fft[i][col_num];
+                    rand &= dots[i] == encoded_polys[i * n_cols + col_num];
                 }
 
                 let eval = dots[n_degree_tests] == p_eval_fft[col_num];
@@ -1061,7 +1161,7 @@ where
             },
         )?;
 
-    // step 4: evaluate and return
+    // step 3: evaluate and return
     let mut out = [FldT::<E>::ZERO; 1];
     enc.column_dots(&proof.p_eval, &[inner_tensor], &mut out);
     Ok(out[0])
@@ -1073,25 +1173,20 @@ where
     D: Digest,
     E: LcEncoding,
 {
-    let mut digest = D::new();
-    digest.update(<Output<D> as Default>::default());
+    let mut hasher = LeafHasher::<D>::new();
     for e in &column.col[..] {
-        e.digest_update(&mut digest);
+        hasher.push(e);
     }
 
     // check Merkle path
-    let mut hash = digest.finalize();
+    let mut hash = hasher.finalize();
     let mut col = col_num;
     for p in &column.path[..] {
-        let mut digest = D::new();
-        if col % 2 == 0 {
-            digest.update(&hash);
-            digest.update(p);
+        hash = if col % 2 == 0 {
+            hash_merkle_node::<D>(&hash, p)
         } else {
-            digest.update(p);
-            digest.update(&hash);
-        }
-        hash = digest.finalize();
+            hash_merkle_node::<D>(p, &hash)
+        };
         col >>= 1;
     }
 
