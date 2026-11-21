@@ -287,6 +287,127 @@ class TestReportPipeline(unittest.TestCase):
         generated = res.stdout.strip()
         self.assertEqual(readme_block, generated, "README.md claims table is out of sync with reproduce/run.sh --list-claims --markdown")
 
+    def test_make_selection_and_report_c0_and_c0_c4_pass(self):
+        with tempfile.TemporaryDirectory(prefix="rbd-test-c0-") as tmp:
+            tmp_path = pathlib.Path(tmp)
+            env = dict(os.environ)
+            env["MPLCONFIGDIR"] = str(tmp_path / "mpl")
+            host = "test-x86"
+            run_id = "2026-11-21-abcdef123456"
+            sess = "quick1"
+            out_root = tmp_path / "out"
+            pf_path = out_root / host / "preflight.json"
+            pf_path.parent.mkdir(parents=True)
+            pf_path.write_text(json.dumps({
+                "cpu_model": "Test x86 CPU",
+                "dropped_stages": {},
+                "claims": [
+                    {"id": f"C{i}", "status": "runnable" if i != 11 else "skipped",
+                     "reason": "" if i != 11 else "needs aarch64"}
+                    for i in range(12)
+                ],
+            }), encoding="utf-8")
+            tests_dir = out_root / host / "tests"
+            tests_dir.mkdir(parents=True)
+            (tests_dir / "test-stamp.json").write_text(json.dumps({
+                "schema_version": "rbd-test-stamp-v1",
+                "status": "passed",
+                "key": "k",
+                "commit": "abcdef123456",
+                "rustc": "rustc 1.99.1",
+                "host": host,
+                "arch": "x86_64",
+            }), encoding="utf-8")
+
+            # 1) --claims C0 alone
+            sel_c0 = out_root / "selection-c0.json"
+            subprocess.run([
+                sys.executable, str(SCRIPT_DIR / "make_selection.py"),
+                "--results-root", str(out_root), "--host-label", host,
+                "--run", run_id, "--session", sess, "--mode", "quick",
+                "--arch", "x86_64", "--claims", "C0", "--preflight", str(pf_path),
+                "--mt-threads", "4", "--out", str(sel_c0),
+            ], check=True, capture_output=True, text=True)
+            ana_c0 = tmp_path / "ana-c0"
+            res = subprocess.run([
+                sys.executable, str(SCRIPT_DIR / "analyze.py"),
+                "--results-dir", str(out_root), "--selection", str(sel_c0),
+                "--out-dir", str(ana_c0), "--no-latex-compile", "--check",
+            ], env=env, capture_output=True, text=True, check=False)
+            self.assertEqual(res.returncode, 0, f"C0 analyze --check failed:\n{res.stdout}\n{res.stderr}")
+            pap_c0 = tmp_path / "pap-c0"
+            claims_c0 = tmp_path / "claims-c0.csv"
+            hard_ok = paper_tables.run_pipeline(
+                csv_dir=ana_c0 / "csv", results_dir=out_root, selection_path=sel_c0,
+                out_dir=pap_c0, strict=False, claims_out=claims_c0,
+            )
+            self.assertTrue(hard_ok)
+            with open(claims_c0, "r", encoding="utf-8", newline="") as f:
+                by_id = {r["claim_id"]: r for r in csv.DictReader(f)}
+            self.assertEqual(by_id["C0"]["status"], "PASS")
+            self.assertNotIn("claim not selected", by_id["C0"]["observed"])
+
+            # 2) --claims C0,C4 with step tags
+            sess_dir = out_root / host / run_id / sess
+            sess_dir.mkdir(parents=True)
+            (sess_dir / "schedule.json").write_text(json.dumps({
+                "profile": "quick", "session_id": sess, "mt_threads": 4, "blocks": [],
+            }), encoding="utf-8")
+            step_tags = [
+                "step/01-modernize", "step/02-fields", "step/03-column-major",
+                "step/04-r2l", "step/05-lazy", "step/06-blocking",
+                "step/07-slicing", "step/08-threads", "step/09-codegen", "HEAD",
+            ]
+            for idx, tag in enumerate(step_tags):
+                ms_a = 500 - idx * 40
+                tag_dir = sess_dir / "quick_steps_mode_a_n16-20" / "steps" / tag.replace("/", "_")
+                tag_dir.mkdir(parents=True)
+                for n in (16, 20):
+                    (tag_dir / f"a_n{n}.json").write_text(json.dumps({
+                        "schema_version": "steps-bench-v1", "tag": tag, "commit": "abcdef123456",
+                        "mode": "a", "field": "Ft127" if idx == 0 else "Mont127",
+                        "params": "lcpc-sdig6", "log_n": n, "threads": 1,
+                        "session_id": sess, "samples_ns": [ms_a * 1_000_000] * 2,
+                    }), encoding="utf-8")
+                if idx >= 3:
+                    ms_b = 300 - (idx - 3) * 20
+                    tag_dir_b = sess_dir / "quick_steps_mode_b_n16-20" / "steps" / tag.replace("/", "_")
+                    tag_dir_b.mkdir(parents=True)
+                    for n in (16, 20):
+                        (tag_dir_b / f"b_n{n}.json").write_text(json.dumps({
+                            "schema_version": "steps-bench-v1", "tag": tag, "commit": "abcdef123456",
+                            "mode": "b", "field": "Mers127", "params": "simd-spielman",
+                            "log_n": n, "threads": 1, "session_id": sess,
+                            "samples_ns": [ms_b * 1_000_000] * 2,
+                        }), encoding="utf-8")
+
+            sel_c04 = out_root / "selection-c04.json"
+            subprocess.run([
+                sys.executable, str(SCRIPT_DIR / "make_selection.py"),
+                "--results-root", str(out_root), "--host-label", host,
+                "--run", run_id, "--session", sess, "--mode", "quick",
+                "--arch", "x86_64", "--claims", "C0,C4", "--preflight", str(pf_path),
+                "--mt-threads", "4", "--out", str(sel_c04),
+            ], check=True, capture_output=True, text=True)
+            ana_c04 = tmp_path / "ana-c04"
+            res = subprocess.run([
+                sys.executable, str(SCRIPT_DIR / "analyze.py"),
+                "--results-dir", str(out_root), "--selection", str(sel_c04),
+                "--out-dir", str(ana_c04), "--no-latex-compile", "--check",
+            ], env=env, capture_output=True, text=True, check=False)
+            self.assertEqual(res.returncode, 0, f"C0,C4 analyze --check failed:\n{res.stdout}\n{res.stderr}")
+            pap_c04 = tmp_path / "pap-c04"
+            claims_c04 = tmp_path / "claims-c04.csv"
+            hard_ok = paper_tables.run_pipeline(
+                csv_dir=ana_c04 / "csv", results_dir=out_root, selection_path=sel_c04,
+                out_dir=pap_c04, strict=False, claims_out=claims_c04,
+            )
+            self.assertTrue(hard_ok)
+            with open(claims_c04, "r", encoding="utf-8", newline="") as f:
+                by_id = {r["claim_id"]: r for r in csv.DictReader(f)}
+            self.assertEqual(by_id["C0"]["status"], "PASS")
+            self.assertEqual(by_id["C4"]["status"], "PASS")
+
 
 if __name__ == "__main__":
     unittest.main()

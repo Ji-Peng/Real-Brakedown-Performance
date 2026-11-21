@@ -669,6 +669,7 @@ class BenchmarkAnalyzer:
         self.reports_ligero_rs: List[Dict] = []
         self.field_benchmarks: List[Dict] = []
         self.codegen_reports: List[Dict] = []
+        self.test_stamps: List[Dict] = []
         self.unmeasured: List[Dict] = []          # status failed / skipped / not_applicable
         self.skipped_baselines: Dict[str, str] = {}
 
@@ -717,6 +718,7 @@ class BenchmarkAnalyzer:
         self.todo_cells: Dict[str, str] = {}             # selector -> reason
         self._used: Set[Tuple[str, str, str]] = set()
         self._used_records: List[Dict] = []
+        self._used_stamps: List[Dict] = []
         self._current_table: str = ""
         self.matched_allow: Set[str] = set()             # --allow selectors that excused something
 
@@ -1062,6 +1064,22 @@ class BenchmarkAnalyzer:
 
     def _load_file(self, path: str, fname: str, data: Any, meta: Dict):
         is_session_level = not meta["block"]
+
+        if isinstance(data, dict) and data.get("schema_version") == "rbd-test-stamp-v1":
+            parts = meta["file_rel"].split("/")
+            host = parts[0] if len(parts) >= 2 and parts[1] == "tests" else str(data.get("host") or meta["machine"] or "")
+            if self.selection:
+                if host not in self.selection.machines:
+                    status, reason = self.selection.classify(host, meta["file_rel"], data)
+                    if status == "exclude":
+                        self.excluded[reason] += 1
+                    else:
+                        self.uncovered.append(meta["file_rel"])
+                    return
+            stamp = dict(data)
+            stamp["_meta"] = dict(meta, host=host)
+            self.test_stamps.append(stamp)
+            return
 
         if isinstance(data, dict) and fname == "schedule.json":
             if self.selection and self._classify(meta, None) != "include":
@@ -1634,6 +1652,13 @@ class BenchmarkAnalyzer:
                 desc.append("VM " + "/".join(sorted(info["vm_type"])))
             label ="/".join(p for p in (machine, run, sess) if p) or "local"
             parts.append(label + (f" ({', '.join(desc)})" if desc else ""))
+        for st in self._used_stamps:
+            h = st["_meta"].get("host") or st.get("host") or "local"
+            c = str(st.get("commit") or "")
+            c_short = c[:7] if c and c != "detached" else ""
+            lbl = f"{h}/tests/test-stamp.json" + (f" (fork {c_short})" if c_short else "")
+            if lbl not in parts:
+                parts.append(lbl)
         recs = self._used_records
         lcpc = sorted({str(r.get("upstream_commit"))[:7] for r in recs if r["_meta"]["impl"] == "lcpc_orig" and r.get("upstream_commit")})
         simd = sorted({str(r.get("upstream_commit"))[:7] for r in recs if r["_meta"]["impl"] == "simd" and r.get("upstream_commit")})
@@ -1687,6 +1712,7 @@ class BenchmarkAnalyzer:
         self._current_table = table
         self._used = set()
         self._used_records = []
+        self._used_stamps = []
 
     def _write_artefact(self, name: str, caption: str, label: str, headers: List[str],
                         rows: List[List[Any]], notes: Optional[List[str]] = None,
@@ -1800,26 +1826,55 @@ class BenchmarkAnalyzer:
     def generate_T0_correctness(self):
         self._begin("T0")
         headers = ["Gate / Invariant", "Evaluation Target", "Oracle / Reference", "Commit / Tag", "Status"]
-        # Test-gated rows: reproduce/this_work.sh (and steps.sh per tag) runs
-        # `cargo test --workspace` before timing and refuses to benchmark on a
-        # failure, so every timed This Work block / step tag in the selection is
-        # evidence that the suite passed for that build. Derived from the data.
+        # Test-gated rows: reproduce/test.sh writes <host>/tests/test-stamp.json
+        # on a clean pass, and reproduce/this_work.sh (plus steps.sh per tag)
+        # runs `cargo test --workspace` before timing and refuses to benchmark on
+        # a failure, so test stamps, timed This Work blocks, and step tags are
+        # evidence that the suite passed. Derived from the data.
         tw_recs = self.reports_this_work + [r for r in self.reports_arm if r["_meta"]["impl"] == "this_work"]
         tw_blocks = {(r["_meta"]["machine"], r["_meta"]["run"], r["_meta"]["session_dir"], r["_meta"]["block"])
                      for r in tw_recs}
         forks = sorted({f for (mc, rn, sd, _) in tw_blocks
                         for f in self.session_info.get((mc, rn, sd), {}).get("fork", set())})
         step_tags = sorted(t for t, recs in self.reports_steps.items() if any(self._extract_samples(r) for r in recs))
+        step_sessions = {(r["_meta"]["machine"], r["_meta"]["run"], r["_meta"]["session_dir"])
+                         for recs in self.reports_steps.values() for r in recs if self._extract_samples(r)}
+        step_forks = sorted(
+            {f for key in step_sessions for f in self.session_info.get(key, {}).get("fork", set())}
+            | {str(r.get("commit"))[:7] for r in self.reports_steps.get("HEAD", [])
+               if r.get("commit") and self._extract_samples(r)}
+        )
+        failed_stamps = [s for s in self.test_stamps if s.get("status") != "passed"]
+        passed_stamps = [s for s in self.test_stamps if s.get("status") == "passed"]
+        stamp_forks = sorted({str(s.get("commit"))[:7] for s in passed_stamps
+                              if s.get("commit") and str(s.get("commit")) != "detached"})
         for r in tw_recs:
             m = r["_meta"]
             self._used.add((m["machine"], m["run"], m["session_dir"]))
+        for key in step_sessions:
+            self._used.add(key)
+        self._used_stamps.extend(self.test_stamps)
 
         def gate_status(row_key: str, tags_from: Optional[str]) -> str:
+            if failed_stamps:
+                statuses = "/".join(sorted({str(s.get("status") or "failed") for s in failed_stamps}))
+                return f"FAIL (reproduce/test.sh status={statuses})"
             tags = [t for t in step_tags if tags_from is None or t == "HEAD" or t >= tags_from]
-            if not tw_blocks:
+            if tw_blocks and not passed_stamps:
+                return (f"PASS (test gate before {len(tw_blocks)} timed blocks @ {'/'.join(forks) or '?'}"
+                        + (f" and {len(tags)} step tags" if tags else "") + ")")
+            if not tw_blocks and not passed_stamps and not tags:
                 return self.missing_text(f"T0|{row_key}|Status")
-            return (f"PASS (test gate before {len(tw_blocks)} timed blocks @ {'/'.join(forks) or '?'}"
-                    + (f" and {len(tags)} step tags" if tags else "") + ")")
+            parts = []
+            if passed_stamps:
+                n = len(passed_stamps)
+                parts.append(f"reproduce/test.sh ({n} stamp)" if n == 1 else f"reproduce/test.sh ({n} stamps)")
+            if tw_blocks:
+                parts.append(f"test gate before {len(tw_blocks)} timed blocks")
+            if tags:
+                parts.append(f"{len(tags)} step tags" if parts else f"test gate before {len(tags)} step tags")
+            all_forks = sorted(set(forks) | set(stamp_forks) | (set(step_forks) if not (forks or stamp_forks) else set()))
+            return f"PASS ({'; '.join(parts)} @ {'/'.join(all_forks) or '?'})"
 
         def verification_status(row_key: str, recs: List[Dict]) -> str:
             flags = [((r.get("correctness") or {}).get("proof_verification_passed"),
@@ -1862,7 +1917,9 @@ class BenchmarkAnalyzer:
             gs = by_arch.get(arch, [])
             statuses = sorted({st for g in gs for st in g["effective"]})
             if not gs:
-                status = self.missing_text("T0|Vector-instruction audit|Status")
+                status = self.missing_text(f"T0|Vector-instruction audit ({arch})|Status")
+                if status == "-":
+                    status = self.missing_text("T0|Vector-instruction audit|Status")
             elif all(g["ok"] for g in gs):
                 status = "PASS" if statuses == ["PASS"] else "PASS (incl. PASS on re-check, see T11)"
             else:
@@ -1870,9 +1927,10 @@ class BenchmarkAnalyzer:
                 status = "/".join(statuses) + (" (documented, see T11)" if documented else "")
             n_rep = sum(len(g["reports"]) for g in gs)
             arith = "/".join(str(g["vec_arith"]) for g in gs) or "-"
+            commit_col = "@ " + "/".join(sorted({g["fork"] for g in gs})) if gs else "N/A (no codegen report)"
             rows.insert(len(gated), [f"Vector-instruction audit ({arch})", f"Hot kernels of the measured binaries ({n_rep} reports)",
                             f"check_codegen.py: zero vector arithmetic (found {arith})",
-                            "@ " + "/".join(sorted({g["fork"] for g in gs})) if gs else "-", status])
+                            commit_col, status])
         notes = ["Test-gated rows: reproduce/this_work.sh runs cargo test --workspace before every This Work block and "
                  "steps.sh before every step tag, and neither times a build whose tests fail; the status counts the timed "
                  "blocks and step tags in this selection (Commit / Tag = the first tag that has the test).",
@@ -1881,6 +1939,9 @@ class BenchmarkAnalyzer:
                  "The vector-instruction audit rows are derived from the selected check_codegen.py reports (T11); a FAIL "
                  "written by an older classifier whose complete stored hot-kernel disassembly re-checks without vector "
                  "arithmetic is 'PASS on re-check'."]
+        if self.test_stamps:
+            notes.append("Test stamps: reproduce/test.sh runs cargo test --workspace and the original-LCPC golden vector "
+                         "check and records <host>/tests/test-stamp.json.")
         self._write_artefact("table_T0_correctness", "Correctness Gates and Verification Summary for Measured Binaries",
                              "tab:correctness_gates", headers, rows, notes, col_align="lllll", key_cols=1)
 

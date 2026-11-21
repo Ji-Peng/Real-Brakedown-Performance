@@ -170,11 +170,20 @@ def main():
         if cells:
             omissions.append({"kind": kind, "reason": reason, "cells": cells})
 
+    test_stamp_path = os.path.join(args.results_root, args.host_label, "tests", "test-stamp.json")
+    has_test_stamp = os.path.isfile(test_stamp_path)
+    has_test_evidence = has_test_stamp or has_any_tw or has_d
+
     # T0: correctness gates
-    if not has_any_tw:
-        add_omission("not-run", "claim not selected", ["T0|*|Status"])
-    elif not (has_a or has_arm or ("T" in stages_ran) or ("QT" in stages_ran)):
-        add_omission("not-run", "claim not selected", ["T0|Original LCPC PCS verification|Status"])
+    if not has_test_evidence:
+        if "C0" not in selected_claims:
+            add_omission("not-run", "claim not selected", ["T0|*|Status"])
+    else:
+        if not has_any_tw:
+            add_omission("not-run", claim_skip_reason("C1"), ["T0|Vector-instruction audit*|Status"])
+            add_omission("not-run", "no timed This Work benchmark blocks", ["T0|PCS end-to-end verification|Status"])
+        if not (has_a or has_arm or ("T" in stages_ran) or ("QT" in stages_ran)):
+            add_omission("not-run", "no timed original-LCPC benchmark blocks", ["T0|Original LCPC PCS verification|Status"])
 
     # T1: headline encoding (C2)
     if has_a:
@@ -352,7 +361,7 @@ def main():
         "exclude": [
             {"path": "*/analysis", "reason": "per-session analyze.py output (derived, not raw data)"},
             {"path": "report/*", "reason": "generated report artefacts"},
-            {"path": "*/tests/*", "reason": "C0 test logs and stamps"},
+            {"path": "*/tests/*.log", "reason": "C0 test logs (test-stamp.json feeds T0)"},
             {"path": "*/preflight.json", "reason": "preflight capability report"},
             {"path": "*.prev-*", "reason": "earlier attempt of a re-run block moved aside by reproduce/all.sh"},
         ],

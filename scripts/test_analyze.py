@@ -1420,6 +1420,88 @@ class ArtifactPortabilityTests(unittest.TestCase):
         self.assertEqual(by_series["Mont127 mode (a) s=1"], {20: "80.000", 22: "320.000"})
         self.assertEqual(by_series["Mont127 mode (a) adaptive"], {20: "60.000", 22: "210.000"})
 
+    def test_t0_reads_test_stamp_and_step_tags_without_this_work_blocks(self):
+        # C0-only run: only <host>/tests/test-stamp.json exists.
+        tests_dir = os.path.join(self.fx.root, MACHINE, "tests")
+        os.makedirs(tests_dir, exist_ok=True)
+        stamp_path = os.path.join(tests_dir, "test-stamp.json")
+        with open(stamp_path, "w") as f:
+            json.dump({
+                "schema_version": "rbd-test-stamp-v1",
+                "status": "passed",
+                "key": "k1",
+                "commit": "abcdef123456",
+                "rustc": "rustc 1.99.1",
+                "host": MACHINE,
+                "arch": "x86_64",
+            }, f)
+        sel = self.fx.selection(
+            sessions=("quick1",), expected=("quick1",),
+            exclude=({"path": "*/tests/*.log", "reason": "C0 test logs"},),
+            omissions=(
+                {"kind": "not-run", "reason": "claim not selected",
+                 "cells": ["T0|Vector-instruction audit*|Status", "T1|*|*", "T2|*|*", "T3|*|*", "T4|*|*",
+                           "T5|*|*", "T6|*|*", "T7|*|*", "T8|*|*", "T9|*|*", "T10|*|*", "T11|*|*", "T12|*|*"]},
+                {"kind": "not-run", "reason": "no timed This Work benchmark blocks",
+                 "cells": ["T0|PCS end-to-end verification|Status"]},
+                {"kind": "not-run", "reason": "no timed original-LCPC benchmark blocks",
+                 "cells": ["T0|Original LCPC PCS verification|Status"]},
+            ),
+        )
+        a = self.fx.analyzer(sel)
+        a.compile_latex = False
+        with contextlib.redirect_stdout(io.StringIO()):
+            a.generate_all()
+            ok = a.check_all_artefacts([])
+        self.assertTrue(ok)
+        self.assertEqual(sel.unmatched_omission_patterns(), [])
+        headers, rows = TableTests._rows(self, "table_T0_correctness.csv")
+        by_gate = {r[0]: dict(zip(headers, r)) for r in rows}
+        self.assertEqual(by_gate["Bit-exact prover encoding (mode a)"]["Status"],
+                         "PASS (reproduce/test.sh (1 stamp) @ abcdef1)")
+        self.assertEqual(by_gate["Vector-instruction audit ((none))"]["Commit / Tag"], "N/A (no codegen report)")
+        self.assertEqual(by_gate["Vector-instruction audit ((none))"]["Status"], "not run (claim not selected)")
+        self.assertEqual(by_gate["PCS end-to-end verification"]["Status"],
+                         "not run (no timed This Work benchmark blocks)")
+
+        # Failed test-stamp.json must produce FAIL in T0.
+        with open(stamp_path, "w") as f:
+            json.dump({"schema_version": "rbd-test-stamp-v1", "status": "failed", "commit": "abcdef123456",
+                       "host": MACHINE}, f)
+        b = self.fx.analyzer(sel)
+        with contextlib.redirect_stdout(io.StringIO()):
+            b.generate_T0_correctness()
+        headers, rows = TableTests._rows(self, "table_T0_correctness.csv")
+        by_gate = {r[0]: dict(zip(headers, r)) for r in rows}
+        self.assertTrue(by_gate["Bit-exact prover encoding (mode a)"]["Status"].startswith("FAIL"))
+
+    def test_t0_counts_step_tags_as_test_evidence_without_stamp(self):
+        for tag in ("step/01-modernize", "step/02-fields", "step/07-slicing", "step/08-threads", "HEAD"):
+            rec = {"schema_version": "steps-bench-v1", "tag": tag, "commit": "123456789abc",
+                   "mode": "a", "field": "Mont127", "params": "lcpc-sdig6", "log_n": 20, "threads": 1,
+                   "session_id": "quick1", "samples_ns": [1e8, 1e8]}
+            self.fx.write("quick1", "quick_steps_mode_a_n20", f"steps/{tag.replace('/', '_')}/a.json", rec)
+        sel = self.fx.selection(
+            sessions=("quick1",), expected=("quick1",),
+            omissions=(
+                {"kind": "not-run", "reason": "claim not selected", "cells": ["T0|Vector-instruction audit*|Status"]},
+                {"kind": "not-run", "reason": "no timed This Work benchmark blocks",
+                 "cells": ["T0|PCS end-to-end verification|Status"]},
+                {"kind": "not-run", "reason": "no timed original-LCPC benchmark blocks",
+                 "cells": ["T0|Original LCPC PCS verification|Status"]},
+            ),
+        )
+        a = self.fx.analyzer(sel)
+        with contextlib.redirect_stdout(io.StringIO()):
+            a.generate_T0_correctness()
+        headers, rows = TableTests._rows(self, "table_T0_correctness.csv")
+        by_gate = {r[0]: dict(zip(headers, r)) for r in rows}
+        self.assertEqual(by_gate["Bit-exact prover encoding (mode a)"]["Status"],
+                         "PASS (test gate before 5 step tags @ 1234567)")
+        self.assertEqual(by_gate["Expander thread invariance"]["Status"],
+                         "PASS (test gate before 2 step tags @ 1234567)")
+        self.assertEqual(a._check_table_cells(sel.omission_patterns()), [])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
