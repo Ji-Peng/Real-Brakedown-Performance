@@ -8,7 +8,8 @@
 // except according to those terms.
 //
 // Modified 2026 by the RealBrakedownPerf authors (Apache-2.0, see NOTICE):
-// transposed (R2L) graph storage and runtime code parameters.
+// transposed (R2L) graph storage, runtime code parameters, portable scalar
+// ChaCha20 stream sampling, and reused generation-stamped neighbor sampling.
 // The per-commit changes are in the git history since step/00-import
 // (upstream conroi/lcpc f0e2116).
 
@@ -19,15 +20,15 @@ Graphs are sampled left to right, one left node at a time, exactly as the code
 specification prescribes, and then transposed into [`R2lGraph`] form by a
 linear-time counting sort:
 
-- mode (a), [`CodeParams::Lcpc`]: upstream LCPC's sampler, unchanged. Level `i`
-  uses its own `ChaCha20Rng` stream `(seed, i)` and samples the precode and
-  then the postcode; each left node gets `d` *distinct* right neighbors
-  (rejection), sorted, followed by `d` nonzero weights. The graphs are
-  bit-exact with `f0e2116`.
+- mode (a), [`CodeParams::Lcpc`]: upstream LCPC's sampler, unchanged in output.
+  Level `i` uses its own [`ChaCha20Stream`] `(seed, i)` (identical word stream
+  to `ChaCha20Rng`) and samples the precode and then the postcode; each left
+  node gets `d` *distinct* right neighbors (rejection), sorted, followed by `d`
+  nonzero weights. The graphs are bit-exact with `f0e2116`.
 - mode (b), [`CodeParams::SimdSpielman`]: SIMD-Spielman's dimensions and
   sampling structure (depth-first order `G1[0], ..., G1[L-1], G2[L-1], ...,
   G2[0]`; per left node, `d` right neighbors *with replacement*, each followed
-  by its weight). The random source here is one `ChaCha20Rng` stream seeded with
+  by its weight). The random source here is one [`ChaCha20Stream`] seeded with
   `seed` (right node uniform via LCPC's `LegacyUniformUsize`, weight nonzero via
   `F::random`), not glibc `random()`. Upstream's exact graphs (for its `tv/`
   test vectors) are reproduced by the test-only sampler in
@@ -40,13 +41,12 @@ use crate::graph::R2lGraph;
 
 use ff::Field;
 use itertools::iterate;
+use lcpc_2d::chacha::ChaCha20Stream;
 use lcpc_2d::{LegacyUniformUsize, SizedField};
 use lcpc_fields::LazyField;
 use num_traits::Num;
 use rand::{Rng, SeedableRng};
-use rand_chacha::ChaCha20Rng;
 use rayon::prelude::*;
-use std::iter::repeat_with;
 
 const fn ceil_muldiv(n: usize, num: usize, den: usize) -> usize {
     (n * num + den - 1) / den
@@ -144,7 +144,7 @@ where
         .zip(&post_dims[..])
         .enumerate()
         .map(|(i, (&(ni, mi, cn), &(nip, mip, dn)))| {
-            let mut rng = ChaCha20Rng::seed_from_u64(seed);
+            let mut rng = ChaCha20Stream::seed_from_u64(seed);
             rng.set_stream(i as u64);
             let precode = gen_code(ni, mi, cn, &mut rng);
             let postcode = gen_code(nip, mip, dn, &mut rng);
@@ -232,34 +232,32 @@ where
     let mut idxs = Vec::<usize>::with_capacity(d * n);
     let mut ptrs = Vec::<usize>::with_capacity(1 + n);
     ptrs.push(0); // ptrs always starts with 0
+    let mut tmp = Vec::with_capacity(d);
+    let mut seen = vec![0u32; m];
+    let mut tag = 0u32;
 
     for _ in 0..n {
-        // for each row, sample d random nonzero columns (without replacement)
-        let cols = {
-            // for small d, the quadratic approach is almost certainly faster
-            let mut tmp = Vec::with_capacity(d);
-            assert_eq!(
-                d,
-                repeat_with(|| dist.sample(&mut rng))
-                    .filter(|&x| {
-                        if tmp.contains(&x) {
-                            false
-                        } else {
-                            tmp.push(x);
-                            true
-                        }
-                    })
-                    .take(d)
-                    .count()
-            );
-            tmp.sort_unstable(); // upstream sorted to supply to new_csc
-            tmp
-        };
-        assert_eq!(d, cols.len());
+        // for each row, sample d distinct right indices and sort them before
+        // drawing weights, matching upstream's RNG consumption and edge order
+        tag = tag.wrapping_add(1);
+        if tag == 0 {
+            seen.fill(0);
+            tag = 1;
+        }
+        tmp.clear();
+        while tmp.len() < d {
+            let x = dist.sample(&mut rng);
+            if seen[x] != tag {
+                seen[x] = tag;
+                tmp.push(x);
+            }
+        }
+        tmp.sort_unstable();
+        assert_eq!(d, tmp.len());
 
         // sample random elements for each column
         let mut last = m + 1;
-        for &col in &cols[..] {
+        for &col in &tmp[..] {
             // detect and skip repeats
             if col == last {
                 continue;
@@ -278,7 +276,7 @@ where
 // sample a nonzero field element by rejection (upstream LCPC's weight sampler)
 fn random_nonzero<F: Field, R: Rng>(rng: &mut R) -> F {
     let mut tmp = F::random(&mut *rng);
-    while <F as Field>::is_zero(&tmp).into() {
+    while tmp.is_zero_vartime() {
         tmp = F::random(&mut *rng);
     }
     tmp
@@ -332,13 +330,13 @@ pub fn simd_spielman_dims(k: usize) -> Vec<LevelDims> {
 /// Mode (b): sample SIMD-Spielman-shaped graphs for message length `k`.
 ///
 /// Graphs are drawn in upstream's depth-first order from a single
-/// `ChaCha20Rng` stream (see the module documentation).
+/// [`ChaCha20Stream`] (see the module documentation).
 pub fn generate_simd_spielman<F>(k: usize, seed: u64) -> (Vec<R2lGraph<F>>, Vec<R2lGraph<F>>)
 where
     F: Field,
 {
     let levels = simd_spielman_dims(k);
-    let mut rng = ChaCha20Rng::seed_from_u64(seed);
+    let mut rng = ChaCha20Stream::seed_from_u64(seed);
     let mut sample = |n: usize, m: usize, d: usize| {
         let dist = LegacyUniformUsize::new(0, m);
         let mut right_idx = Vec::<u32>::with_capacity(n * d);
@@ -363,6 +361,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lcpc_fields::Mont127;
+    use rand_chacha::ChaCha20Rng;
 
     #[test]
     fn simd_spielman_dims_small() {
@@ -378,5 +378,35 @@ mod tests {
             (15, 3, 3, 7)
         );
         assert!(dims.iter().all(|l| l.c == 10 && l.d == 20));
+    }
+
+    #[test]
+    fn generate_simd_spielman_matches_chacha20rng() {
+        let seed = 0x51a0_501e_1234_5678;
+        let k = 128;
+        let (got_pre, got_post) = generate_simd_spielman::<Mont127>(k, seed);
+
+        let levels = simd_spielman_dims(k);
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
+        let mut sample = |n: usize, m: usize, d: usize| {
+            let dist = LegacyUniformUsize::new(0, m);
+            let mut right_idx = Vec::<u32>::with_capacity(n * d);
+            let mut weights = Vec::<Mont127>::with_capacity(n * d);
+            for _ in 0..n * d {
+                right_idx.push(dist.sample(&mut rng) as u32);
+                weights.push(random_nonzero(&mut rng));
+            }
+            R2lGraph::from_left_edges_fixed_degree(n, m, d, &right_idx, &weights)
+        };
+        let ref_pre: Vec<_> = levels.iter().map(|l| sample(l.n, l.m, l.c)).collect();
+        let mut ref_post: Vec<_> = levels
+            .iter()
+            .rev()
+            .map(|l| sample(l.n_prime, l.m_prime, l.d))
+            .collect();
+        ref_post.reverse();
+
+        assert_eq!(got_pre, ref_pre);
+        assert_eq!(got_post, ref_post);
     }
 }

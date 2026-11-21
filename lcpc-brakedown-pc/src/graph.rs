@@ -156,19 +156,21 @@ impl<F: Copy> R2lGraph<F> {
         }
         assert_eq!(row_ptr[n_right] as usize, n_edges);
 
-        // pass 2: stable scatter in left-node (sampling) order; every slot of
-        // `new_weights` is overwritten exactly once (the copy only initializes it)
+        // pass 2: stable scatter in left-node (sampling) order, recording each
+        // edge's source index so `new_weights` can be gathered without cloning
+        // `weights` first
         let mut cursor = row_ptr[..n_right].to_vec();
         let mut col_idx = vec![0u32; n_edges];
-        let mut new_weights = weights.to_vec();
+        let mut src = vec![0u32; n_edges];
         for l in 0..n_left {
             for (r, e) in edges_of(l) {
                 let pos = cursor[r] as usize;
                 cursor[r] += 1;
                 col_idx[pos] = l as u32;
-                new_weights[pos] = weights[e];
+                src[pos] = e as u32;
             }
         }
+        let new_weights: Vec<F> = src.iter().map(|&e| weights[e as usize]).collect();
 
         Self {
             n_left,
