@@ -1588,6 +1588,25 @@ fn test_pool_lifecycle() {
         p.execute(&job);
         assert_eq!(job.0.load(Ordering::SeqCst), t);
     }
+
+    // 3. Concurrent callers sharing one pool: every job must see all workers
+    // exactly once (jobs are serialized, never interleaved or skipped).
+    let pool = std::sync::Arc::new(ThreadPool::new(4, &allowed_cores));
+    let handles: Vec<_> = (0..4)
+        .map(|_| {
+            let pool = std::sync::Arc::clone(&pool);
+            std::thread::spawn(move || {
+                for _ in 0..200 {
+                    let job = CounterJob(AtomicUsize::new(0));
+                    pool.execute(&job);
+                    assert_eq!(job.0.load(Ordering::SeqCst), 4);
+                }
+            })
+        })
+        .collect();
+    for h in handles {
+        h.join().unwrap();
+    }
 }
 
 #[test]

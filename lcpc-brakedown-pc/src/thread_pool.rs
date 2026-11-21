@@ -251,6 +251,9 @@ pub struct ThreadPool {
     cores: Vec<usize>,
     shared: Arc<WorkerState>,
     workers: Vec<JoinHandle<()>>,
+    // Serializes `execute`: the workers run one job at a time, so concurrent
+    // callers sharing the pool (e.g. through cloned encoders) must take turns.
+    execute_lock: Mutex<()>,
 }
 
 impl std::fmt::Debug for ThreadPool {
@@ -305,6 +308,7 @@ impl ThreadPool {
             cores: core_list,
             shared,
             workers,
+            execute_lock: Mutex::new(()),
         }
     }
 
@@ -334,6 +338,7 @@ impl ThreadPool {
             job.run(tid, num_threads, barrier);
         }
 
+        let _serial = self.execute_lock.lock().unwrap_or_else(|e| e.into_inner());
         let new_job_id = self.shared.next_job_id.fetch_add(1, Ordering::SeqCst);
         let invocation = JobInvocation {
             job_id: new_job_id,
