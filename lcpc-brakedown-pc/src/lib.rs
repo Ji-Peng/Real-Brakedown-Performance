@@ -8,8 +8,8 @@
 // except according to those terms.
 //
 // Modified 2026 by the RealBrakedownPerf authors (Apache-2.0, see NOTICE):
-// LazyField fields, batched/sliced/threaded encoding API, lazy linear-combination
-// kernels, runtime code parameters.
+// LazyField fields, batched/sliced/threaded encoding API, reusable encoding
+// scratch, lazy linear-combination kernels, runtime code parameters.
 // The per-commit changes are in the git history since step/00-import
 // (upstream conroi/lcpc f0e2116).
 #![deny(missing_docs)]
@@ -19,7 +19,7 @@ sdig-pc is a polynomial commitment scheme from the SDIG expander code
 */
 
 use codespec::{CodeParams, LcpcParams, SdigCode3 as SdigCodeDflt, SdigSpecification};
-use encode::{encode, encode_row_major_slices, ExpanderCode};
+use encode::{encode, encode_row_major_slices_mt_with, encode_row_major_slices_with, ExpanderCode};
 use matgen::generate_code;
 
 use lcpc_2d::{def_labels, n_degree_tests, LcCommit, LcEncoding, LcEvalProof};
@@ -31,6 +31,9 @@ pub mod graph;
 pub mod lincomb;
 pub mod matgen;
 pub mod thread_pool;
+
+// Re-export reusable encoder scratch buffer.
+pub use encode::EncodeScratch;
 
 // Re-export cache detection and slicing utilities.
 pub use cache::{
@@ -52,6 +55,37 @@ pub use lcpc_fields::{
 #[cfg(test)]
 mod tests;
 
+/// Interior-mutable slot holding a reusable [`EncodeScratch`].
+///
+/// Cloning an encoding yields a fresh empty scratch slot so clones do not eagerly
+/// duplicate multi-megabyte temporary buffers.
+struct ScratchSlot<F>(std::sync::Mutex<EncodeScratch<F>>);
+
+impl<F> Default for ScratchSlot<F> {
+    fn default() -> Self {
+        Self(std::sync::Mutex::new(EncodeScratch::new()))
+    }
+}
+
+impl<F> Clone for ScratchSlot<F> {
+    fn clone(&self) -> Self {
+        Self::default()
+    }
+}
+
+impl<F> std::fmt::Debug for ScratchSlot<F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Ok(guard) = self.0.try_lock() {
+            f.debug_struct("ScratchSlot")
+                .field("buf_len", &guard.buf_len())
+                .field("temp_rs_len", &guard.temp_rs_len())
+                .finish()
+        } else {
+            f.debug_struct("ScratchSlot").field("locked", &true).finish()
+        }
+    }
+}
+
 /// Encoding definition for SDIG expander-based polycommit
 ///
 /// The type parameter `S` selects the LCPC code specification used by the
@@ -69,6 +103,11 @@ mod tests;
 /// Expander-level multithreading is configured via
 /// [`set_threads`](Self::set_threads), [`with_threads`](Self::with_threads), or
 /// [`with_threads_and_cores`](Self::with_threads_and_cores).
+///
+/// Across batched row encodings, the instance retains a reusable [`EncodeScratch`]
+/// holding `n_cols * max_h` field elements (approximately the host LLC budget under
+/// adaptive slicing) plus the Reed-Solomon base-case temporary buffer; call
+/// [`release_scratch`](Self::release_scratch) to free this retained memory.
 #[derive(Clone, Debug)]
 pub struct SdigEncodingS<Ft, S> {
     n_per_row: usize, // number of inputs to the encoding
@@ -78,6 +117,7 @@ pub struct SdigEncodingS<Ft, S> {
     slices: usize,    // 0 = adaptive, >0 = explicit slice count
     threads: usize,   // 1 = single-threaded, >1 = expander-level multithreading
     pool: Option<std::sync::Arc<ThreadPool>>,
+    scratch: ScratchSlot<Ft>,
     _p: std::marker::PhantomData<S>,
 }
 
@@ -173,6 +213,7 @@ where
             slices: 0, // 0 = adaptive
             threads: 1,
             pool: None,
+            scratch: ScratchSlot::default(),
             _p: std::marker::PhantomData,
         }
     }
@@ -308,10 +349,25 @@ where
         self
     }
 
+    /// Free any encoding scratch buffers retained from previous batched encodings.
+    ///
+    /// Batched row encodings retain a slice buffer of `n_cols * max_h` elements (about
+    /// the host last-level-cache budget under adaptive slicing) and, in Reed-Solomon
+    /// mode, the last-precode temporary buffer so subsequent calls avoid re-allocating
+    /// and zero-filling them. Calling `release_scratch` drops those allocations.
+    pub fn release_scratch(&self) {
+        match self.scratch.0.lock() {
+            Ok(mut guard) => *guard = EncodeScratch::default(),
+            Err(poisoned) => *poisoned.into_inner() = EncodeScratch::default(),
+        }
+    }
+
     /// Encode all rows in sliced batched column-major passes.
     ///
     /// Slices the rows horizontally into `slices` chunks (or uses adaptive slicing if `slices == 0`).
     /// If a thread pool is configured (`threads > 1`), uses expander-level multithreading with pinned workers.
+    /// Reuses the internal [`EncodeScratch`] across calls; concurrent callers proceed with a fresh
+    /// empty scratch while another call holds the existing buffer.
     pub fn encode_rows_with_slices(
         &self,
         comm: &mut [Ft],
@@ -324,10 +380,18 @@ where
         if n_rows == 0 {
             return Ok(());
         }
+        let mut scratch = match self.scratch.0.lock() {
+            Ok(mut guard) => std::mem::take(&mut *guard),
+            Err(poisoned) => std::mem::take(&mut *poisoned.into_inner()),
+        };
         if let Some(ref pool) = self.pool {
-            crate::encode::encode_row_major_slices_mt(comm, n_rows, &self.code, slices, pool);
+            encode_row_major_slices_mt_with(comm, n_rows, &self.code, slices, pool, &mut scratch);
         } else {
-            encode_row_major_slices(comm, n_rows, &self.code, slices);
+            encode_row_major_slices_with(comm, n_rows, &self.code, slices, &mut scratch);
+        }
+        match self.scratch.0.lock() {
+            Ok(mut guard) => guard.merge_larger(scratch),
+            Err(poisoned) => poisoned.into_inner().merge_larger(scratch),
         }
         Ok(())
     }

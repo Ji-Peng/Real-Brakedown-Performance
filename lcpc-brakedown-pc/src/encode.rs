@@ -186,6 +186,55 @@ where
     encode_col_major(xi.as_mut(), 1, code);
 }
 
+/// Reusable scratch buffers for sliced row-major encoding.
+///
+/// Retains the column-major slice buffer (`n_cols * max_h` elements, about the host
+/// last-level-cache budget under adaptive slicing) and, for [`BaseCase::ReedSolomon`],
+/// the last-precode temporary buffer across calls so repeated encodings avoid
+/// re-allocating and zero-filling them.
+#[derive(Clone, Debug)]
+pub struct EncodeScratch<F> {
+    buf: Vec<F>,
+    temp_rs: Vec<F>,
+}
+
+impl<F> Default for EncodeScratch<F> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<F> EncodeScratch<F> {
+    /// Create an empty scratch with no allocated buffers.
+    #[inline]
+    pub const fn new() -> Self {
+        Self {
+            buf: Vec::new(),
+            temp_rs: Vec::new(),
+        }
+    }
+
+    #[inline]
+    pub(crate) fn buf_len(&self) -> usize {
+        self.buf.len()
+    }
+
+    #[inline]
+    pub(crate) fn temp_rs_len(&self) -> usize {
+        self.temp_rs.len()
+    }
+
+    #[inline]
+    pub(crate) fn merge_larger(&mut self, other: Self) {
+        if self.buf.capacity() < other.buf.capacity() {
+            self.buf = other.buf;
+        }
+        if self.temp_rs.capacity() < other.temp_rs.capacity() {
+            self.temp_rs = other.temp_rs;
+        }
+    }
+}
+
 /// Encode a batch of `n_rows` vectors stored column-major in `buf`.
 ///
 /// `buf` holds `n_cols * n_rows` elements, where `n_cols = code.codeword_len()`;
@@ -199,6 +248,18 @@ where
 /// Panics if `n_rows == 0` or `buf.len() != n_cols * n_rows`.
 pub fn encode_col_major<F>(buf: &mut [F], n_rows: usize, code: &ExpanderCode<F>)
 where
+    F: LazyField,
+{
+    let mut temp_rs = Vec::new();
+    encode_col_major_with_temp(buf, n_rows, code, &mut temp_rs);
+}
+
+fn encode_col_major_with_temp<F>(
+    buf: &mut [F],
+    n_rows: usize,
+    code: &ExpanderCode<F>,
+    temp_rs: &mut Vec<F>,
+) where
     F: LazyField,
 {
     let (precodes, postcodes) = (code.precodes(), code.postcodes());
@@ -231,20 +292,25 @@ where
     // `out_start` is where the deepest postcode writes
     let (mut in_start, mut out_start) = match code.base_case() {
         BaseCase::ReedSolomon => {
-            // evaluate last precode into temporary column-major storage
+            // evaluate last precode into temporary column-major storage; every
+            // element of `in_arr` is written before `reed_solomon_column_block` reads it
             let precode = &precodes[levels - 1];
             let in_end = in_start + precode.n_left();
-            let mut in_arr = vec![F::ZERO; precode.n_right() * n_rows];
+            let need_rs = precode.n_right() * n_rows;
+            if temp_rs.len() < need_rs {
+                temp_rs.resize(need_rs, F::ZERO);
+            }
+            let in_arr = &mut temp_rs[..need_rs];
             encode_column_block(
                 precode,
                 &buf[in_start * n_rows..in_end * n_rows],
-                &mut in_arr,
+                in_arr,
                 n_rows,
             );
 
             // now evaluate Reed-Solomon code on the result
             let out_end = in_end + postcodes[levels - 1].n_left();
-            reed_solomon_column_block(&in_arr, &mut buf[in_end * n_rows..out_end * n_rows], n_rows);
+            reed_solomon_column_block(in_arr, &mut buf[in_end * n_rows..out_end * n_rows], n_rows);
 
             (in_end + precode.n_right(), out_end)
         }
@@ -289,6 +355,22 @@ pub fn encode_row_major_slices<F: LazyField>(
     code: &ExpanderCode<F>,
     slices: usize,
 ) {
+    let mut scratch = EncodeScratch::default();
+    encode_row_major_slices_with(comm, n_rows, code, slices, &mut scratch);
+}
+
+/// Encode a batch of `n_rows` rows stored row-major in `comm` using `slices` horizontal
+/// slices and reusable `scratch` buffers.
+///
+/// Behaves identically to [`encode_row_major_slices`], growing `scratch` vectors with
+/// `resize(need, F::ZERO)` only when shorter than needed and never clearing them.
+pub fn encode_row_major_slices_with<F: LazyField>(
+    comm: &mut [F],
+    n_rows: usize,
+    code: &ExpanderCode<F>,
+    slices: usize,
+    scratch: &mut EncodeScratch<F>,
+) {
     if n_rows == 0 {
         return;
     }
@@ -310,7 +392,19 @@ pub fn encode_row_major_slices<F: LazyField>(
         base_r.max(n_rows - (s - 1) * base_r)
     };
 
-    let mut buf = vec![F::ZERO; n_cols * max_h];
+    // Stale contents in `scratch.buf` and `scratch.temp_rs` are harmless and never need
+    // clearing: in each slice of height `h`, the input transpose writes all `h` rows of
+    // the `n_per_row` message columns; every graph phase writes all `h` rows of all its
+    // right nodes (nodes without incoming edges are filled with `F::ZERO`); the last
+    // precode fills the whole `precode.n_right() * h` temporary before the base case
+    // reads it; the base case writes all its output columns; and these column ranges
+    // tile the `n_cols` columns (checked by the assertions at the end of
+    // `encode_col_major_with_temp`). No element is read before it is written in the
+    // same slice.
+    let need_buf = n_cols * max_h;
+    if scratch.buf.len() < need_buf {
+        scratch.buf.resize(need_buf, F::ZERO);
+    }
 
     for slice_idx in 0..s {
         let r_start = slice_idx * base_r;
@@ -324,7 +418,7 @@ pub fn encode_row_major_slices<F: LazyField>(
             continue;
         }
 
-        let slice_buf = &mut buf[..n_cols * h];
+        let slice_buf = &mut scratch.buf[..n_cols * h];
 
         // 1. Transpose row-major messages from comm into column-major slice_buf
         transpose_into(
@@ -337,7 +431,7 @@ pub fn encode_row_major_slices<F: LazyField>(
         );
 
         // 2. Encode this slice
-        encode_col_major(slice_buf, h, code);
+        encode_col_major_with_temp(slice_buf, h, code, &mut scratch.temp_rs);
 
         // 3. Transpose column-major redundancy back into row-major comm
         transpose_into(
@@ -618,11 +712,28 @@ pub fn encode_row_major_slices_mt<F: LazyField>(
     slices: usize,
     pool: &ThreadPool,
 ) {
+    let mut scratch = EncodeScratch::default();
+    encode_row_major_slices_mt_with(comm, n_rows, code, slices, pool, &mut scratch);
+}
+
+/// Encode a batch of `n_rows` rows stored row-major in `comm` using multithreaded
+/// expander-level parallelism and reusable `scratch` buffers.
+///
+/// Behaves identically to [`encode_row_major_slices_mt`], growing `scratch` vectors with
+/// `resize(need, F::ZERO)` only when shorter than needed and never clearing them.
+pub fn encode_row_major_slices_mt_with<F: LazyField>(
+    comm: &mut [F],
+    n_rows: usize,
+    code: &ExpanderCode<F>,
+    slices: usize,
+    pool: &ThreadPool,
+    scratch: &mut EncodeScratch<F>,
+) {
     if n_rows == 0 {
         return;
     }
     if pool.num_threads() <= 1 {
-        encode_row_major_slices(comm, n_rows, code, slices);
+        encode_row_major_slices_with(comm, n_rows, code, slices, scratch);
         return;
     }
 
@@ -644,17 +755,33 @@ pub fn encode_row_major_slices_mt<F: LazyField>(
         base_r.max(n_rows - (s - 1) * base_r)
     };
 
-    let mut buf = vec![F::ZERO; n_cols * max_h];
-    let last_precode_right = code.precodes().last().map(|p| p.n_right()).unwrap_or(0);
-    let mut temp_rs = if code.base_case() == BaseCase::ReedSolomon {
-        vec![F::ZERO; last_precode_right * max_h]
+    // Stale contents in `scratch.buf` and `scratch.temp_rs` are harmless and never need
+    // clearing: in each slice of height `h`, the input transposes write all `h` rows of
+    // the `n_per_row` message columns; every graph phase writes all `h` rows of all its
+    // right nodes (nodes without incoming edges are filled with `F::ZERO`); the last
+    // precode fills the whole `precode.n_right() * h` temporary before the base case
+    // reads it; the base case writes all its output columns; and these column ranges
+    // tile the `n_cols` columns (the assertions at the end of `encode_col_major`).
+    // Barriers separate every phase, so no element is read before it is written in the
+    // same slice.
+    let need_buf = n_cols * max_h;
+    if scratch.buf.len() < need_buf {
+        scratch.buf.resize(need_buf, F::ZERO);
+    }
+
+    let need_rs = if code.base_case() == BaseCase::ReedSolomon {
+        let last_precode_right = code.precodes().last().map(|p| p.n_right()).unwrap_or(0);
+        last_precode_right * max_h
     } else {
-        Vec::new()
+        0
     };
+    if scratch.temp_rs.len() < need_rs {
+        scratch.temp_rs.resize(need_rs, F::ZERO);
+    }
 
     let job = RowMajorSliceJob {
         comm: comm.as_mut_ptr(),
-        buf: buf.as_mut_ptr(),
+        buf: scratch.buf.as_mut_ptr(),
         n_rows,
         n_cols,
         n_per_row,
@@ -662,7 +789,7 @@ pub fn encode_row_major_slices_mt<F: LazyField>(
         slices: s,
         base_r,
         max_h,
-        temp_rs: temp_rs.as_mut_ptr(),
+        temp_rs: scratch.temp_rs.as_mut_ptr(),
     };
 
     pool.execute(&job);
@@ -981,12 +1108,13 @@ pub fn autotune_slices_with_pool<F: LazyField>(
 
     let mut best_s = s_star;
     let mut min_time = std::time::Duration::MAX;
+    let mut scratch = EncodeScratch::default();
 
-    let run_enc = |mat: &mut [F], s: usize| {
+    let mut run_enc = |mat: &mut [F], s: usize| {
         if let Some(p) = pool {
-            encode_row_major_slices_mt(mat, n_rows, code, s, p);
+            encode_row_major_slices_mt_with(mat, n_rows, code, s, p, &mut scratch);
         } else {
-            encode_row_major_slices(mat, n_rows, code, s);
+            encode_row_major_slices_with(mat, n_rows, code, s, &mut scratch);
         }
     };
 

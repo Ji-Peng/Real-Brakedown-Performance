@@ -2281,3 +2281,130 @@ fn test_split_right_nodes_partition_invariants() {
         }
     }
 }
+
+#[test]
+fn test_reusable_scratch_stale_data_invariance() {
+    use super::codespec::SdigCode6;
+    use super::encode::{
+        encode_row_major_slices, encode_row_major_slices_mt_with, encode_row_major_slices_with,
+        EncodeScratch,
+    };
+    use super::thread_pool::{get_affinity_cores, ThreadPool};
+
+    fn check_field<F: LazyField>(seed: u64) {
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
+        let allowed = get_affinity_cores();
+        let k = 64usize;
+
+        for params in [
+            CodeParams::Lcpc(LcpcParams::of::<SdigCode6>()),
+            CodeParams::SimdSpielman,
+        ] {
+            for &threads in &[1usize, 4, 8] {
+                let enc_reused = SpielmanEncoding::<F>::with_params(params, k, seed)
+                    .with_threads_and_cores(threads, &allowed);
+                let n_cols = enc_reused.code().codeword_len();
+
+                // Sequence of (n_rows, slices): start with a large single-slice batch so
+                // `scratch.buf` and `scratch.temp_rs` grow large and fill with non-zero
+                // values, then run smaller batches with different row counts and slice
+                // counts so reused buffers hold stale data across every call.
+                let batches = [
+                    (130usize, 1usize),
+                    (37, 4),
+                    (19, 1),
+                    (53, 7),
+                    (1, 1),
+                    (65, 3),
+                ];
+
+                for &(n_rows, slices) in &batches {
+                    let initial: Vec<F> = (0..n_rows * n_cols)
+                        .map(|_| {
+                            let v = F::random(&mut rng);
+                            if v == F::ZERO { F::ONE } else { v }
+                        })
+                        .collect();
+
+                    let mut got_reused = initial.clone();
+                    enc_reused
+                        .encode_rows_with_slices(&mut got_reused, n_cols, slices)
+                        .unwrap();
+
+                    let enc_fresh = SpielmanEncoding::<F>::with_params(params, k, seed)
+                        .with_threads_and_cores(threads, &allowed);
+                    let mut got_fresh = initial;
+                    enc_fresh
+                        .encode_rows_with_slices(&mut got_fresh, n_cols, slices)
+                        .unwrap();
+
+                    assert_eq!(
+                        got_reused,
+                        got_fresh,
+                        "reused SdigEncodingS scratch diverged for {}, {:?}, T={threads}, n_rows={n_rows}, slices={slices}",
+                        std::any::type_name::<F>(),
+                        params
+                    );
+                }
+
+                // Cloning returns an empty scratch and still produces bit-exact outputs.
+                let cloned = enc_reused.clone();
+                assert_eq!(cloned.scratch.0.lock().unwrap().buf_len(), 0);
+                assert_eq!(cloned.scratch.0.lock().unwrap().temp_rs_len(), 0);
+
+                // `release_scratch` drops retained memory and subsequent calls re-grow cleanly.
+                assert!(enc_reused.scratch.0.lock().unwrap().buf_len() >= n_cols * 130);
+                enc_reused.release_scratch();
+                assert_eq!(enc_reused.scratch.0.lock().unwrap().buf_len(), 0);
+                assert_eq!(enc_reused.scratch.0.lock().unwrap().temp_rs_len(), 0);
+
+                let after_release_init: Vec<F> =
+                    (0..23 * n_cols).map(|_| F::random(&mut rng)).collect();
+                let mut got_after_release = after_release_init.clone();
+                enc_reused
+                    .encode_rows_with_slices(&mut got_after_release, n_cols, 3)
+                    .unwrap();
+                let mut got_cloned = after_release_init.clone();
+                cloned
+                    .encode_rows_with_slices(&mut got_cloned, n_cols, 3)
+                    .unwrap();
+                let mut expected_ref = after_release_init;
+                encode_row_major_slices(&mut expected_ref, 23, enc_reused.code(), 1);
+                assert_eq!(got_after_release, expected_ref);
+                assert_eq!(got_cloned, expected_ref);
+            }
+
+            // Also test `encode_row_major_slices_with` and `encode_row_major_slices_mt_with`
+            // directly on an explicit `EncodeScratch<F>`.
+            let enc = SpielmanEncoding::<F>::with_params(params, k, seed ^ 0x99);
+            let code = enc.code();
+            let n_cols = code.codeword_len();
+            let pool4 = ThreadPool::new(4, &allowed);
+            let mut scratch = EncodeScratch::<F>::default();
+
+            let big_init: Vec<F> = (0..96 * n_cols).map(|_| -F::ONE).collect();
+            let mut big_st = big_init.clone();
+            encode_row_major_slices_with(&mut big_st, 96, code, 1, &mut scratch);
+            let cap_after_big = scratch.buf_len();
+            assert_eq!(cap_after_big, 96 * n_cols);
+
+            let small_init: Vec<F> = (0..29 * n_cols).map(|_| F::random(&mut rng)).collect();
+            let mut small_expected = small_init.clone();
+            encode_row_major_slices(&mut small_expected, 29, code, 1);
+
+            let mut small_st = small_init.clone();
+            encode_row_major_slices_with(&mut small_st, 29, code, 4, &mut scratch);
+            assert_eq!(small_st, small_expected);
+            assert_eq!(scratch.buf_len(), cap_after_big);
+
+            let mut small_mt = small_init;
+            encode_row_major_slices_mt_with(&mut small_mt, 29, code, 4, &pool4, &mut scratch);
+            assert_eq!(small_mt, small_expected);
+            assert_eq!(scratch.buf_len(), cap_after_big);
+        }
+    }
+
+    check_field::<Mont127>(0x5c2a_0001);
+    check_field::<Mers127>(0x5c2a_0002);
+    check_field::<Fp2M61>(0x5c2a_0003);
+}
