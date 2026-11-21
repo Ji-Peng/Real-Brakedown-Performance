@@ -1,0 +1,17 @@
+# Copyright 2026 RealBrakedownPerf Authors. Licensed under Apache-2.0.
+# Single source of truth for paper claims, stage mappings, and host requirements.
+# Stage prefixes: '+' denotes an optional stage (included when its requirements hold).
+# Requirement qualifiers: '(full)' restricts a requirement to full mode only.
+id	title	paper_refs	tables	x86_stages	arm_stages	requires	quick_note
+C0	Bit-exact with LCPC f0e2116 (encodings, roots, proofs); all 18 SIMD-Spielman TV pairs; field axioms	§Correctness	T0 / tab_correctness	TEST	TEST	-	Full workspace tests and LCPC golden check
+C1	Hot kernels contain no vector arithmetic (x86-64, AArch64)	§Codegen	T11 / tab_codegen	CODEGEN	CODEGEN	-	Checked on every This Work block (minimal check if C1 alone)
+C2	Encoding speedup over LCPC-default, LCPC-tuned, PolyCommit; T=1 and T=8	§Headline	T1 / tab_headline	A,B	-	x86_64	QA: logN 16,18,20; T in {1,Tmt}; runs 3
+C3	SIMD-Spielman remains faster at T=1 for N<=2^26; Brakedown and Orion shapes; three fields	§SIMD	T2,T9 / tab_simd	A,S,B	-	x86_64,avx512ifma,boost,cmake	QA,QS: logN 16,20; Brakedown and Orion; runs 3
+C4	Per-technique attribution, one tagged commit per technique	§Steps	T3,F1 / tab_steps	D	-	x86_64,git-tags	QD: logN 16,20; modes a and b; runs 2
+C5	Slicing for the LLC; adaptive slice choice	§Slicing	T4,F2 / tab_slices,fig_llc	C	-	x86_64	QC: s in {1,4,16,adaptive}; logN 20,22; runs 3
+C6	Thread scaling vs LCPC	§Threads	F3 / fig_threads	T,T28	-	x86_64,cores>=8(full)	QT: T in {1,2,4,Tmt} cap cores; logN 20,22; runs 3
+C7	Field arithmetic comparison	§Fields	T5 / tab_fields	A	-	x86_64	QA: field microbenchmarks + mode (b) logN 20
+C8	Commit / prove / verify, hash share; BLAKE3 backend separation	§PCS	T6,T7 / tab_pcs	A,H,B	-	x86_64	QA,QH: logN 20; all 4 LCPC build variants
+C9	PCS setup, input generation and peak RSS (separated)	§Setup	T8 / tab_setup	A,B,+S	-	x86_64	QA (+QS if IFMA): logN 20
+C10	Brakedown vs same-library Ligero RS encoding	§Ligero	T10 (artifact CSV only)	A	-	x86_64	QA: logN 20
+C11	AArch64 portability: speedup over LCPC on Arm	§Arm	T12 / tab_arm	-	ARM	aarch64	QARM: logN 18,20; T in {1,Tmt}; runs 3

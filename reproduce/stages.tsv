@@ -1,0 +1,24 @@
+# Copyright 2026 RealBrakedownPerf Authors. Licensed under Apache-2.0.
+# Benchmark campaign stages for full and quick modes.
+# Full-mode rows match the paper campaign verbatim.
+mode	arch	name	blocks_regex	logn	lcpc_variants	warmup
+full	x86_64	A	^full_(this_work_mode|this_work_ft127|lcpc_orig_mode|polycommit|ligero)	16,18,20,22,24,26	as-published-as-is,fork-flags-portable	1
+full	x86_64	H	^full_lcpc_orig_mode_a_t[18]$	20,24	as-published-portable,fork-flags-as-is	1
+full	x86_64	S	^full_simd_spielman	16,18,20,22,24,26	as-published-as-is,fork-flags-portable	1
+full	x86_64	C	^full_slice_sweep	20,24,26	as-published-as-is,fork-flags-portable	1
+full	x86_64	T	^full_(this_work|lcpc_orig)_threads_t[0-9]+$	20,24,26	as-published-as-is,fork-flags-portable	1
+full	x86_64	T28	^full_(this_work|lcpc_orig)_threads_t[0-9]+$	28	as-published-as-is,fork-flags-portable	1
+full	x86_64	D	^full_steps	16,20,24	as-published-as-is,fork-flags-portable	1
+full	x86_64	B	^full_(this_work_mode|lcpc_orig_mode|polycommit|simd_spielman)	28	as-published-as-is,fork-flags-portable	1
+full	x86_64	CODEGEN	^full_this_work_mode_a_t1$	16	as-published-as-is,fork-flags-portable	1
+full	aarch64	ARM	^arm_	18,22,26	as-published-as-is,fork-flags-portable	1
+full	aarch64	CODEGEN	^arm_this_work_t1$	18	as-published-as-is,fork-flags-portable	1
+quick	x86_64	QA	^quick_(this_work_mode|this_work_ft127|lcpc_orig_mode|polycommit|ligero)	16,18,20	as-published-as-is,fork-flags-portable	1
+quick	x86_64	QH	^quick_lcpc_orig_mode_a_t[0-9]+$	20	as-published-portable,fork-flags-as-is	1
+quick	x86_64	QS	^quick_simd_spielman	16,20	as-published-as-is,fork-flags-portable	1
+quick	x86_64	QC	^quick_slice_sweep	20,22	as-published-as-is,fork-flags-portable	1
+quick	x86_64	QT	^quick_(this_work|lcpc_orig)_threads_t[0-9]+$	20,22	as-published-as-is,fork-flags-portable	1
+quick	x86_64	QD	^quick_steps	16,20	as-published-as-is,fork-flags-portable	1
+quick	x86_64	QCODEGEN	^quick_this_work_mode_a_t1$	16	as-published-as-is,fork-flags-portable	0
+quick	aarch64	QARM	^quick_arm_	18,20	as-published-as-is,fork-flags-portable	1
+quick	aarch64	QCODEGEN	^quick_arm_this_work_t1$	18	as-published-as-is,fork-flags-portable	0
