@@ -12,7 +12,7 @@
         {
           "run_dir": "20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*",
           "sessions": ["s1", "s2", "s3"],
-          "stage": "reproduce/soc/run_stages.sh --preset x86 (stages A, H, S, C, T, T28, D, B); s1 and s2 on two different xcnh nodes"
+          "stage": "x86-64 full campaign stages A, H, S, C, T, T28, D, B (reproduce/stages.tsv via reproduce/all.sh); s1 and s2 on two different xcnh nodes"
         }
       ]
     },
@@ -23,7 +23,7 @@
         {
           "run_dir": "20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*",
           "sessions": ["arm1"],
-          "stage": "reproduce/soc/run_stages.sh --preset arm (stage ARM)"
+          "stage": "AArch64 full campaign stage ARM (reproduce/stages.tsv via reproduce/all.sh)"
         }
       ]
     },
@@ -40,7 +40,7 @@
     }
   },
   "exclude": [
-    {"path": "local-i7-*", "reason": "local workstation output: development only, never published"},
+    {"path": "local-i7-*", "reason": "local development output: never published"},
     {"path": "*/analysis", "reason": "per-session analyze.py output (derived, not raw data)"},
     {"path": "*.prev-*", "reason": "earlier attempt of a re-run block, moved aside by reproduce/all.sh as <block>.prev-<UTC> (never mixed with the re-run)"},
     {"path": "*", "match": {"implementation": "lcpc-original-upstream", "build_variant": "as-published-*", "build_variant_recorded": "false"}, "reason": "original-LCPC record without a recorded build variant: its build flags cannot be established"}

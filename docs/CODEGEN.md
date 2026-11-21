@@ -2,13 +2,13 @@
 
 # Compiler Code Generation and Portability Report
 
-This document describes the scalar assembly codegen, portability verification, and microarchitectural behavior of the LCPC fork in [`code/`](../) across target 64-bit architectures (`x86_64`, `aarch64`, `riscv64gc`).
+This document describes the scalar assembly codegen, portability verification, and microarchitectural behavior of the LCPC fork in this repository across target 64-bit architectures (`x86_64`, `aarch64`, `riscv64gc`).
 
 ---
 
 ## 1. Design Principle: Portable Rust, Compiler-Emitted Scalar Code
 
-As established in [AGENTS.md](../../AGENTS.md), the project maintains **one implementation**: the stable Rust LCPC fork. It contains:
+The project maintains **one implementation**: the stable Rust LCPC fork. It contains:
 - **No inline assembly:** `no asm!`;
 - **No architecture-specific intrinsics or SIMD libraries:** `no std::arch`, `no core::arch`, `no core::simd`;
 - **No SIMD-accelerated dependencies:** `blake3` is compiled in portable-only mode (`features = ["pure", "no_sse2", "no_sse41", "no_avx2", "no_avx512"]`);
@@ -281,8 +281,6 @@ The evidence supports **"no vector arithmetic in the hot kernels; the compiler e
 Reports and listings can be generated under `target/codegen/` from the repository root:
 
 ```bash
-cd code
-
 # 1. Run check_codegen self-test
 python3 scripts/check_codegen.py --self-test
 

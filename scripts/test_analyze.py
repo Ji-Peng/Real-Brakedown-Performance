@@ -787,7 +787,7 @@ class SupersedeTests(unittest.TestCase):
         status, _ = real.classify("soc-xcnh/2026-11-14-0123456789ab/s1/full_this_work_mode_a_t1_n28.prev-20261114T000000Z",
                                   "x.json", {})
         self.assertEqual(status, "exclude")
-        status, _ = real.classify("local-i7-11700k/2026-11-14-0123456789ab/s1/full_this_work_mode_a_t1", "x.json", {})
+        status, _ = real.classify("local-i7-dev/2026-11-14-0123456789ab/s1/full_this_work_mode_a_t1", "x.json", {})
         self.assertEqual(status, "exclude")
         fields = {"implementation": "lcpc-original-upstream", "build_variant": "as-published-as-is",
                   "build_variant_recorded": "true"}

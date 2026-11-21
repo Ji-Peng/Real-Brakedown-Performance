@@ -7,7 +7,7 @@
 //! 1. [`SenseReversingBarrier`]: Reusable barrier using an atomic generation counter and release-acquire
 //!    ordering to coordinate worker threads between expander graph levels without allocation or spin thrashing.
 //! 2. Pinning and affinity discovery: [`pin_current_thread_to_core`], [`get_affinity_cores`], [`parse_core_list`].
-//!    Respects process affinity masks (never implicitly CPU 2 on reserved hosts).
+//!    Respects process affinity masks (never pins workers outside the process affinity mask).
 //! 3. [`ThreadPool`]: Persistent pinned worker threads that remain alive across all slices, recursion levels,
 //!    and benchmark repetitions, parking gracefully via condition variables when idle.
 
@@ -57,7 +57,7 @@ pub fn split_range(total: usize, tid: usize, num_threads: usize) -> (usize, usiz
 ///      when threads arrive nearly simultaneously.
 ///    - If the generation has not yet advanced after 64 spins, yields the CPU time slice via
 ///      `std::thread::yield_now()`. This is essential on systems where multiple worker threads
-///      share a logical core (such as T=8 workers on the 7 available cores of the local workstation),
+///      share a logical core (for example, when worker count exceeds available cores),
 ///      preventing priority inversion and thread starvation.
 pub struct SenseReversingBarrier {
     num_threads: usize,
@@ -165,7 +165,7 @@ pub fn get_affinity_cores() -> Vec<usize> {
     (0..count).collect()
 }
 
-/// Parse a comma-separated or range-based core list string like `"0,1,3-7"` into `Vec<usize>`.
+/// Parse a comma-separated or range-based core list string like `"0,2-5"` into `Vec<usize>`.
 pub fn parse_core_list(s: &str) -> Result<Vec<usize>, String> {
     let s = s.trim();
     if s.is_empty() {

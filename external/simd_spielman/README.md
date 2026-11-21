@@ -52,7 +52,7 @@ The script sources `reproduce/common.sh`; it accepts its `--threads`, `--logN`, 
 
 **Upstream tests.** Before timing, the script builds the upstream correctness targets and runs the complete upstream `run_tests.py` suite under `taskset`. Since `2557b55` it does this once per host, upstream commit, patch SHA-256 and compiler, recorded by a marker file under `target-simd-spielman/`; later runs with the same key reuse the marker and copy its log. Benchmarks run under `taskset` with the same explicit affinity, and each case's raw output is saved separately. Generated source copies and build directories live below `target-simd-spielman/`.
 
-Default output is `results/<host>/<UTC-date>-<code-git-sha>/simd_spielman/`. `--out` selects an exact output directory; relative paths are resolved from `code/`. Each output contains raw logs, a manifest, and a SIMD-Spielman-specific manifest supplement. Workstation measurements are smoke checks only and must not be reported as publishable performance results.
+Default output is `results/<host>/<UTC-date>-<code-git-sha>/simd_spielman/`. `--out` selects an exact output directory; relative paths are resolved from `code/`. Each output contains raw logs, a manifest, and a SIMD-Spielman-specific manifest supplement. Development-machine smoke checks must not be reported as publishable performance results.
 
 ## License and attribution
 

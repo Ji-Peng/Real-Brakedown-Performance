@@ -148,9 +148,9 @@ release profile, not the published build. These records are excluded in
 builds every variant outside `code/` (the `fork-flags-*` variants pass the
 fork's flags explicitly). The `fork-flags-*` records are unaffected; on Arm,
 `fork-flags-portable` is therefore the only original-LCPC data of the
-campaign. The re-measurement (stages RL, RL28, RH, RT*, ARM; launched on
-2026-10-23) is recorded in `docs/STATUS.md` §7.6; its blocks supersede the
-campaign's original-LCPC blocks of the same cells.
+campaign. The subsequent re-measurement blocks supersede the earlier campaign's
+original-LCPC blocks of the same cells (see `results/selection.json` and
+`results/README.md`).
 
 `RAYON_NUM_THREADS` follows `--threads`. `--cores` is metadata only, and
 `taskset` performs pinning. In the campaign, T > 1 blocks were pinned to all 8

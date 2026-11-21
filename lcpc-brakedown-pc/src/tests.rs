@@ -1298,7 +1298,7 @@ fn test_cache_detection_sanity() {
     let elem_bytes = 16;
     let gamma = DEFAULT_LLC_HEADROOM_GAMMA;
 
-    // 16 MiB LLC (e.g. i7-11700K, EPYC 9754)
+    // 16 MiB LLC
     let llc_16m = 16 * 1024 * 1024;
     let expected_16m = [
         (16, 256, 1),
@@ -1618,21 +1618,34 @@ fn test_pinning_respects_core_list() {
     let allowed = get_affinity_cores();
     assert!(!allowed.is_empty(), "affinity mask must contain at least 1 core");
 
-    // Under taskset -c 0,1,3-7 on local host, CPU 2 must never be included
+    // Verify get_affinity_cores() matches the process affinity mask exactly so
+    // no CPU outside the process affinity mask is ever included.
     #[cfg(target_os = "linux")]
-    {
-        // Check if CPU 2 was filtered by the affinity mask
-        unsafe {
-            let mut cpuset: libc::cpu_set_t = std::mem::zeroed();
-            if libc::sched_getaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &mut cpuset) == 0 {
-                let cpu2_allowed = libc::CPU_ISSET(2, &cpuset);
-                assert_eq!(allowed.contains(&2), cpu2_allowed);
+    let orig_cpuset = unsafe {
+        let mut cpuset: libc::cpu_set_t = std::mem::zeroed();
+        let ok = libc::sched_getaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &mut cpuset) == 0;
+        if ok {
+            for cpu in 0..libc::CPU_SETSIZE as usize {
+                assert_eq!(
+                    allowed.contains(&cpu),
+                    libc::CPU_ISSET(cpu, &cpuset),
+                    "affinity mismatch for CPU {cpu}"
+                );
             }
+            Some(cpuset)
+        } else {
+            None
+        }
+    };
+
+    // Test pin_current_thread_to_core on a permitted core, then restore the process mask.
+    let _ = pin_current_thread_to_core(allowed[0]);
+    #[cfg(target_os = "linux")]
+    if let Some(cpuset) = orig_cpuset {
+        unsafe {
+            let _ = libc::sched_setaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &cpuset);
         }
     }
-
-    // Test pin_current_thread_to_core
-    let _ = pin_current_thread_to_core(allowed[0]);
 
     // Test parse_core_list
     assert_eq!(parse_core_list("0,1,3-5").unwrap(), vec![0, 1, 3, 4, 5]);
@@ -1640,7 +1653,7 @@ fn test_pinning_respects_core_list() {
     assert_eq!(parse_core_list("3-3").unwrap(), vec![3]);
     assert!(parse_core_list("5-3").is_err());
 
-    // Test pinning on allowed cores inside worker threads
+    // Test that worker pinning stays strictly within the process affinity mask.
     #[cfg(target_os = "linux")]
     {
         let pool = ThreadPool::new(allowed.len(), &allowed);
@@ -1659,6 +1672,11 @@ fn test_pinning_respects_core_list() {
                         if !libc::CPU_ISSET(expected, &cpuset) {
                             self.pass.store(false, Ordering::SeqCst);
                         }
+                        for cpu in 0..libc::CPU_SETSIZE as usize {
+                            if libc::CPU_ISSET(cpu, &cpuset) && !self.expected_cores.contains(&cpu) {
+                                self.pass.store(false, Ordering::SeqCst);
+                            }
+                        }
                     }
                 }
             }
@@ -1668,7 +1686,7 @@ fn test_pinning_respects_core_list() {
             expected_cores: allowed.clone(),
             pass: Arc::clone(&pass),
         });
-        assert!(pass.load(Ordering::SeqCst), "worker threads were not pinned to expected cores");
+        assert!(pass.load(Ordering::SeqCst), "worker threads were not pinned within the process affinity mask");
     }
 }
 
