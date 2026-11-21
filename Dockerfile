@@ -23,8 +23,7 @@
 #   docker run --rm --network none --cpuset-cpus 0-7 -v "$PWD/out:/rbd/out" \
 #       rbd-artifact reproduce/run.sh --mode quick
 
-# TODO(digest): pin ubuntu:24.04@sha256:<digest> from the release build.
-FROM ubuntu:24.04
+FROM ubuntu:24.04@sha256:9c7f200c07e3d4a03e7249d2c16bf66a51120fb876aa2242cf31451412543289
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -46,6 +45,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     texlive-latex-recommended \
     texlive-latex-extra \
     texlive-fonts-recommended \
+    texlive-science \
     && rm -rf /var/lib/apt/lists/*
 
 # Install rustup without a default toolchain; rust-toolchain.toml selects 1.99.1.
