@@ -1338,6 +1338,88 @@ class ArtifactPortabilityTests(unittest.TestCase):
         self.assertEqual(a.reports_arm[0]["_meta"]["arch"], "aarch64")
         self.assertEqual(len(a.reports_this_work), 0)
 
+    def test_t5_microbenchmarks_fallback_for_non_headline_this_work_families(self):
+        def field_micro(mul_ns):
+            return [
+                {"field": f, "mul": {"ns_per_op": mul_ns}, "mac": {"ns_per_op": mul_ns + 1.0},
+                 "reduce": {"ns_per_op": mul_ns + 2.0}}
+                for f in ("Mont127", "Mers127", "Fp2M61", "Ft127")
+            ]
+
+        for block, arch in (
+            ("quick_arm_this_work_t1_n18-20", "aarch64"),
+            ("quick_slice_sweep_s1_t1_n20-22", "x86_64"),
+            ("quick_this_work_threads_t1_n20-22", "x86_64"),
+        ):
+            fx = Fixture()
+            try:
+                fx.write("s1", block, "this_work/field_microbenchmarks.json", field_micro(3.5))
+                fx.write("s1", block, "this_work/manifest.json", {"os_and_kernel": {"machine": arch}})
+                sel = fx.selection(
+                    sessions=("s1",), expected=("s1",),
+                    omissions=[{"kind": "not-run", "reason": "claim not selected",
+                                "cells": ["T5|*|Encode*", "T5|*|Cost*"]}],
+                )
+                a = fx.analyzer(sel)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    a.generate_T5_field_comparison()
+                headers, rows = TableTests._rows(self, "table_T5_field_comparison.csv") if False else ([], [])
+                with open(os.path.join(fx.out, "csv", "table_T5_field_comparison.csv"), newline="") as f:
+                    raw = [r for r in csv.reader(f) if r and not r[0].startswith("#")]
+                headers, rows = raw[0], raw[1:]
+                by_f = {r[0]: dict(zip(headers, r)) for r in rows}
+                for fld in ("Mont127", "Mers127", "Fp2M61", "Ft127"):
+                    self.assertEqual(by_f[fld]["Mul (ns)"], "3.50", f"{block} {fld}")
+                    self.assertEqual(by_f[fld]["MAC (ns)"], "4.50", f"{block} {fld}")
+                    self.assertEqual(by_f[fld]["Reduce (ns)"], "5.50", f"{block} {fld}")
+                self.assertEqual(a._check_table_cells(sel.omission_patterns()), [], block)
+            finally:
+                fx.cleanup()
+
+        # Headline blocks take precedence over non-headline fallback when both exist.
+        self.fx.write("s1", "full_this_work_mode_a_t1_n20", "this_work/field_microbenchmarks.json", field_micro(2.0))
+        self.fx.write("s1", "full_slice_sweep_s1_t1_n20", "this_work/field_microbenchmarks.json", field_micro(9.0))
+        a = self.fx.analyzer(self.fx.selection(sessions=("s1",), expected=("s1",)))
+        with contextlib.redirect_stdout(io.StringIO()):
+            a.generate_T5_field_comparison()
+        headers, rows = TableTests._rows(self, "table_T5_field_comparison.csv")
+        by_f = {r[0]: dict(zip(headers, r)) for r in rows}
+        self.assertEqual(by_f["Mont127"]["Mul (ns)"], "2.00")
+
+    def test_t5_missing_microbench_selectors_match_column_headers(self):
+        sel = self.fx.selection(
+            sessions=("s1",), expected=("s1",),
+            omissions=[{"kind": "not-run", "reason": "claim not selected",
+                        "cells": ["T5|*|Mul (ns)", "T5|*|MAC (ns)", "T5|*|Reduce (ns)",
+                                  "T5|*|Encode*", "T5|*|Cost*"]}],
+        )
+        a = self.fx.analyzer(sel)
+        with contextlib.redirect_stdout(io.StringIO()):
+            a.generate_T5_field_comparison()
+        self.assertEqual(a._check_table_cells(sel.omission_patterns()), [])
+        self.assertEqual(sel.unmatched_omission_patterns(), [])
+        self.assertIn("T5|Mont127|Mul (ns)", a.todo_cells)
+        self.assertIn("T5|Mont127|MAC (ns)", a.todo_cells)
+        self.assertIn("T5|Mont127|Reduce (ns)", a.todo_cells)
+
+    def test_f2_falls_back_to_slice_sweep_adaptive_curve(self):
+        for n, s1_ms, ad_ms in ((20, 80, 60), (22, 320, 210)):
+            self.fx.write("s1", "quick_slice_sweep_s1_t1_n20-22", f"tw/s1_n{n}.json",
+                          [tw_record("s1", log_n=n, threads=1, samples=(s1_ms,) * 3, slice_mode="explicit", slices=1)])
+            self.fx.write("s1", "quick_slice_sweep_sadaptive_t1_n20-22", f"tw/ad_n{n}.json",
+                          [tw_record("s1", log_n=n, threads=1, samples=(ad_ms,) * 3, slice_mode="adaptive", slices=4)])
+        a = self.fx.analyzer(self.fx.selection(sessions=("s1",), expected=("s1",)))
+        with contextlib.redirect_stdout(io.StringIO()):
+            a.generate_F2_llc_scaling()
+        self.assertEqual(a.cell_errors, [])
+        headers, rows = TableTests._rows(self, "figure_F2_llc_scaling_data.csv")
+        by_series = {}
+        for r in rows:
+            d = dict(zip(headers, r))
+            by_series.setdefault(d["Series"], {})[int(d["log2(N)"])] = d["Latency (ms)"]
+        self.assertEqual(by_series["Mont127 mode (a) s=1"], {20: "80.000", 22: "320.000"})
+        self.assertEqual(by_series["Mont127 mode (a) adaptive"], {20: "60.000", 22: "210.000"})
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

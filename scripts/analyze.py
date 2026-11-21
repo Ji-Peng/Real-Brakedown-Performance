@@ -2291,12 +2291,17 @@ class BenchmarkAnalyzer:
                   [f"Encode N=2^{n} T=1 (ms)" for n in sizes] + [f"Cost N=2^{n} (ns/MAC)" for n in sizes]
         micro = [fb for fb in self.field_benchmarks if fb["_meta"]["family"] in ("tw_a", "tw_b", "unknown", None)
                  or not self.selection]
+        used_micro_fallback = False
+        if not micro and self.field_benchmarks:
+            micro = [fb for fb in self.field_benchmarks
+                     if fb["_meta"]["family"] in ("arm_this_work", "slice_sweep", "tw_threads", "tw_ft127", "ligero")]
+            used_micro_fallback = bool(micro)
         pool = self.select(self.reports_this_work, family="tw_b", params="simd-spielman", shape="brakedown", threads=1)
         rows = []
         for f in ("Mont127", "Mers127", "Fp2M61", "Ft127"):
             rk = f
             ops = []
-            for op in ("mul", "mac", "reduce"):
+            for op, col in (("mul", "Mul (ns)"), ("mac", "MAC (ns)"), ("reduce", "Reduce (ns)")):
                 per_session: Dict[str, List[float]] = defaultdict(list)
                 for fb in micro:
                     if fb.get("field") == f and safe_float((fb.get(op) or {}).get("ns_per_op")):
@@ -2304,7 +2309,7 @@ class BenchmarkAnalyzer:
                         m = fb["_meta"]
                         self._used.add((m["machine"], m["run"], m["session_dir"]))
                 meds = [median(v) for v in per_session.values()]
-                ops.append(f"{sum(meds) / len(meds):.2f}" if meds else self.missing_text(f"{T}|{rk}|{op}"))
+                ops.append(f"{sum(meds) / len(meds):.2f}" if meds else self.missing_text(f"{T}|{rk}|{col}"))
             enc, cost = [], []
             for n in sizes:
                 if f == "Ft127":
@@ -2319,9 +2324,15 @@ class BenchmarkAnalyzer:
                 enc.append(self.value_cell(T, rk, f"Encode N=2^{n} T=1 (ms)", st))
                 cost.append(self.ns_per_mac_cell(T, rk, f"Cost N=2^{n} (ns/MAC)", st))
             rows.append([f, 122 if f == "Fp2M61" else 127] + ops + enc + cost)
-        notes = [
+        micro_note = (
+            "Microbenchmarks: per session the median over the available field_microbenchmarks records "
+            "(fallback from non-headline This Work blocks), then the mean over sessions (ns per operation)."
+            if used_micro_fallback else
             "Microbenchmarks: per session the median over the field_microbenchmarks records of the headline blocks, then "
-            "the mean over sessions (ns per operation).",
+            "the mean over sessions (ns per operation)."
+        )
+        notes = [
+            micro_note,
             "Encodings: mode (b) SIMD-Spielman parameters for every field (blocks full_this_work_mode_b_*), T=1, adaptive "
             "slices; cost = mean encode time / total edge-row MACs of the same records.",
             "Security caveat: Fp2M61 is F_{(2^61-1)^2}, 122 bits rather than 127.",
@@ -3127,17 +3138,23 @@ class BenchmarkAnalyzer:
         self._begin("F2")
         fig, ax = plt.subplots(figsize=(7.5, 4.5))
         data = []
-        series = [("Mont127 mode (a) adaptive", self.select(self.reports_this_work, family="tw_a", params="lcpc-sdig6",
-                                                            shape="brakedown", slice_mode="adaptive", threads=1)),
-                  ("Mont127 mode (a) s=1", self.select(self.reports_this_work, family="slice_sweep", params="lcpc-sdig6",
-                                                       shape="brakedown", slices=1, threads=1))]
+        adapt_headline = self.select(self.reports_this_work, family="tw_a", params="lcpc-sdig6",
+                                     shape="brakedown", slice_mode="adaptive", threads=1)
+        adapt_sweep = self.select(self.reports_this_work, family="slice_sweep", params="lcpc-sdig6",
+                                  shape="brakedown", slice_mode="adaptive", threads=1)
+        series: List[Tuple[str, List[Dict], List[Dict]]] = [
+            ("Mont127 mode (a) adaptive", adapt_headline, adapt_sweep),
+            ("Mont127 mode (a) s=1", self.select(self.reports_this_work, family="slice_sweep", params="lcpc-sdig6",
+                                                 shape="brakedown", slices=1, threads=1), []),
+        ]
         for f in ("Mont127", "Mers127", "Fp2M61"):
             series.append((f"{f} mode (b) adaptive", self.select(self.reports_this_work, family="tw_b", params="simd-spielman",
-                                                                 shape="brakedown", field=f, threads=1)))
-        for name, pool in series:
+                                                                 shape="brakedown", field=f, threads=1), []))
+        for name, pool, fallback in series:
             xs, ys = [], []
-            for n in sorted({int(r["log_n"]) for r in pool}):
-                st = self.stat(self.select(pool, log_n=n), label=f"F2|{name}|{n}")
+            for n in sorted({int(r["log_n"]) for r in pool + fallback}):
+                recs = self.select(pool, log_n=n) or self.select(fallback, log_n=n)
+                st = self.stat(recs, label=f"F2|{name}|{n}")
                 if st.get("mean"):
                     xs.append(n)
                     ys.append(st["mean"] / 1e6)
