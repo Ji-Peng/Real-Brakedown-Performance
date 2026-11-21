@@ -690,7 +690,7 @@ with open(os.environ["SCHEDULE_FILE"], "w", encoding="utf-8") as f:
 with open(os.environ["BLOCKS_TSV"], "w", encoding="utf-8") as f:
     for b in blocks:
         f.write("\t".join([
-            b["id"], b["out"], b["cores"].split(",")[0], b["skip_reason"], b["description"], b["cmd"]
+            b["id"], b["out"], b["cores"].split(",")[0], b["skip_reason"] or "-", b["description"], b["cmd"]
         ]) + "\n")
 
 print(f"[INFO] Generated schedule of {len(blocks)} blocks randomized with seed {seed}.")
@@ -881,7 +881,7 @@ EXECUTION_LOG_JSONL="$STAGE_DIR/execution_log.jsonl"
 
 while IFS="$TAB" read -r block_id block_out block_core block_skip_reason block_desc block_cmd; do
     log_info ""
-    if [ -n "$block_skip_reason" ]; then
+    if [ -n "$block_skip_reason" ] && [ "$block_skip_reason" != "-" ]; then
         log_info ">>> Skipping Block [$CURRENT_INDEX/$TOTAL_BLOCKS]: $block_id ($block_skip_reason) <<<"
         START_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)
         python3 -c '
