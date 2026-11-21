@@ -323,10 +323,12 @@ prepare_driver() {
     mkdir -p "$DRIVER_TARGET"
     DRIVER_BUILD_LOG="$STEP_DEST/build-${MODE_TO_BUILD}.log"
     echo "[steps] Building timing harness for $TAG ($MODE_TO_BUILD; $DRIVER_ADAPTER)"
+    # Build the synthetic steps-driver crate from the worktree's copied Cargo.lock;
+    # omit --locked so Cargo can add the steps-driver package entry while honoring $OFFLINE_FLAG.
     # shellcheck disable=SC2086
     if ! (cd "$CURRENT_WORKTREE" && \
         env CARGO_TARGET_DIR="$DRIVER_TARGET" RAYON_NUM_THREADS=1 \
-        taskset -c "$CORES" cargo build --release --locked $OFFLINE_FLAG --manifest-path "$PROJECT/Cargo.toml") \
+        taskset -c "$CORES" cargo build --release $OFFLINE_FLAG --manifest-path "$PROJECT/Cargo.toml") \
         > "$DRIVER_BUILD_LOG" 2>&1; then
         echo "Timing harness build failed for $TAG; see $DRIVER_BUILD_LOG" >&2
         tail -n 80 "$DRIVER_BUILD_LOG" >&2 || true
