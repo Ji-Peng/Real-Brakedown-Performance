@@ -351,6 +351,48 @@ pub fn encode_row_major_slices<F: LazyField>(
     }
 }
 
+/// Partition right nodes `0..g.n_right()` across `t` workers by cumulative work.
+///
+/// Uses cost prefix `W(r) = row_ptr[r] + 2 * r` (incoming edges before right node `r`
+/// plus a reduction cost of two MAC equivalents per node). Because `row_ptr` is
+/// non-decreasing, `W` is strictly increasing on `0..=n_right` with `W(0) = 0` and
+/// `W(n_right) = total`. Setting `bound(k)` to the smallest `r` in `0..=n_right` with
+/// `W(r) >= ceil(k * total / t)` (partition point over `0..=n_right` found by binary
+/// search) gives `bound(0) = 0`, `bound(k) <= bound(k + 1)`, and `bound(t) = n_right`,
+/// so worker `tid` receives `[bound(tid), bound(tid + 1))` and the ranges cover
+/// `0..n_right` without gaps or overlaps.
+#[inline]
+pub(crate) fn split_right_nodes<F>(g: &R2lGraph<F>, tid: usize, t: usize) -> (usize, usize) {
+    assert!(tid < t, "tid {tid} >= num_threads {t}");
+    let n_right = g.n_right();
+    let row_ptr = g.row_ptr();
+    debug_assert_eq!(row_ptr.len(), n_right + 1);
+    let cost = |r: usize| -> u64 { row_ptr[r] as u64 + 2 * r as u64 };
+    let total = cost(n_right);
+
+    let bound = |k: usize| -> usize {
+        if k == 0 {
+            return 0;
+        }
+        if k == t {
+            return n_right;
+        }
+        let target = ((k as u128 * total as u128).div_ceil(t as u128)) as u64;
+        let (mut lo, mut hi) = (0usize, n_right);
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            if cost(mid) < target {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        lo
+    };
+
+    (bound(tid), bound(tid + 1))
+}
+
 struct RowMajorSliceJob<'a, F: LazyField> {
     comm: *mut F,
     buf: *mut F,
@@ -427,7 +469,7 @@ impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
             for precode in &precodes[..n_inplace] {
                 let in_end = in_start + precode.n_left();
                 let out_start = in_end;
-                let (r_start_node, r_end_node) = split_range(precode.n_right(), tid, num_threads);
+                let (r_start_node, r_end_node) = split_right_nodes(precode, tid, num_threads);
 
                 unsafe {
                     let in_slice = std::slice::from_raw_parts(
@@ -458,8 +500,7 @@ impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
                 BaseCase::ReedSolomon => {
                     let precode = &precodes[levels - 1];
                     let in_end = in_start + precode.n_left();
-                    let (r_start_node, r_end_node) =
-                        split_range(precode.n_right(), tid, num_threads);
+                    let (r_start_node, r_end_node) = split_right_nodes(precode, tid, num_threads);
 
                     unsafe {
                         let in_slice = std::slice::from_raw_parts(
@@ -509,7 +550,7 @@ impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
             // Postcodes (bottom-up)
             for (precode, postcode) in precodes.iter().rev().zip(postcodes.iter().rev()) {
                 in_start -= precode.n_right();
-                let (r_start_node, r_end_node) = split_range(postcode.n_right(), tid, num_threads);
+                let (r_start_node, r_end_node) = split_right_nodes(postcode, tid, num_threads);
 
                 unsafe {
                     let in_slice = std::slice::from_raw_parts(
@@ -722,7 +763,7 @@ impl<'a, F: LazyField> WorkerJob for ColMajorSlicedJob<'a, F> {
             for precode in &precodes[..n_inplace] {
                 let in_end = in_start + precode.n_left();
                 let out_start = in_end;
-                let (r_start_node, r_end_node) = split_range(precode.n_right(), tid, num_threads);
+                let (r_start_node, r_end_node) = split_right_nodes(precode, tid, num_threads);
 
                 unsafe {
                     let in_slice = std::slice::from_raw_parts(
@@ -753,8 +794,7 @@ impl<'a, F: LazyField> WorkerJob for ColMajorSlicedJob<'a, F> {
                 BaseCase::ReedSolomon => {
                     let precode = &precodes[levels - 1];
                     let in_end = in_start + precode.n_left();
-                    let (r_start_node, r_end_node) =
-                        split_range(precode.n_right(), tid, num_threads);
+                    let (r_start_node, r_end_node) = split_right_nodes(precode, tid, num_threads);
 
                     unsafe {
                         let in_slice = std::slice::from_raw_parts(
@@ -804,7 +844,7 @@ impl<'a, F: LazyField> WorkerJob for ColMajorSlicedJob<'a, F> {
             // Postcodes
             for (precode, postcode) in precodes.iter().rev().zip(postcodes.iter().rev()) {
                 in_start -= precode.n_right();
-                let (r_start_node, r_end_node) = split_range(postcode.n_right(), tid, num_threads);
+                let (r_start_node, r_end_node) = split_right_nodes(postcode, tid, num_threads);
 
                 unsafe {
                     let in_slice = std::slice::from_raw_parts(

@@ -2125,3 +2125,159 @@ fn test_threaded_transposes_fewer_cols_or_rows_than_threads() {
     run_for_field::<Mers127>(0x711ed_0002, &pools);
     run_for_field::<Fp2M61>(0x711ed_0003, &pools);
 }
+
+#[test]
+fn test_split_right_nodes_partition_invariants() {
+    use super::codespec::SdigCode6;
+    use super::encode::{
+        encode_col_major_sliced, encode_col_major_sliced_mt, split_right_nodes,
+    };
+    use super::thread_pool::{get_affinity_cores, ThreadPool};
+
+    fn verify_partition<F>(g: &R2lGraph<F>, label: &str) {
+        let n_right = g.n_right();
+        let row_ptr = g.row_ptr();
+        let cost = |r: usize| -> u64 { row_ptr[r] as u64 + 2 * r as u64 };
+        let total = cost(n_right);
+
+        for t in 1..=9 {
+            let mut prev_end = 0usize;
+            for tid in 0..t {
+                let (start, end) = split_right_nodes(g, tid, t);
+                if tid == 0 {
+                    assert_eq!(start, 0, "{label}: t={t} tid=0 start != 0");
+                } else {
+                    assert_eq!(
+                        start, prev_end,
+                        "{label}: gap/overlap at t={t} tid={tid}: prev_end={prev_end}, start={start}"
+                    );
+                }
+                assert!(
+                    start <= end && end <= n_right,
+                    "{label}: invalid range ({start}, {end}) for n_right={n_right}, t={t}, tid={tid}"
+                );
+
+                // Verify exact partition-point definition at boundary `k = tid + 1`
+                let k = tid + 1;
+                let target = ((k as u128 * total as u128).div_ceil(t as u128)) as u64;
+                assert!(
+                    cost(end) >= target,
+                    "{label}: W({end})={} < target={target} at t={t}, k={k}",
+                    cost(end)
+                );
+                if end > 0 {
+                    assert!(
+                        cost(end - 1) < target,
+                        "{label}: end={end} not minimal: W({})={} >= target={target} at t={t}, k={k}",
+                        end - 1,
+                        cost(end - 1)
+                    );
+                }
+                prev_end = end;
+            }
+            assert_eq!(
+                prev_end, n_right,
+                "{label}: t={t} final end {prev_end} != n_right {n_right}"
+            );
+        }
+    }
+
+    // 1. Graph with zero right nodes and zero edges
+    let g_zero = R2lGraph::from_left_edges(4, 0, &[0, 0, 0, 0, 0], &[], &[]);
+    verify_partition::<u64>(&g_zero, "zero_right_nodes");
+
+    // 2. Graphs with fewer right nodes than workers (n_right in 1..=8, tested up to t=9),
+    //    including completely edgeless graphs and graphs with empty right nodes.
+    for n_right in 1..=8 {
+        let g_edgeless = R2lGraph::from_left_edges(3, n_right, &[0, 0, 0, 0], &[], &[]);
+        verify_partition::<u64>(&g_edgeless, &format!("edgeless_nr_{n_right}"));
+
+        // Edges land only on even right nodes; odd right nodes are empty.
+        let mut right_idx = Vec::new();
+        let mut weights = Vec::new();
+        let mut left_ptr = vec![0usize];
+        for l in 0..5usize {
+            let r = ((l * 2) % n_right) & !1;
+            right_idx.push(r.min(n_right - 1));
+            weights.push((l + 1) as u64);
+            left_ptr.push(right_idx.len());
+        }
+        let g_sparse = R2lGraph::from_left_edges(5, n_right, &left_ptr, &right_idx, &weights);
+        verify_partition::<u64>(&g_sparse, &format!("sparse_empty_nodes_nr_{n_right}"));
+    }
+
+    // 3. Graphs with empty right nodes at prefix, middle, and suffix
+    {
+        // n_right = 12; nodes 0, 1, 5, 6, 7, 10, 11 have 0 edges
+        let targets = [2usize, 3, 4, 8, 9, 2, 4, 8, 3, 9];
+        let left_ptr: Vec<usize> = (0..=targets.len()).collect();
+        let weights: Vec<u64> = (1..=targets.len() as u64).collect();
+        let g = R2lGraph::from_left_edges(targets.len(), 12, &left_ptr, &targets, &weights);
+        verify_partition(&g, "empty_prefix_middle_suffix");
+    }
+
+    // 4. Graphs with one very heavy right node (at start, middle, and end)
+    for &heavy_node in &[0usize, 5, 11] {
+        let n_right = 12usize;
+        let n_left = 500usize;
+        let mut right_idx = Vec::with_capacity(n_left);
+        let mut weights = Vec::with_capacity(n_left);
+        let mut left_ptr = Vec::with_capacity(n_left + 1);
+        left_ptr.push(0);
+        for l in 0..n_left {
+            // 494 edges into `heavy_node`, plus 6 isolated single edges elsewhere
+            let r = if l < 494 {
+                heavy_node
+            } else {
+                (l - 494) * 2 % n_right
+            };
+            right_idx.push(r);
+            weights.push((l + 1) as u64);
+            left_ptr.push(right_idx.len());
+        }
+        let g = R2lGraph::from_left_edges(n_left, n_right, &left_ptr, &right_idx, &weights);
+        verify_partition(&g, &format!("heavy_node_{heavy_node}"));
+    }
+
+    // 5. Real sampled expander graphs (mode (a) and mode (b)) + ColMajorSlicedJob check
+    let enc_a = SpielmanEncoding::<Mont127>::with_params(
+        CodeParams::Lcpc(LcpcParams::of::<SdigCode6>()),
+        128,
+        0x4242,
+    );
+    for (i, g) in enc_a.code().precodes().iter().enumerate() {
+        verify_partition(g, &format!("sdig6_pre_{i}"));
+    }
+    for (i, g) in enc_a.code().postcodes().iter().enumerate() {
+        verify_partition(g, &format!("sdig6_post_{i}"));
+    }
+
+    let enc_b = SpielmanEncoding::<Mont127>::with_params(CodeParams::SimdSpielman, 128, 0x4343);
+    for (i, g) in enc_b.code().precodes().iter().enumerate() {
+        verify_partition(g, &format!("spielman_pre_{i}"));
+    }
+    for (i, g) in enc_b.code().postcodes().iter().enumerate() {
+        verify_partition(g, &format!("spielman_post_{i}"));
+    }
+
+    // Verify ColMajorSlicedJob with split_right_nodes matches single-threaded encode_col_major_sliced
+    let allowed = get_affinity_cores();
+    let mut rng = ChaCha20Rng::seed_from_u64(0x55aa_1234);
+    for code in [enc_a.code(), enc_b.code()] {
+        let n_rows = 35usize;
+        let slices = 4usize;
+        let n_cols = code.codeword_len();
+        let initial: Vec<Mont127> = (0..n_rows * n_cols)
+            .map(|_| Mont127::random(&mut rng))
+            .collect();
+        let mut expected = initial.clone();
+        encode_col_major_sliced(&mut expected, n_rows, code, slices);
+
+        for t in [1usize, 2, 4, 8, 9] {
+            let pool = ThreadPool::new(t, &allowed);
+            let mut got = initial.clone();
+            encode_col_major_sliced_mt(&mut got, n_rows, code, slices, &pool);
+            assert_eq!(got, expected, "ColMajorSlicedJob mismatch for T={t}");
+        }
+    }
+}
