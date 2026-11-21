@@ -12,7 +12,8 @@
 // row-collapse and column inner-product hooks on LcEncoding; batched leaf and
 // Merkle hashing, merkle_root helper, repeated-opening deduplication and
 // batched verifier encodings; tiled deduplicated column opening and parallel
-// single-pass buffer initialisation in commit.
+// single-pass buffer initialisation in commit; portable scalar ChaCha20 stream
+// generator for Fiat-Shamir challenges.
 // The per-commit changes are in the git history since step/00-import
 // (upstream conroi/lcpc f0e2116).
 #![deny(missing_docs)]
@@ -27,10 +28,12 @@ use err_derive::Error;
 use ff::{Field, PrimeField};
 use merlin::Transcript;
 use rand::{Rng, SeedableRng};
-use rand_chacha::ChaCha20Rng;
 use rayon::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::iter::repeat_with;
+
+pub mod chacha;
+pub use chacha::ChaCha20Stream;
 
 /// Legacy `rand 0.8`-compatible uniform `usize` sampler on 64-bit targets.
 ///
@@ -1203,9 +1206,9 @@ where
     let mut rand_tensor_vec: Vec<Vec<FldT<E>>> = Vec::with_capacity(n_degree_tests);
     for i in 0..n_degree_tests {
         let rand_tensor: Vec<FldT<E>> = {
-            let mut key: <ChaCha20Rng as SeedableRng>::Seed = Default::default();
+            let mut key = [0u8; 32];
             tr.challenge_bytes(E::LABEL_DT, &mut key);
-            let mut deg_test_rng = ChaCha20Rng::from_seed(key);
+            let mut deg_test_rng = ChaCha20Stream::from_seed(key);
             // XXX(optimization) could expand seed in parallel instead of in series
             repeat_with(|| FldT::<E>::random(&mut deg_test_rng))
                 .take(n_rows)
@@ -1227,9 +1230,9 @@ where
 
     // step 1c: extract columns to open
     let cols_to_open: Vec<usize> = {
-        let mut key: <ChaCha20Rng as SeedableRng>::Seed = Default::default();
+        let mut key = [0u8; 32];
         tr.challenge_bytes(E::LABEL_CO, &mut key);
-        let mut cols_rng = ChaCha20Rng::from_seed(key);
+        let mut cols_rng = ChaCha20Stream::from_seed(key);
         // XXX(optimization) could expand seed in parallel instead of in series
         let col_range = LegacyUniformUsize::new(0usize, n_cols);
         repeat_with(|| col_range.sample(&mut cols_rng))
@@ -1415,9 +1418,9 @@ where
     let mut p_eval_opt: Option<Vec<FldT<E>>> = None;
 
     for i in 0..n_degree_tests {
-        let mut key: <ChaCha20Rng as SeedableRng>::Seed = Default::default();
+        let mut key = [0u8; 32];
         tr.challenge_bytes(E::LABEL_DT, &mut key);
-        let mut deg_test_rng = ChaCha20Rng::from_seed(key);
+        let mut deg_test_rng = ChaCha20Stream::from_seed(key);
         // XXX(optimization) could expand seed in parallel instead of in series
         let rand_tensor: Vec<FldT<E>> = repeat_with(|| FldT::<E>::random(&mut deg_test_rng))
             .take(comm.n_rows)
@@ -1461,9 +1464,9 @@ where
     // now extract the column numbers to open
     let n_col_opens = enc.get_n_col_opens();
     let columns: Vec<LcColumn<D, E>> = {
-        let mut key: <ChaCha20Rng as SeedableRng>::Seed = Default::default();
+        let mut key = [0u8; 32];
         tr.challenge_bytes(E::LABEL_CO, &mut key);
-        let mut cols_rng = ChaCha20Rng::from_seed(key);
+        let mut cols_rng = ChaCha20Stream::from_seed(key);
         // XXX(optimization) could expand seed in parallel instead of in series
         let col_range = LegacyUniformUsize::new(0usize, comm.n_cols);
         let cols_to_open: Vec<usize> = repeat_with(|| col_range.sample(&mut cols_rng))
