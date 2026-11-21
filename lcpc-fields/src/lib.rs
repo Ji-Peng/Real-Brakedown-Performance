@@ -47,6 +47,13 @@ pub use mont127::{mac_column_mont127, reduce_column_mont127, Mont127, Mont127Acc
 /// - Once all incident edges of right node $r$ have been accumulated, a single call to
 ///   [`LazyField::reduce`] normalizes the accumulator to the canonical field element in
 ///   `Self`'s standard representation.
+/// - [`LazyField::prepare_weight`] is required to be multiplication by a fixed non-zero
+///   field constant $\kappa$ (for example, $\kappa = 2^{64} \bmod q$ in Montgomery form
+///   for [`Mont127`], and $\kappa = 1$ for [`Mers127`] and [`Fp2M61`]). Because `mac` is
+///   bilinear, accumulating with unprepared canonical weights produces
+///   $\kappa^{-1} \sum_i w_i x_i$ after [`LazyField::reduce`], so a single trailing
+///   `prepare_weight(&reduce(acc))` recovers $\sum_i w_i x_i$ without per-element weight
+///   preparation.
 pub trait LazyField:
     ff::Field
     + num_traits::Num
@@ -67,8 +74,13 @@ pub trait LazyField:
     const MAX_ACCUMULATIONS: usize;
 
     /// Per-edge transform of a weight into the form [`LazyField::mac`] expects, applied once
-    /// per edge outside the row loop
-    /// (e.g. $w \cdot 2^{192} \bmod q$ for [`Mont127`]; identity for [`Mers127`]).
+    /// per edge outside the row loop.
+    ///
+    /// Implementations must satisfy `prepare_weight(w) == kappa * w` for a fixed non-zero
+    /// field constant `kappa` (e.g. $w \cdot 2^{192} \bmod q$, i.e. $\kappa = 2^{64} \bmod q$
+    /// in Montgomery representation, for [`Mont127`]; identity $\kappa = 1$ for [`Mers127`]
+    /// and [`Fp2M61`]), so that `prepare_weight(&reduce(mac(0, w, x))) == w * x` holds for
+    /// unprepared canonical operands `w` and `x`.
     #[inline(always)]
     fn prepare_weight(w: &Self) -> Self {
         *w
@@ -391,4 +403,52 @@ macro_rules! impl_field_ops_and_num {
             }
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Fp2M61, LazyField, Mers127, Mont127};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha20Rng;
+
+    fn check_unprepared_mac_roundtrip<F: LazyField>(extra_extremes: &[F], seed: u64) {
+        let two = F::ONE + F::ONE;
+        let mut extremes = vec![F::ZERO, F::ONE, -F::ONE, two, -two];
+        extremes.extend_from_slice(extra_extremes);
+
+        for &w in &extremes {
+            for &x in &extremes {
+                let mut acc = F::Acc::default();
+                F::mac(&mut acc, &w, &x);
+                let got = F::prepare_weight(&F::reduce(acc));
+                assert_eq!(got, w * x);
+            }
+        }
+
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
+        for _ in 0..1_000 {
+            let w = F::random(&mut rng);
+            let x = F::random(&mut rng);
+            let mut acc = F::Acc::default();
+            F::mac(&mut acc, &w, &x);
+            let got = F::prepare_weight(&F::reduce(acc));
+            assert_eq!(got, w * x);
+        }
+    }
+
+    #[test]
+    fn unprepared_mac_reduce_then_prepare_weight_equals_mul() {
+        check_unprepared_mac_roundtrip::<Mont127>(&[], 0x1010_2020_3030_4040);
+        check_unprepared_mac_roundtrip::<Mers127>(&[], 0x5050_6060_7070_8080);
+        let p_minus_1 = Fp2M61::MODULUS_P - 1;
+        check_unprepared_mac_roundtrip::<Fp2M61>(
+            &[
+                Fp2M61::I,
+                -Fp2M61::I,
+                Fp2M61::from_parts(p_minus_1, p_minus_1),
+                Fp2M61::from_parts(0, p_minus_1),
+            ],
+            0x9090_a0a0_b0b0_c0c0,
+        );
+    }
 }
