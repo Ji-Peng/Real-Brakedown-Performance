@@ -9,7 +9,8 @@
 //
 // Modified 2026 by the RealBrakedownPerf authors (Apache-2.0, see NOTICE):
 // tests updated for current dependencies, stable Rust, parallel row collapse,
-// batched leaf hashing, merkle_root, and repeated-opening verification.
+// batched leaf hashing, merkle_root, repeated-opening verification, tiled
+// column opening, and parallel single-pass commit initialisation.
 // The per-commit changes are in the git history since step/00-import
 // (upstream conroi/lcpc f0e2116).
 
@@ -778,6 +779,154 @@ fn verify_rejects_tampered_repeated_opening() {
         matches!(got_all_err, VerifierError::ColumnPath),
         "expected ColumnPath, got {got_all_err:?}"
     );
+}
+
+#[test]
+fn open_columns_matches_open_column() {
+    use super::{merkleize, open_column, open_columns, ProverError};
+
+    let mut rng = ChaCha20Rng::seed_from_u64(0x09e4_c015);
+
+    // Test both a small matrix (< 16 rows) and a larger matrix whose row count
+    // is not a multiple of 16 and whose column count spans multiple column tiles.
+    for &(n_rows, n_per_row, n_cols) in &[(5usize, 7usize, 16usize), (37, 45, 128)] {
+        let coeffs: Vec<Ft127> = repeat_with(|| Ft127::random(&mut rng))
+            .take(n_rows * n_per_row)
+            .collect();
+        let comm_data: Vec<Ft127> = repeat_with(|| Ft127::random(&mut rng))
+            .take(n_rows * n_cols)
+            .collect();
+        let mut test_comm = LigeroCommit::<Blake3, Ft127> {
+            comm: comm_data,
+            coeffs,
+            n_rows,
+            n_cols,
+            n_per_row,
+            hashes: vec![<Output<Blake3> as Default>::default(); 2 * n_cols - 1],
+        };
+        merkleize(&mut test_comm);
+
+        let all_rev: Vec<usize> = (0..n_cols).rev().collect();
+        let mut all_shuffled: Vec<usize> = (0..n_cols).collect();
+        for i in (1..n_cols).rev() {
+            let j = (rng.random::<u64>() as usize) % (i + 1);
+            all_shuffled.swap(i, j);
+        }
+        let random_with_repeats: Vec<usize> = (0..n_cols * 2 + 13)
+            .map(|_| (rng.random::<u64>() as usize) % n_cols)
+            .collect();
+        let explicit_repeats = vec![
+            n_cols - 1,
+            3,
+            n_cols - 1,
+            n_cols - 1,
+            0,
+            3,
+            n_cols / 2,
+            0,
+        ];
+
+        let cases: Vec<Vec<usize>> = vec![
+            vec![],
+            vec![0],
+            vec![n_cols - 1],
+            vec![5, 5, 5, 5],
+            explicit_repeats,
+            all_rev,
+            all_shuffled,
+            random_with_repeats,
+        ];
+
+        for indices in &cases {
+            let opened = open_columns(&test_comm, indices).unwrap();
+            assert_eq!(opened.len(), indices.len());
+            for (got, &col_idx) in opened.iter().zip(indices.iter()) {
+                let expected = open_column(&test_comm, col_idx).unwrap();
+                assert_eq!(got.col, expected.col);
+                assert_eq!(got.path, expected.path);
+            }
+        }
+
+        // Out-of-range indices must return ColumnNumber.
+        for bad in [
+            vec![n_cols],
+            vec![0, 3, n_cols, 1],
+            vec![n_cols + 17],
+        ] {
+            assert!(matches!(
+                open_columns(&test_comm, &bad),
+                Err(ProverError::ColumnNumber)
+            ));
+        }
+    }
+}
+
+#[test]
+fn commit_matches_serial_reference_unaligned() {
+    use super::{commit, merkleize_ser};
+
+    let mut rng = ChaCha20Rng::seed_from_u64(0xc0a1_7001);
+
+    // Cover non-multiples of n_per_row (single partial row, 1 full + 1 elem,
+    // nearly full last row, multi-row unaligned) as well as an exact multiple.
+    let cases = [
+        (1usize, 13usize, 32usize),
+        (14, 13, 32),
+        (3 * 13 + 12, 13, 32),
+        (37 * 45 + 19, 45, 64),
+        (17 * 30, 30, 64),
+    ];
+
+    for &(len, n_per_row, n_cols) in &cases {
+        let coeffs_in: Vec<Ft127> = repeat_with(|| Ft127::random(&mut rng)).take(len).collect();
+        let enc = LigeroEncoding::<Ft127>::new_from_dims(n_per_row, n_cols);
+        let got = commit::<Blake3, _>(&coeffs_in, &enc).unwrap();
+
+        let (n_rows, ref_n_per_row, ref_n_cols) = enc.get_dims(coeffs_in.len());
+        assert_eq!(ref_n_per_row, n_per_row);
+        assert_eq!(ref_n_cols, n_cols);
+
+        let mut ref_coeffs = vec![Ft127::ZERO; n_rows * n_per_row];
+        for (dst, src) in ref_coeffs
+            .chunks_mut(n_per_row)
+            .zip(coeffs_in.chunks(n_per_row))
+        {
+            dst[..src.len()].copy_from_slice(src);
+        }
+
+        let mut ref_comm = vec![Ft127::ZERO; n_rows * n_cols];
+        for (dst, src) in ref_comm
+            .chunks_mut(n_cols)
+            .zip(ref_coeffs.chunks(n_per_row))
+        {
+            dst[..src.len()].copy_from_slice(src);
+        }
+
+        enc.encode_rows(&mut ref_comm, n_cols).unwrap();
+
+        let n_cols_np2 = n_cols.next_power_of_two();
+        let mut expected = LigeroCommit::<Blake3, Ft127> {
+            comm: ref_comm,
+            coeffs: ref_coeffs,
+            n_rows,
+            n_cols,
+            n_per_row,
+            hashes: vec![<Output<Blake3> as Default>::default(); 2 * n_cols_np2 - 1],
+        };
+        merkleize_ser(&mut expected);
+
+        assert_eq!(got.n_rows, expected.n_rows);
+        assert_eq!(got.n_per_row, expected.n_per_row);
+        assert_eq!(got.n_cols, expected.n_cols);
+        assert_eq!(got.coeffs, expected.coeffs, "coeffs mismatch for len={len}");
+        assert_eq!(got.comm, expected.comm, "comm mismatch for len={len}");
+        assert_eq!(got.hashes, expected.hashes, "hashes mismatch for len={len}");
+        assert_eq!(
+            got.get_root().as_ref(),
+            expected.get_root().as_ref(),
+            "root mismatch for len={len}"
+        );
+    }
 }
 
 fn random_coeffs_rho() -> (Vec<Ft63>, f64) {

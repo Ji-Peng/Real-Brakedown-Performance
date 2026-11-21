@@ -11,7 +11,8 @@
 // stable Rust and current dependencies; column-major batched encoding interface;
 // row-collapse and column inner-product hooks on LcEncoding; batched leaf and
 // Merkle hashing, merkle_root helper, repeated-opening deduplication and
-// batched verifier encodings.
+// batched verifier encodings; tiled deduplicated column opening and parallel
+// single-pass buffer initialisation in commit.
 // The per-commit changes are in the git history since step/00-import
 // (upstream conroi/lcpc f0e2116).
 #![deny(missing_docs)]
@@ -738,6 +739,10 @@ const HASH_COLUMNS_BLOCK: usize = 32;
 // stack buffer size for batched leaf hashing (1 KiB = one BLAKE3 chunk)
 const LEAF_HASH_BUF_LEN: usize = 1024;
 
+// tile dimensions for deduplicated column opening
+const OPEN_TILE_ROWS: usize = 8;
+const OPEN_TILE_COLS: usize = 64;
+
 struct LeafHasher<D: Digest> {
     digest: D,
     buf: [u8; LEAF_HASH_BUF_LEN],
@@ -819,24 +824,49 @@ where
     assert!(n_rows * n_per_row >= coeffs_in.len());
     assert!((n_rows - 1) * n_per_row < coeffs_in.len());
     assert!(enc.dims_ok(n_per_row, n_cols));
+    assert!(n_per_row > 0);
+    assert!(n_per_row <= n_cols);
+    assert_eq!(coeffs_in.len().div_ceil(n_per_row), n_rows);
 
-    // matrix (encoded as a vector)
+    // matrix (encoded as a vector), each buffer initialised in one parallel pass
     // XXX(zk) pad coeffs
-    let mut coeffs = vec![FldT::<E>::ZERO; n_rows * n_per_row];
-    let mut comm = vec![FldT::<E>::ZERO; n_rows * n_cols];
-
-    // local copy of coeffs with padding
-    coeffs
+    let coeffs_len = n_rows.checked_mul(n_per_row).expect("coeffs size overflow");
+    let mut coeffs: Vec<FldT<E>> = Vec::with_capacity(coeffs_len);
+    coeffs.spare_capacity_mut()[..coeffs_len]
         .par_chunks_mut(n_per_row)
         .zip(coeffs_in.par_chunks(n_per_row))
-        .for_each(|(c, c_in)| {
-            c[..c_in.len()].copy_from_slice(c_in);
+        .for_each(|(dst, src)| {
+            let (head, tail) = dst.split_at_mut(src.len());
+            for (d, s) in head.iter_mut().zip(src) {
+                d.write(*s);
+            }
+            for d in tail {
+                d.write(FldT::<E>::ZERO);
+            }
         });
+    // SAFETY: `coeffs_in.len().div_ceil(n_per_row) == n_rows`, so both sides have
+    // `n_rows` chunks with `dst.len() == n_per_row >= src.len()`, and each of the
+    // `coeffs_len` elements was written exactly once.
+    unsafe { coeffs.set_len(coeffs_len) };
 
-    // place each row's message at the start of its codeword row
-    comm.par_chunks_mut(n_cols)
-        .zip(coeffs.par_chunks(n_per_row))
-        .for_each(|(r, c)| r[..c.len()].copy_from_slice(c));
+    let comm_len = n_rows.checked_mul(n_cols).expect("comm size overflow");
+    let mut comm: Vec<FldT<E>> = Vec::with_capacity(comm_len);
+    comm.spare_capacity_mut()[..comm_len]
+        .par_chunks_mut(n_cols)
+        .zip(coeffs_in.par_chunks(n_per_row))
+        .for_each(|(dst, src)| {
+            let (head, tail) = dst.split_at_mut(src.len());
+            for (d, s) in head.iter_mut().zip(src) {
+                d.write(*s);
+            }
+            for d in tail {
+                d.write(FldT::<E>::ZERO);
+            }
+        });
+    // SAFETY: `coeffs_in.len().div_ceil(n_per_row) == n_rows` and `n_per_row <= n_cols`,
+    // so both sides have `n_rows` chunks with `dst.len() == n_cols >= src.len()`, and
+    // each of the `comm_len` elements was written exactly once.
+    unsafe { comm.set_len(comm_len) };
 
     // now encode all rows (batched for encodings that support it)
     enc.encode_rows(&mut comm, n_cols)?;
@@ -983,11 +1013,30 @@ where
     }
 }
 
-// Open the commitment to one column
-fn open_column<D, E>(
-    comm: &LcCommit<D, E>,
+// Extract the Merkle authentication path for one column.
+fn merkle_path<D: Digest>(
+    hashes: &[Output<D>],
+    n_cols: usize,
     mut column: usize,
-) -> ProverResult<LcColumn<D, E>, ErrT<E>>
+) -> Vec<Output<D>> {
+    let mut hashes = hashes;
+    let path_len = log2(n_cols);
+    let mut path = Vec::with_capacity(path_len);
+    for _ in 0..path_len {
+        let other = (column & !1) | (!column & 1);
+        assert_eq!(other ^ column, 1);
+        path.push(hashes[other].clone());
+        let (_, hashes_new) = hashes.split_at((hashes.len() + 1) / 2);
+        hashes = hashes_new;
+        column >>= 1;
+    }
+    assert_eq!(column, 0);
+    path
+}
+
+// Open the commitment to one column
+#[cfg(test)]
+fn open_column<D, E>(comm: &LcCommit<D, E>, column: usize) -> ProverResult<LcColumn<D, E>, ErrT<E>>
 where
     D: Digest,
     E: LcEncoding,
@@ -1007,20 +1056,97 @@ where
         .collect();
 
     // Merkle path
-    let mut hashes = &comm.hashes[..];
-    let path_len = log2(comm.n_cols);
-    let mut path = Vec::with_capacity(path_len);
-    for _ in 0..path_len {
-        let other = (column & !1) | (!column & 1);
-        assert_eq!(other ^ column, 1);
-        path.push(hashes[other].clone());
-        let (_, hashes_new) = hashes.split_at((hashes.len() + 1) / 2);
-        hashes = hashes_new;
-        column >>= 1;
-    }
-    assert_eq!(column, 0);
+    let path = merkle_path::<D>(&comm.hashes, comm.n_cols, column);
 
     Ok(LcColumn { col, path })
+}
+
+// Gather a sorted slice of unique columns from a row-major matrix in row-by-column tiles.
+fn gather_columns<F: Copy>(comm: &[F], n_rows: usize, n_cols: usize, cols: &[usize]) -> Vec<Vec<F>> {
+    assert_eq!(comm.len(), n_rows * n_cols);
+    let mut out: Vec<Vec<F>> = cols.iter().map(|_| Vec::with_capacity(n_rows)).collect();
+    for rows in comm.chunks(OPEN_TILE_ROWS * n_cols) {
+        for (ct, ot) in cols
+            .chunks(OPEN_TILE_COLS)
+            .zip(out.chunks_mut(OPEN_TILE_COLS))
+        {
+            for (&c, o) in ct.iter().zip(ot.iter_mut()) {
+                o.extend(rows.chunks_exact(n_cols).map(|row| row[c]));
+            }
+        }
+    }
+    out
+}
+
+// Open the commitment to a list of columns, gathering each unique column once in
+// tiles and cloning repeated openings while each chunk is still warm in cache.
+fn open_columns<D, E>(
+    comm: &LcCommit<D, E>,
+    cols_to_open: &[usize],
+) -> ProverResult<Vec<LcColumn<D, E>>, ErrT<E>>
+where
+    D: Digest,
+    E: LcEncoding,
+{
+    if cols_to_open.iter().any(|&c| c >= comm.n_cols) {
+        return Err(ProverError::ColumnNumber);
+    }
+    if cols_to_open.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut uniq = cols_to_open.to_vec();
+    uniq.sort_unstable();
+    uniq.dedup();
+
+    let mut slot = vec![0usize; comm.n_cols];
+    for (s, &c) in uniq.iter().enumerate() {
+        slot[c] = s;
+    }
+
+    let mut counts = vec![0usize; uniq.len()];
+    for &c in cols_to_open {
+        counts[slot[c]] += 1;
+    }
+
+    let n_threads = rayon::current_num_threads().max(1);
+    let chunk_size = uniq.len().div_ceil(n_threads).clamp(16, OPEN_TILE_COLS);
+
+    let chunks: Vec<Vec<Vec<LcColumn<D, E>>>> = uniq
+        .par_chunks(chunk_size)
+        .zip(counts.par_chunks(chunk_size))
+        .map(|(cols, cnts)| {
+            let cols_data = gather_columns(&comm.comm, comm.n_rows, comm.n_cols, cols);
+            cols_data
+                .into_iter()
+                .zip(cols.iter().zip(cnts.iter()))
+                .map(|(col, (&c, &cnt))| {
+                    let path = merkle_path::<D>(&comm.hashes, comm.n_cols, c);
+                    let mut copies = Vec::with_capacity(cnt);
+                    for _ in 1..cnt {
+                        copies.push(LcColumn {
+                            col: col.clone(),
+                            path: path.clone(),
+                        });
+                    }
+                    copies.push(LcColumn { col, path });
+                    copies
+                })
+                .collect()
+        })
+        .collect();
+
+    let mut buckets: Vec<Vec<LcColumn<D, E>>> = Vec::with_capacity(uniq.len());
+    for chunk in chunks {
+        buckets.extend(chunk);
+    }
+
+    let columns = cols_to_open
+        .iter()
+        .map(|&c| buckets[slot[c]].pop().unwrap())
+        .collect();
+
+    Ok(columns)
 }
 
 const fn log2(v: usize) -> usize {
@@ -1343,10 +1469,7 @@ where
         let cols_to_open: Vec<usize> = repeat_with(|| col_range.sample(&mut cols_rng))
             .take(n_col_opens)
             .collect();
-        cols_to_open
-            .par_iter()
-            .map(|&col| open_column(comm, col))
-            .collect::<ProverResult<Vec<LcColumn<D, E>>, ErrT<E>>>()?
+        open_columns(comm, &cols_to_open)?
     };
 
     Ok(LcEvalProof {
