@@ -8,7 +8,7 @@
 // except according to those terms.
 //
 // Modified 2026 by the RealBrakedownPerf authors (Apache-2.0, see NOTICE):
-// tests updated for current dependencies and stable Rust.
+// tests updated for current dependencies, stable Rust, and parallel row collapse.
 // The per-commit changes are in the git history since step/00-import
 // (upstream conroi/lcpc f0e2116).
 
@@ -167,6 +167,63 @@ fn eval_outer() {
     let res2 = eval_outer_ser(&test_comm, &tensor[..]).unwrap();
 
     assert_eq!(&res1[..], &res2[..]);
+}
+
+#[test]
+fn collapse_par_matches_eval_outer_ser() {
+    use super::{collapse_par, eval_outer_ser};
+
+    let mut rng = ChaCha20Rng::seed_from_u64(0x2d_c011_a95e);
+
+    // Random dimensions plus explicit small / non-power-of-two row counts
+    let mut comms = vec![random_comm(), random_comm()];
+    for &(n_rows, n_per_row, n_cols) in &[(1usize, 5usize, 16usize), (3, 7, 16), (17, 19, 32)] {
+        let coeffs: Vec<Ft63> = repeat_with(|| Ft63::random(&mut rng))
+            .take(n_rows * n_per_row)
+            .collect();
+        let comm: Vec<Ft63> = repeat_with(|| Ft63::random(&mut rng))
+            .take(n_rows * n_cols)
+            .collect();
+        comms.push(LigeroCommit::<Blake3, Ft63> {
+            comm,
+            coeffs,
+            n_rows,
+            n_cols,
+            n_per_row,
+            hashes: vec![<Output<Blake3> as Default>::default(); 2 * n_cols - 1],
+        });
+    }
+
+    for test_comm in &comms {
+        let enc = LigeroEncoding::<Ft63>::new_from_dims(test_comm.n_per_row, test_comm.n_cols);
+        let t0: Vec<Ft63> = repeat_with(|| Ft63::random(&mut rng))
+            .take(test_comm.n_rows)
+            .collect();
+        let t1: Vec<Ft63> = repeat_with(|| Ft63::random(&mut rng))
+            .take(test_comm.n_rows)
+            .collect();
+        let t2: Vec<Ft63> = repeat_with(|| Ft63::random(&mut rng))
+            .take(test_comm.n_rows)
+            .collect();
+
+        let exp0 = eval_outer_ser(test_comm, &t0).unwrap();
+        let exp1 = eval_outer_ser(test_comm, &t1).unwrap();
+        let exp2 = eval_outer_ser(test_comm, &t2).unwrap();
+
+        let got1 = collapse_par(&enc, &test_comm.coeffs, test_comm.n_per_row, &[&t0]);
+        assert_eq!(got1, vec![exp0.clone()]);
+
+        let got2 = collapse_par(&enc, &test_comm.coeffs, test_comm.n_per_row, &[&t0, &t1]);
+        assert_eq!(got2, vec![exp0.clone(), exp1.clone()]);
+
+        let got3 = collapse_par(
+            &enc,
+            &test_comm.coeffs,
+            test_comm.n_per_row,
+            &[&t0, &t1, &t2],
+        );
+        assert_eq!(got3, vec![exp0, exp1, exp2]);
+    }
 }
 
 #[test]

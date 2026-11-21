@@ -8,7 +8,8 @@
 // except according to those terms.
 //
 // Modified 2026 by the RealBrakedownPerf authors (Apache-2.0, see NOTICE):
-// stable Rust and current dependencies; column-major batched encoding interface.
+// stable Rust and current dependencies; column-major batched encoding interface;
+// row-collapse and column inner-product hooks on LcEncoding.
 // The per-commit changes are in the git history since step/00-import
 // (upstream conroi/lcpc f0e2116).
 #![deny(missing_docs)]
@@ -174,6 +175,42 @@ pub trait LcEncoding: Clone + std::fmt::Debug + Sync {
 
     /// Get the number of degree tests required for this encoding
     fn get_n_degree_tests(&self) -> usize;
+
+    /// Add row-wise linear combinations of `rows` into `polys`.
+    ///
+    /// `rows` is a row-major matrix whose length is a multiple of `n_per_row`.
+    /// Each `tensors[t]` supplies one weight per row of `rows`, and each
+    /// `polys[t]` has length `n_per_row`; on return,
+    /// `polys[t][j] += sum_i tensors[t][i] * rows[i * n_per_row + j]`.
+    fn collapse_rows(
+        &self,
+        rows: &[Self::F],
+        n_per_row: usize,
+        tensors: &[&[Self::F]],
+        polys: &mut [Vec<Self::F>],
+    ) {
+        for (tensor, poly) in tensors.iter().zip(polys.iter_mut()) {
+            for (row, w) in rows.chunks_exact(n_per_row).zip(tensor.iter()) {
+                for (p, c) in poly.iter_mut().zip(row) {
+                    *p += *c * w;
+                }
+            }
+        }
+    }
+
+    /// Compute inner products of `col` with each tensor in `tensors`.
+    ///
+    /// Sets `out[t]` to the dot product over the common prefix of `tensors[t]`
+    /// and `col`. Equal lengths are not assumed because a malformed proof may
+    /// carry columns of a different length.
+    fn column_dots(&self, col: &[Self::F], tensors: &[&[Self::F]], out: &mut [Self::F]) {
+        for (tensor, o) in tensors.iter().zip(out.iter_mut()) {
+            *o = tensor
+                .iter()
+                .zip(col)
+                .fold(Self::F::ZERO, |a, (t, e)| a + *t * e);
+        }
+    }
 }
 
 // local accessors for enclosed types
@@ -995,35 +1032,39 @@ where
     };
 
     // step 3: check p_random, p_eval, and col paths
+    let mut tensors: Vec<&[FldT<E>]> = Vec::with_capacity(n_degree_tests + 1);
+    for t in &rand_tensor_vec {
+        tensors.push(t.as_slice());
+    }
+    tensors.push(outer_tensor);
+
     cols_to_open
         .par_iter()
         .zip(&proof.columns[..])
-        .try_for_each(|(&col_num, column)| {
-            let rand = {
+        .try_for_each_init(
+            || vec![FldT::<E>::ZERO; n_degree_tests + 1],
+            |dots, (&col_num, column)| {
+                enc.column_dots(&column.col, &tensors, dots);
                 let mut rand = true;
                 for i in 0..n_degree_tests {
-                    rand &=
-                        verify_column_value(column, &rand_tensor_vec[i], &p_random_fft[i][col_num]);
+                    rand &= dots[i] == p_random_fft[i][col_num];
                 }
-                rand
-            };
 
-            let eval = verify_column_value(column, outer_tensor, &p_eval_fft[col_num]);
-            let path = verify_column_path(column, col_num, root);
-            match (rand, eval, path) {
-                (false, _, _) => Err(VerifierError::ColumnDegree),
-                (_, false, _) => Err(VerifierError::ColumnEval),
-                (_, _, false) => Err(VerifierError::ColumnPath),
-                _ => Ok(()),
-            }
-        })?;
+                let eval = dots[n_degree_tests] == p_eval_fft[col_num];
+                let path = verify_column_path(column, col_num, root);
+                match (rand, eval, path) {
+                    (false, _, _) => Err(VerifierError::ColumnDegree),
+                    (_, false, _) => Err(VerifierError::ColumnEval),
+                    (_, _, false) => Err(VerifierError::ColumnPath),
+                    _ => Ok(()),
+                }
+            },
+        )?;
 
     // step 4: evaluate and return
-    Ok(inner_tensor
-        .par_iter()
-        .zip(&proof.p_eval[..])
-        .fold(|| FldT::<E>::ZERO, |a, (t, e)| a + *t * e)
-        .reduce(|| FldT::<E>::ZERO, |a, v| a + v))
+    let mut out = [FldT::<E>::ZERO; 1];
+    enc.column_dots(&proof.p_eval, &[inner_tensor], &mut out);
+    Ok(out[0])
 }
 
 // Check a column opening
@@ -1058,6 +1099,7 @@ where
 }
 
 // check column value
+#[cfg(test)]
 fn verify_column_value<D, E>(
     column: &LcColumn<D, E>,
     tensor: &[FldT<E>],
@@ -1073,6 +1115,57 @@ where
         .fold(FldT::<E>::ZERO, |a, (t, e)| a + *t * e);
 
     poly_eval == &tensor_eval
+}
+
+fn collapse_par<E>(
+    enc: &E,
+    coeffs: &[FldT<E>],
+    n_per_row: usize,
+    tensors: &[&[FldT<E>]],
+) -> Vec<Vec<FldT<E>>>
+where
+    E: LcEncoding,
+{
+    if tensors.is_empty() {
+        return Vec::new();
+    }
+    if n_per_row == 0 || coeffs.is_empty() {
+        return vec![vec![FldT::<E>::ZERO; n_per_row]; tensors.len()];
+    }
+    assert_eq!(coeffs.len() % n_per_row, 0);
+    let n_rows = coeffs.len() / n_per_row;
+    for t in tensors {
+        assert_eq!(t.len(), n_rows);
+    }
+
+    let n_threads = rayon::current_num_threads().max(1);
+    let rows_per_task = n_rows.div_ceil(n_threads);
+
+    let partials: Vec<Vec<Vec<FldT<E>>>> = coeffs
+        .par_chunks(rows_per_task * n_per_row)
+        .enumerate()
+        .map(|(k, chunk)| {
+            let chunk_rows = chunk.len() / n_per_row;
+            let row_start = k * rows_per_task;
+            let row_end = row_start + chunk_rows;
+            let task_tensors: Vec<&[FldT<E>]> =
+                tensors.iter().map(|t| &t[row_start..row_end]).collect();
+            let mut polys = vec![vec![FldT::<E>::ZERO; n_per_row]; tensors.len()];
+            enc.collapse_rows(chunk, n_per_row, &task_tensors, &mut polys);
+            polys
+        })
+        .collect();
+
+    let mut iter = partials.into_iter();
+    let mut acc = iter.next().unwrap();
+    for part in iter {
+        for (dst_poly, src_poly) in acc.iter_mut().zip(part.iter()) {
+            for (d, s) in dst_poly.iter_mut().zip(src_poly.iter()) {
+                *d += s;
+            }
+        }
+    }
+    acc
 }
 
 /// Evaluate the committed polynomial using the supplied "outer" tensor
@@ -1093,30 +1186,37 @@ where
         return Err(ProverError::OuterTensor);
     }
 
-    // first, evaluate the polynomial on a random tensor (low-degree test)
-    // we repeat this to boost soundness
-    let mut p_random_vec: Vec<Vec<FldT<E>>> = Vec::new();
+    // first, evaluate the polynomial on random tensors (low-degree test);
+    // degree test 0 and outer_tensor are both known before p_random_0 enters
+    // the transcript, so they are collapsed together in one pass.
     let n_degree_tests = enc.get_n_degree_tests();
-    for _i in 0..n_degree_tests {
-        let p_random = {
-            let mut key: <ChaCha20Rng as SeedableRng>::Seed = Default::default();
-            tr.challenge_bytes(E::LABEL_DT, &mut key);
-            let mut deg_test_rng = ChaCha20Rng::from_seed(key);
-            // XXX(optimization) could expand seed in parallel instead of in series
-            let rand_tensor: Vec<FldT<E>> = repeat_with(|| FldT::<E>::random(&mut deg_test_rng))
-                .take(comm.n_rows)
-                .collect();
-            let mut tmp = vec![FldT::<E>::ZERO; comm.n_per_row];
-            collapse_columns::<E>(
+    let mut p_random_vec: Vec<Vec<FldT<E>>> = Vec::with_capacity(n_degree_tests);
+    let mut p_eval_opt: Option<Vec<FldT<E>>> = None;
+
+    for i in 0..n_degree_tests {
+        let mut key: <ChaCha20Rng as SeedableRng>::Seed = Default::default();
+        tr.challenge_bytes(E::LABEL_DT, &mut key);
+        let mut deg_test_rng = ChaCha20Rng::from_seed(key);
+        // XXX(optimization) could expand seed in parallel instead of in series
+        let rand_tensor: Vec<FldT<E>> = repeat_with(|| FldT::<E>::random(&mut deg_test_rng))
+            .take(comm.n_rows)
+            .collect();
+
+        let p_random = if i == 0 {
+            let mut collapsed = collapse_par(
+                enc,
                 &comm.coeffs,
-                &rand_tensor,
-                &mut tmp,
-                comm.n_rows,
                 comm.n_per_row,
-                0,
+                &[&rand_tensor, outer_tensor],
             );
-            tmp
+            p_eval_opt = collapsed.pop();
+            collapsed.pop().unwrap()
+        } else {
+            collapse_par(enc, &comm.coeffs, comm.n_per_row, &[&rand_tensor])
+                .pop()
+                .unwrap()
         };
+
         // add p_random to the transcript
         p_random
             .iter()
@@ -1125,18 +1225,12 @@ where
         p_random_vec.push(p_random);
     }
 
-    // next, evaluate the polynomial using the supplied tensor
-    let p_eval = {
-        let mut tmp = vec![FldT::<E>::ZERO; comm.n_per_row];
-        collapse_columns::<E>(
-            &comm.coeffs,
-            outer_tensor,
-            &mut tmp,
-            comm.n_rows,
-            comm.n_per_row,
-            0,
-        );
-        tmp
+    // next, evaluate the polynomial using the supplied tensor (computed alone only if n_degree_tests == 0)
+    let p_eval = match p_eval_opt {
+        Some(poly) => poly,
+        None => collapse_par(enc, &comm.coeffs, comm.n_per_row, &[outer_tensor])
+            .pop()
+            .unwrap(),
     };
     // add p_eval to the transcript
     p_eval
@@ -1168,6 +1262,7 @@ where
     })
 }
 
+#[cfg(test)]
 fn collapse_columns<E>(
     coeffs: &[FldT<E>],
     tensor: &[FldT<E>],
