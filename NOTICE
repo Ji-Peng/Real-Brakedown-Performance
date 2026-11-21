@@ -40,12 +40,15 @@ Changes made by the RealBrakedownPerf authors (2026), Apache-2.0:
 - New files in upstream crates: lcpc-brakedown-pc/src/{cache,graph,
   thread_pool}.rs and lcpc-test-fields/src/fft.rs (see below).
 - New crates and files: lcpc-fields/, lcpc-oracle-tests/,
-  lcpc-spielman-oracle/, bench/, reproduce/ (including run.sh, preflight.sh,
-  fetch_deps.sh, test.sh, claims.tsv, stages.tsv, and lib/cores.py),
-  external/, docs/, tests/golden/, tools/, results/, NOTICE,
+  lcpc-spielman-oracle/, bench/, reproduce/ (including run.sh, report.sh,
+  preflight.sh, fetch_deps.sh, test.sh, claims.tsv, stages.tsv, and
+  lib/cores.py), external/, docs/, tests/golden/, tools/, results/
+  (including results/README.md), Dockerfile, .dockerignore, NOTICE,
   rust-toolchain.toml, .cargo/config.toml, Cargo.lock, and every file under
-  scripts/ (including analyze.py, check_codegen.py, kdhr26_reported.json,
-  make_selection.py, and test_analyze.py).
+  scripts/ (including analyze.py, paper_tables.py, paper_macros.tex,
+  report_tables.tex, claim_times.py, check_codegen.py,
+  kdhr26_reported.json, make_selection.py, paper_reference/,
+  test_analyze.py, and test_report.py).
 
 Code derived from fffft:
 
