@@ -34,14 +34,18 @@ Changes made by the RealBrakedownPerf authors (2026), Apache-2.0:
   tuning.
 - Removed upstream files: upstream's nightly #[bench] harnesses
   lcpc-brakedown-pc/src/bench.rs and lcpc-ligero-pc/src/bench.rs (replaced
-  by the stable benchmark crate bench/).
+  by the stable benchmark crate bench/), and upstream's local shell helpers
+  scripts/microbench.sh and scripts/print_bench.sh (replaced by
+  reproduce/run.sh, reproduce/test.sh, and scripts/analyze.py).
 - New files in upstream crates: lcpc-brakedown-pc/src/{cache,graph,
   thread_pool}.rs and lcpc-test-fields/src/fft.rs (see below).
 - New crates and files: lcpc-fields/, lcpc-oracle-tests/,
-  lcpc-spielman-oracle/, bench/, reproduce/, external/, docs/, tests/golden/,
-  tools/, results/, NOTICE, rust-toolchain.toml, .cargo/config.toml,
-  Cargo.lock, and every file under scripts/ except upstream's
-  scripts/microbench.sh and scripts/print_bench.sh (unchanged).
+  lcpc-spielman-oracle/, bench/, reproduce/ (including run.sh, preflight.sh,
+  fetch_deps.sh, test.sh, claims.tsv, stages.tsv, and lib/cores.py),
+  external/, docs/, tests/golden/, tools/, results/, NOTICE,
+  rust-toolchain.toml, .cargo/config.toml, Cargo.lock, and every file under
+  scripts/ (including analyze.py, check_codegen.py, kdhr26_reported.json,
+  make_selection.py, and test_analyze.py).
 
 Code derived from fffft:
 
