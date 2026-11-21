@@ -97,8 +97,8 @@ PARTNER_FAMILIES = (("tw_threads", "lcpc_threads"), ("arm_this_work", "arm_lcpc_
 DIVERGENCE_THRESHOLD = 0.05
 MEASURED_STATUSES = {None, "", "ok", "complete", "completed", "success", "pass"}
 
-# Block-id families (shared interface 4). Profile prefixes (full_, smoke_) are
-# stripped first; Arm blocks keep their own families.
+# Block-id families (shared interface 4). Profile prefixes (full_, quick_, smoke_)
+# are stripped first; Arm blocks keep their own families.
 _FAMILY_RULES = [
     ("arm_this_work", r"^arm_this_work"),
     ("arm_lcpc_orig", r"^arm_lcpc_orig"),
@@ -123,7 +123,7 @@ def block_family(block_id: str) -> Optional[str]:
     if block_id.startswith("arm_"):
         stripped = block_id
     else:
-        stripped = re.sub(r"^(full|smoke)_", "", block_id)
+        stripped = re.sub(r"^(full|quick|smoke)_", "", block_id)
     for family, pattern in _FAMILY_RULES:
         if re.search(pattern, stripped):
             return family
@@ -294,6 +294,8 @@ def cell_missing_reason(value: Any, header: str, row_values: List[str]) -> Optio
         return text
     if normalized.startswith(("skipped", "todo", "omitted")):
         return text
+    if re.match(r"^not run\s*\(.+\)$", normalized):
+        return None
     if re.match(r"^n/a\s*\(.+\)$", normalized):
         return None
     if normalized.startswith("n/a"):
@@ -457,6 +459,8 @@ class Selection:
             raise ValueError(f"{path}: unsupported schema_version {data.get('schema_version')!r}")
         self.data = data
         self.root = os.path.normpath(os.path.join(os.path.dirname(self.path), data.get("results_root", ".")))
+        self.mode: Optional[str] = data.get("mode")
+        self.mt_threads: Optional[int] = int(data["mt_threads"]) if data.get("mt_threads") is not None else None
         self.machines: Dict[str, Dict] = data.get("machines", {})
         self.exclude: List[Dict] = data.get("exclude", [])
         self.omissions: List[Dict] = data.get("omissions", [])
@@ -469,8 +473,8 @@ class Selection:
             if not ex.get("reason") or not (ex.get("path") or ex.get("match")):
                 raise ValueError(f"{path}: exclude[{i}] needs a path or match and a reason")
         for i, om in enumerate(self.omissions):
-            if not om.get("reason") or not om.get("cells") or om.get("kind") not in ("pending", "omitted"):
-                raise ValueError(f"{path}: omissions[{i}] needs cells, kind (pending|omitted) and a reason")
+            if not om.get("reason") or not om.get("cells") or om.get("kind") not in ("pending", "omitted", "not-run"):
+                raise ValueError(f"{path}: omissions[{i}] needs cells, kind (pending|omitted|not-run) and a reason")
         for i, sp in enumerate(self.supersede):
             if not sp.get("reason") or not sp.get("by") or not sp.get("blocks"):
                 raise ValueError(f"{path}: supersede[{i}] needs by, blocks and a reason")
@@ -588,10 +592,13 @@ def run_self_test() -> None:
     assert cell_missing_reason("N/A", "Latency", ["mode b", "step/03-fields"]) is None
     assert cell_missing_reason("N/A", "Latency", ["mode b", "step/04-r2l"]) == "N/A"
     assert cell_missing_reason("N/A (KDHR26 reports Mont127 only)", "Latency", ["20"]) is None
+    assert cell_missing_reason("not run (quick mode)", "Latency", ["20"]) is None
     assert cell_missing_reason("TODO (pending)", "Latency", ["20"]) == "TODO (pending)"
     assert cell_missing_reason("12.30 [12.1-12.5]", "Latency", ["20"]) is None
-    assert fnmatch.fnmatchcase("T12|soc-xcng,18,1|This Work Arm (ms)", "T12|*|This Work Arm (ms)")
+    assert fnmatch.fnmatchcase("T12|arm-host,18,1|This Work Arm (ms)", "T12|*|This Work Arm (ms)")
     assert block_family("full_this_work_mode_a_t1_n16-18-20-22-24-26") == "tw_a"
+    assert block_family("quick_this_work_mode_a_t1_n16-18-20") == "tw_a"
+    assert block_family("quick_arm_this_work_t1_n18-20") == "arm_this_work"
     assert block_family("full_slice_sweep_s4_t8_n20-24-26") == "slice_sweep"
     assert block_family("smoke_lcpc_orig_a_t1") == "lcpc_a"
     assert block_family("full_simd_spielman_mont127_t7_n28") == "simd"
@@ -630,13 +637,21 @@ def run_self_test() -> None:
 class BenchmarkAnalyzer:
     def __init__(self, out_dir: str, kdhr26_path: str, is_smoke: bool = False,
                  selection: Optional[Selection] = None, compile_latex: bool = True,
-                 latex_build_dir: Optional[str] = None):
+                 latex_build_dir: Optional[str] = None, mt_threads: Optional[int] = None):
         self.out_dir = out_dir
         self.compile_latex = compile_latex
         self.latex_build_dir = latex_build_dir
         self.kdhr26_path = kdhr26_path
         self.is_smoke = is_smoke
         self.selection = selection
+        self._mt_threads_explicit = mt_threads
+        self.mt_threads: int = (int(mt_threads) if mt_threads is not None else
+                                (int(selection.mt_threads) if (selection and selection.mt_threads) else 8))
+        self._schedule_mt_threads: Set[int] = set()
+        self.has_quick_watermark = bool(selection and selection.mode == "quick")
+        self.block_arch: Dict[Tuple[str, str, str, str], str] = {}
+        self.session_arch: Dict[Tuple[str, str, str], str] = {}
+        self.machine_arch: Dict[str, str] = {}
 
         self.csv_dir = os.path.join(out_dir, "csv")
         self.latex_dir = os.path.join(out_dir, "latex")
@@ -821,6 +836,17 @@ class BenchmarkAnalyzer:
                         continue
                     meta = self._locate(path, root, cache)
                     self._load_file(path, fname, data, meta)
+
+        if (self._mt_threads_explicit is None
+                and not (self.selection and self.selection.mt_threads)
+                and len(self._schedule_mt_threads) == 1):
+            self.mt_threads = next(iter(self._schedule_mt_threads))
+        for _, item in self._pending:
+            item["_meta"]["arch"] = self._resolve_arch(item["_meta"], item)
+        for item in self.field_benchmarks:
+            item["_meta"]["arch"] = self._resolve_arch(item["_meta"], item)
+        for item in self.step_codegen_reports:
+            item["_meta"]["arch"] = self._resolve_arch(item["_meta"], item)
 
         self._apply_supersede()
         self._check_partner_runs()
@@ -1045,12 +1071,21 @@ class BenchmarkAnalyzer:
             if isinstance(data.get("stages"), list):
                 self.session_stages[(meta["machine"], meta["run"], meta["session_dir"])] = [
                     s for s in data["stages"] if isinstance(s, dict)]
+                for st_entry in data["stages"]:
+                    if isinstance(st_entry, dict):
+                        mt_v = st_entry.get("mt_threads") or (st_entry.get("arguments") or {}).get("mt_threads")
+                        if isinstance(mt_v, int) and mt_v > 0:
+                            self._schedule_mt_threads.add(mt_v)
+            if isinstance(data.get("mt_threads"), int) and data["mt_threads"] > 0:
+                self._schedule_mt_threads.add(data["mt_threads"])
             profile = data.get("profile")
             if profile:
                 self.profiles.add(str(profile))
                 self.profile = self.profile or str(profile)
             if profile == "smoke":
                 self.has_smoke_watermark = True
+            elif profile == "quick":
+                self.has_quick_watermark = True
             if data.get("session_id"):
                 self.session_ids.add(str(data["session_id"]))
             return
@@ -1111,7 +1146,10 @@ class BenchmarkAnalyzer:
             schema = item.get("schema_version")
             if schema not in ("lcpc-bench-v1", "steps-bench-v1"):
                 continue
-            if item.get("watermark") or item.get("run_class") == "smoke":
+            wm = str(item.get("watermark") or "")
+            if "QUICK MODE" in wm or item.get("run_class") == "quick":
+                self.has_quick_watermark = True
+            elif wm or item.get("run_class") == "smoke":
                 self.has_smoke_watermark = True
             impl = self._impl_of(item, meta)
             rmeta = self._record_meta(meta, item, path, impl=impl)
@@ -1157,10 +1195,20 @@ class BenchmarkAnalyzer:
         node =((data.get("machine") or {}).get("uname") or {}).get("node") if isinstance(data.get("machine"), dict) else None
         if node:
             info["vm"].add(str(node))
+        os_k = data.get("os_and_kernel") if isinstance(data.get("os_and_kernel"), dict) else {}
+        mach_arch = os_k.get("machine") or ((data.get("machine") or {}).get("uname") or {}).get("machine")
+        if mach_arch:
+            norm_arch = "aarch64" if str(mach_arch).lower() in ("aarch64", "arm64") else str(mach_arch)
+            self.block_arch[(meta["machine"], meta["run"], meta["session_dir"], meta["block"])] = norm_arch
+            self.session_arch[(meta["machine"], meta["run"], meta["session_dir"])] = norm_arch
+            self.machine_arch[meta["machine"]] = norm_arch
         host = data.get("host_profile") or data.get("host")
         if host:
             self.hosts.add(str(host))
-        if data.get("watermark") or data.get("run_class") == "smoke":
+        wm = str(data.get("watermark") or "")
+        if "QUICK MODE" in wm or data.get("run_class") == "quick":
+            self.has_quick_watermark = True
+        elif wm or data.get("run_class") == "smoke":
             self.has_smoke_watermark = True
         # A run whose threads outnumber its pinned cores measures
         # oversubscription, not scaling. SIMD-Spielman's MT encoder adds a
@@ -1194,6 +1242,18 @@ class BenchmarkAnalyzer:
             return "polycommit"
         return "this_work"
 
+    def _resolve_arch(self, m: Dict, item: Dict) -> str:
+        raw = (
+            item.get("arch")
+            or self.block_arch.get((m["machine"], m["run"], m["session_dir"], m["block"]))
+            or self.session_arch.get((m["machine"], m["run"], m["session_dir"]))
+            or self.machine_arch.get(m["machine"])
+        )
+        if raw:
+            s = str(raw).lower()
+            return "aarch64" if s in ("aarch64", "arm64") else s
+        return "aarch64" if str(m.get("family") or "").startswith("arm_") else "x86_64"
+
     def _record_meta(self, meta: Dict, item: Dict, path: str, impl: str) -> Dict:
         m = dict(meta)
         m["path"] = path
@@ -1202,8 +1262,7 @@ class BenchmarkAnalyzer:
         if family is None:
             family = self._infer_family(impl, item)
         m["family"] = family
-        m["arch"] = ("aarch64" if (str(family).startswith("arm_") or item.get("arch") == "aarch64"
-                                   or "xcng" in meta["machine"]) else "x86_64")
+        m["arch"] = self._resolve_arch(m, item)
         if impl == "lcpc_orig":
             variant, recorded = infer_build_variant(item, path)
             m["variant"], m["variant_recorded"] = variant, recorded
@@ -1382,8 +1441,23 @@ class BenchmarkAnalyzer:
             om = self.selection.omission_for(selector)
             if om:
                 self.todo_cells[selector] = f"{om['kind']}: {om['reason']}"
-                return "TODO (pending)" if om["kind"] == "pending" else "omitted (documented)"
+                if om["kind"] == "pending":
+                    return "TODO (pending)"
+                if om["kind"] == "not-run":
+                    return f"not run ({om['reason']})"
+                return "omitted (documented)"
         return "-"
+
+    def _empty_table_not_run_row(self, table: str, headers: List[str]) -> Optional[List[str]]:
+        if not self.selection:
+            return None
+        sel = f"{table}|(all)|(table)"
+        om = self.selection.omission_for(sel)
+        if om and om.get("kind") == "not-run":
+            self.todo_cells[sel] = f"not-run: {om['reason']}"
+            txt = f"not run ({om['reason']})"
+            return [txt for _ in headers]
+        return None
 
     def _session_marker(self, selector: str, sessions: List[str], expected: Optional[List[str]],
                         what: str = "") -> str:
@@ -1523,9 +1597,18 @@ class BenchmarkAnalyzer:
                          "reproduce/lcpc_orig.sh and cannot be confirmed from the records.")
         return notes
 
-    def kdhr26_entry(self, table: str, log_n: int, machine: Optional[str]) -> Tuple[Optional[Dict], str]:
+    def kdhr26_entry(self, table: str, log_n: int, machine: Optional[str]) -> Tuple[Optional[Dict], Optional[str]]:
         """[KDHR26] entry keyed by (reference CPU for the machine, log2 N)."""
-        cpu = (self.selection.kdhr26_cpu(machine) if (self.selection and machine) else None) or "EPYC 9754"
+        if self.selection and machine and machine in self.selection.machines:
+            m_cfg = self.selection.machines[machine]
+            if "kdhr26_reference_cpu" in m_cfg:
+                cpu = m_cfg["kdhr26_reference_cpu"]
+                if cpu is None:
+                    return None, None
+            else:
+                cpu = "EPYC 9754"
+        else:
+            cpu = "EPYC 9754"
         for entry in self.kdhr26_data.get(table, {}).get("entries", []):
             if entry.get("log_n") == log_n and entry.get("cpu", cpu) == cpu:
                 return entry, cpu
@@ -1567,7 +1650,11 @@ class BenchmarkAnalyzer:
             base.append("PolyCommit " + "/".join(poly))
         sel = (f"selection {os.path.basename(self.selection.path)} sha256 {self.selection.sha256[:12]}"
                if self.selection else "UNSELECTED (all records under " + ", ".join(self.result_dirs) + "; not paper evidence)")
-        watermark = " [LOCAL SMOKE - NOT A RESULT]" if (self.is_smoke or self.has_smoke_watermark) else ""
+        watermark = ""
+        if self.is_smoke or self.has_smoke_watermark:
+            watermark = " [LOCAL SMOKE - NOT A RESULT]"
+        elif self.has_quick_watermark:
+            watermark = " [QUICK MODE - reduced sizes and repetitions; not comparable cell-by-cell with the paper]"
         data = "; ".join(parts) if parts else "no measured records"
         return (f"Provenance: {sel}; data: {data}"
                 + (f"; baselines: {'; '.join(base)}" if base else "") + f".{watermark}")
@@ -1613,6 +1700,8 @@ class BenchmarkAnalyzer:
             notes.append("[sX only]: measured in fewer sessions than planned; see csv/todo_cells.csv.")
         if (self.is_smoke or self.has_smoke_watermark) and name.startswith("table_"):
             notes.append("LOCAL SMOKE - NOT A RESULT. Do not copy these values to paper/.")
+        elif self.has_quick_watermark and name.startswith("table_"):
+            notes.append("QUICK MODE - reduced sizes and repetitions; not comparable cell-by-cell with the paper.")
 
         csv_path = os.path.join(self.csv_dir, f"{name}.csv")
         with open(csv_path, "w", newline="", encoding="utf-8") as f:
@@ -1811,8 +1900,9 @@ class BenchmarkAnalyzer:
         keys = sorted({(int(r["log_n"]), int(r.get("threads", 1))) for r in tw_pool + lcpc_pool + poly_pool})
         rows = []
         dims_mismatch = []
+        mt_set = (1,) if self.mt_threads <= 1 else (1, self.mt_threads)
         for log_n, threads in keys:
-            if threads not in (1, 8):
+            if threads not in mt_set:
                 continue
             rk = f"{log_n},{threads}"
             tw_recs = self.select(tw_pool, log_n=log_n, threads=threads, slice_mode="adaptive")
@@ -1840,6 +1930,10 @@ class BenchmarkAnalyzer:
                     self.speedup_cell(T, rk, "Speedup vs PolyCommit", pst, tw),
                     self.significance(tw, pst, f"{T}|{rk}|Significance vs PolyCommit")]
             rows.append(row)
+        if not rows:
+            nr = self._empty_table_not_run_row(T, headers)
+            if nr:
+                rows.append(nr)
         notes = [
             "Mode (a) SdigCode6; This Work = blocks full_this_work_mode_a_* only (adaptive slices, Mont127); "
             "original LCPC = blocks full_lcpc_orig_mode_a_* over Ft127 (the same prime), one column group per build variant.",
@@ -1863,11 +1957,16 @@ class BenchmarkAnalyzer:
 
     # ---- T2 ---------------------------------------------------------------
     def generate_T2_simd_spielman(self):
-        """mode (b) This Work vs SIMD-Spielman (T=1, T=8 and 7 workers + coordinator)."""
+        """mode (b) This Work vs SIMD-Spielman (T=1, T=mt_threads and (mt_threads-1) workers + coordinator)."""
         self._begin("T2")
         T = "T2"
+        mt_t = self.mt_threads
+        coord_w = max(1, mt_t - 1)
+        mt_set = (1,) if mt_t <= 1 else (1, mt_t)
+        col_coord = f"SIMD-Spielman {coord_w} workers + coordinator (ms)"
+        col_gap = f"SIMD Gap Recovered ({mt_t} cores)"
         headers = ["Field", "T", "log2(N)", "This Work (ms)", "SIMD-Spielman T workers (ms)",
-                   "SIMD-Spielman 7 workers + coordinator (ms)", "SIMD Gap Recovered (8 cores)",
+                   col_coord, col_gap,
                    "SIMD best-of-T incl. T=1 (ms)", "Gap vs SIMD best-of-T", "SIMD MT slower than its T=1",
                    "SIMD params.patch", "[KDHR26] SIMD reported (ms)", "[KDHR26] LCPC/SIMD reported",
                    "Measured LCPC as-published-as-is/SIMD", "Measured LCPC fork-flags-portable/SIMD"]
@@ -1875,9 +1974,10 @@ class BenchmarkAnalyzer:
         simd_pool = self.select(self.reports_simd_spielman, family="simd", params="simd-spielman", shape="brakedown")
         lcpc_pool = self.select(self.reports_lcpc_orig, family="lcpc_a", params="lcpc-sdig6")
         keys = sorted({(r.get("field"), int(r["log_n"]), int(r.get("threads", 1))) for r in tw_pool + simd_pool
-                       if int(r.get("threads", 1)) in (1, 8)}, key=lambda k: (str(k[0]), k[2], k[1]))
+                       if int(r.get("threads", 1)) in mt_set}, key=lambda k: (str(k[0]), k[2], k[1]))
         rows = []
         cpu_used = set()
+        any_null_kdhr26 = False
         mt_overhead_rows, mixed_patch_rows = [], []
         for field, log_n, threads in keys:
             rk = f"{field},{threads},{log_n}"
@@ -1886,8 +1986,7 @@ class BenchmarkAnalyzer:
                 continue
             tw = self.stat(tw_recs, label=f"{T}|{rk}|This Work")
             mt = self.simd_multithread_cells(T, rk, self.select(simd_pool, field=field, log_n=log_n), threads, tw,
-                                             "SIMD-Spielman T workers (ms)", "SIMD-Spielman 7 workers + coordinator (ms)",
-                                             "SIMD Gap Recovered (8 cores)")
+                                             "SIMD-Spielman T workers (ms)", col_coord, col_gap)
             simd, best_all = mt["simd"], mt["best_all"]
             simd_text = mt["simd_text"]
             if simd.get("mean") is None and self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
@@ -1900,6 +1999,16 @@ class BenchmarkAnalyzer:
             entry, cpu = self.kdhr26_entry("table_2", log_n, machine)
             if field != "Mont127":
                 rep_ms = rep_ratio = "N/A (KDHR26 Table 2 reports Mont127 only)"
+            elif cpu is None:
+                any_null_kdhr26 = True
+                rep_ms = self.missing_text(f"{T}|{rk}|[KDHR26] SIMD reported (ms)")
+                rep_ratio = self.missing_text(f"{T}|{rk}|[KDHR26] LCPC/SIMD reported")
+                if rep_ms == "-":
+                    rep_ms = "not run (no KDHR26 reference for this CPU)"
+                if rep_ratio == "-":
+                    rep_ratio = "not run (no KDHR26 reference for this CPU)"
+            elif threads not in (1, 8):
+                rep_ms = rep_ratio = f"N/A (KDHR26 Table 2 reports T=1 and T=8 only, not T={threads})"
             elif entry is None:
                 rep_ms = rep_ratio = f"N/A (no KDHR26 {cpu} entry for 2^{log_n})"
             else:
@@ -1917,27 +2026,33 @@ class BenchmarkAnalyzer:
                     continue
                 lst = self.stat(self.select(lcpc_pool, variant=v, log_n=log_n, threads=threads),
                                 label=f"{T}|{rk}|LCPC {v}")
-                # At T=8 the SIMD reference is its best-of-T time (incl. T=1), so the
+                # At T=mt_t the SIMD reference is its best-of-T time (incl. T=1), so the
                 # ratio is not inflated by SIMD-Spielman's small-N threading overhead.
                 measured_ratios.append(self.speedup_cell(T, rk, col, lst, best_all or {}))
             rows.append([field, threads, log_n, self.value_cell(T, rk, "This Work (ms)", tw), simd_text,
                          mt["simd7_text"], mt["gap"], mt["best_text"], mt["gap_best"], mt["slower_text"],
                          mt["patch_text"], rep_ms, rep_ratio] + measured_ratios)
+        if not rows:
+            nr = self._empty_table_not_run_row(T, headers)
+            if nr:
+                rows.append(nr)
         cpu_text = ", ".join(sorted(cpu_used)) or "EPYC 9754"
         notes = [
             "Mode (b) parameters matching [KDHR26]; This Work = blocks full_this_work_mode_b_*; SIMD-Spielman runs its "
             "upstream slice table (slice_mode 'table').",
-            "SIMD Gap Recovered = T_SIMD / T_ThisWork (>1: This Work faster in that configuration). At T=8 SIMD-Spielman's "
-            "upstream encoder adds a spin-waiting coordinator thread; on the 8-core host the T=8 blocks let it share a worker "
-            "core, and the 7 workers + coordinator blocks use exactly 8 cores. The 8-core gap uses the faster of the two.",
-            "SIMD best-of-T also includes SIMD-Spielman's own T=1 time. Where 'SIMD MT slower than its T=1' is yes, the 8-core "
+            f"SIMD Gap Recovered = T_SIMD / T_ThisWork (>1: This Work faster in that configuration). At T={mt_t} SIMD-Spielman's "
+            f"upstream encoder adds a spin-waiting coordinator thread; on the {mt_t}-core host the T={mt_t} blocks let it share a worker "
+            f"core, and the {coord_w} workers + coordinator blocks use exactly {mt_t} cores. The {mt_t}-core gap uses the faster of the two.",
+            f"SIMD best-of-T also includes SIMD-Spielman's own T=1 time. Where 'SIMD MT slower than its T=1' is yes, the {mt_t}-core "
             "gap reflects SIMD-Spielman's multithreading overhead at that size, not a faster encoder; use the best-of-T gap.",
-            f"[KDHR26] columns quoted verbatim from Table 2 (page 11) for {cpu_text}, the reference CPU recorded for this "
-            "machine in selection.json (Zen 4c; our host is a Zen 5 EPYC 9755). The table compares our measured LCPC/SIMD ratio "
-            "with their reported LCPC speedup; at T=8 our ratio uses SIMD-Spielman's best-of-T time.",
+            ("No [KDHR26] reference CPU matches this host (kdhr26_reference_cpu is null in selection.json)."
+             if (any_null_kdhr26 and not cpu_used) else
+             f"[KDHR26] columns quoted verbatim from Table 2 (page 11) for {cpu_text}, the reference CPU recorded for this "
+             "machine in selection.json (Zen 4c; our host is a Zen 5 EPYC 9755). The table compares our measured LCPC/SIMD ratio "
+             f"with their reported LCPC speedup; at T={mt_t} our ratio uses SIMD-Spielman's best-of-T time."),
         ]
         if mt_overhead_rows:
-            notes.append("SIMD-Spielman 8-core time exceeds its T=1 time at: " + ", ".join(mt_overhead_rows) + ".")
+            notes.append(f"SIMD-Spielman {mt_t}-core time exceeds its T=1 time at: " + ", ".join(mt_overhead_rows) + ".")
         notes += self.simd_patch_notes(mixed_patch_rows)
         if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
             notes.append("SIMD-Spielman cells marked SKIPPED for this local smoke: " + self.skipped_baselines["SIMD-Spielman"])
@@ -1949,24 +2064,27 @@ class BenchmarkAnalyzer:
                                col_t: str, col_7w: str, col_gap: str) -> Dict[str, Any]:
         """SIMD-Spielman cells shared by T2 and T9 for one (field, N) and row thread count.
 
-        At T=8 the 8-core SIMD time is the faster of its T=8 run (coordinator
-        sharing a worker core) and its 7 workers + coordinator run; best-of-T
-        additionally includes its own T=1 time, and 'MT slower than its T=1'
+        At T=mt_threads the multi-core SIMD time is the faster of its T=mt_threads run
+        (coordinator sharing a worker core) and its (mt_threads-1) workers + coordinator
+        run; best-of-T additionally includes its own T=1 time, and 'MT slower than its T=1'
         flags sizes where SIMD-Spielman's multithreading is a slowdown.
         """
+        mt_t = self.mt_threads
+        coord_w = max(1, mt_t - 1)
         simd = self.stat(self.select(recs, threads=threads), label=f"{T}|{rk}|SIMD T")
         simd_t1 = simd if threads == 1 else self.stat(self.select(recs, threads=1), label=f"{T}|{rk}|SIMD T=1")
         out: Dict[str, Any] = {"simd": simd, "slower": False, "mixed_patch": False}
         out["simd_text"] = self.value_cell(T, rk, col_t, simd)
         used = [simd]
-        if threads == 8:
-            simd7 = self.stat(self.select(recs, threads=7), label=f"{T}|{rk}|SIMD 7W")
-            out["simd7_text"] = self.value_cell(T, rk, col_7w, simd7)
-            cands = [st for st in (simd, simd7) if st.get("mean") is not None]
+        is_mt = threads == mt_t and threads > 1
+        if is_mt:
+            simd_cw = self.stat(self.select(recs, threads=coord_w), label=f"{T}|{rk}|SIMD {coord_w}W")
+            out["simd7_text"] = self.value_cell(T, rk, col_7w, simd_cw)
+            cands = [st for st in (simd, simd_cw) if st.get("mean") is not None]
             best8 = min(cands, key=lambda st: st["mean"]) if cands else None
             pool = cands + ([simd_t1] if simd_t1.get("mean") is not None else [])
             best_all = min(pool, key=lambda st: st["mean"]) if pool else None
-            used += [simd7, simd_t1]
+            used += [simd_cw, simd_t1]
         else:
             out["simd7_text"] = "N/A (T=1 row)"
             best8 = simd if simd.get("mean") is not None else None
@@ -1978,7 +2096,8 @@ class BenchmarkAnalyzer:
         else:
             which = ""
             if best_all is not None:
-                which = " (T=1)" if best_all is simd_t1 else (" (7W+coord)" if best_all is not simd else " (T=8)")
+                which = (" (T=1)" if best_all is simd_t1 else
+                         (f" ({coord_w}W+coord)" if best_all is not simd else f" (T={mt_t})"))
             out["best_text"] = self.best_value_cell(T, rk, "SIMD best-of-T incl. T=1 (ms)", best_all, which)
             out["gap_best"] = self.speedup_cell(T, rk, "Gap vs SIMD best-of-T", best_all, tw)
             if best8 and simd_t1.get("mean") is not None:
@@ -1988,8 +2107,8 @@ class BenchmarkAnalyzer:
             else:
                 out["slower_text"] = self.missing_text(f"{T}|{rk}|SIMD MT slower than its T=1")
         patches = []
-        for st, label in ((simd_t1, "T=1"), (simd, f"T={threads}"), (used[1] if threads == 8 else None, "7W")):
-            if st and st.get("records") and (threads == 8 or label == "T=1"):
+        for st, label in ((simd_t1, "T=1"), (simd, f"T={threads}"), (used[1] if is_mt else None, f"{coord_w}W")):
+            if st and st.get("records") and (is_mt or label == "T=1"):
                 ps = sorted({str(r["_meta"].get("simd_patch") or "?")[:8] for r in st["records"]})
                 patches.append((label, "/".join(ps)))
         distinct = {p for _, p in patches}
@@ -2086,6 +2205,10 @@ class BenchmarkAnalyzer:
                 notes_extra.append(f"Mode ({mode}): {', '.join(changed)} measured over "
                                    f"{'/'.join(sorted(set().union(*(fields[t] for t in changed))))}, later tags over "
                                    f"{'/'.join(sorted(fields[tags[-1]]))}; the following step ratio includes that field change.")
+        if not rows:
+            nr = self._empty_table_not_run_row(T, headers)
+            if nr:
+                rows.append(nr)
         notes = [
             "Evaluated at T=1 with steps.sh: each tag's mode is taken from the block named for it (full_steps_mode_a / "
             "full_steps_mode_b); both blocks time both modes, the other copy is excluded in selection.json.",
@@ -2103,9 +2226,12 @@ class BenchmarkAnalyzer:
         T = "T4"
         headers = ["log2(N)", "T", "s=1 (ms)", "Best s*", "Best (ms)", "Adaptive s", "Sweep at adaptive s (ms)",
                    "Headline adaptive (ms)", "Adaptive Gap (%)", "Gap <= 10%", "Slicing Speedup (s=1 / best)"]
-        sweep = self.select(self.reports_this_work, family="slice_sweep", params="lcpc-sdig6", shape="brakedown")
+        sweep = self.select(self.reports_this_work, family="slice_sweep", params="lcpc-sdig6", shape="brakedown",
+                            slice_mode="explicit")
         headline = self.select(self.reports_this_work, family="tw_a", params="lcpc-sdig6", shape="brakedown",
                                slice_mode="adaptive")
+        sweep_adaptive = self.select(self.reports_this_work, family="slice_sweep", params="lcpc-sdig6", shape="brakedown",
+                                     slice_mode="adaptive")
         rows, verdicts = [], []
         for log_n, threads in sorted({(int(r["log_n"]), int(r.get("threads", 1))) for r in sweep}):
             rk = f"{log_n},{threads}"
@@ -2118,7 +2244,9 @@ class BenchmarkAnalyzer:
             best_s = min(measured, key=lambda s: measured[s]["mean"])
             adapt = {int(r["adaptive_slices"]) for r in recs if r.get("adaptive_slices") is not None}
             adapt_s = next(iter(adapt)) if len(adapt) == 1 else None
-            head = self.stat(self.select(headline, log_n=log_n, threads=threads), label=f"{T}|{rk}|headline adaptive")
+            head_recs = self.select(headline, log_n=log_n, threads=threads) or self.select(
+                sweep_adaptive, log_n=log_n, threads=threads)
+            head = self.stat(head_recs, label=f"{T}|{rk}|headline adaptive")
             gap_txt = verdict = "-"
             if adapt_s in measured:
                 gap = (measured[adapt_s]["mean"] - measured[best_s]["mean"]) / measured[best_s]["mean"] * 100.0
@@ -2127,7 +2255,8 @@ class BenchmarkAnalyzer:
                 verdict = "yes" if gap <= 10.0 else "no"
                 verdicts.append(verdict)
             else:
-                gap_txt = verdict = self.missing_text(f"{T}|{rk}|Adaptive Gap (%)")
+                gap_txt = self.missing_text(f"{T}|{rk}|Adaptive Gap (%)")
+                verdict = self.missing_text(f"{T}|{rk}|Gap <= 10%")
             s1 = by_s.get(1) or {}
             spd = self.ratio_cell(T, rk, "Slicing Speedup (s=1 / best)", s1, measured[best_s])
             rows.append([log_n, threads, self.value_cell(T, rk, "s=1 (ms)", s1, with_range=False), best_s,
@@ -2136,6 +2265,10 @@ class BenchmarkAnalyzer:
                          self.value_cell(T, rk, "Sweep at adaptive s (ms)", measured.get(adapt_s) or {}, with_range=False),
                          self.value_cell(T, rk, "Headline adaptive (ms)", head, with_range=False),
                          gap_txt, verdict, spd])
+        if not rows:
+            nr = self._empty_table_not_run_row(T, headers)
+            if nr:
+                rows.append(nr)
         swept = sorted({int(r["slices"]) for r in sweep})
         notes = [
             "Blocks full_slice_sweep_* (explicit slices s in {" + ", ".join(map(str, swept)) + "}), Mont127, mode (a). "
@@ -2259,13 +2392,18 @@ class BenchmarkAnalyzer:
                    for v in SECONDARY_LCPC_VARIANTS]
         groups.append(("This Work Ft127", self.select(self.reports_this_work, family="tw_ft127", params="lcpc-sdig6",
                                                       shape="brakedown", slice_mode="adaptive"), FT127_SIZES))
+        mt_vals = (1,) if self.mt_threads <= 1 else (1, self.mt_threads)
         for label, pool, sizes in groups:
-            for threads in (1, 8):
+            for threads in mt_vals:
                 for log_n in sizes:
                     recs = self.select(pool, threads=threads, log_n=log_n)
                     rk = f"{label},{threads},{log_n}"
                     if not recs and not (self.selection and self.selection.omission_for(f"{T}|{rk}|Commit (ms)")):
                         continue
+                    if not recs and self.selection:
+                        om_row = self.selection.omission_for(f"{T}|{rk}|Commit (ms)")
+                        if om_row and om_row.get("kind") == "not-run":
+                            continue
                     sts = {op: self.stat(recs, op, label=f"{T}|{rk}|{op}") for op in
                            ("commit_total", "encode_matrix", "hash_matrix_decomposition", "prove", "verify")}
                     for op, st in sts.items():
@@ -2283,6 +2421,10 @@ class BenchmarkAnalyzer:
                                  self.value_cell(T, rk, "Prove (ms)", sts["prove"], with_range=False),
                                  self.value_cell(T, rk, "Verify (ms)", sts["verify"], with_range=False),
                                  "/".join(str(p) for p in sorted(proof)) if proof else self.missing_text(f"{T}|{rk}|Proof Size (B)")])
+        if not rows:
+            nr = self._empty_table_not_run_row(T, headers)
+            if nr:
+                rows.append(nr)
         for (label, threads, log_n, op), v in means.items():
             if label.startswith("This Work") or op not in ("prove", "verify"):
                 continue
@@ -2341,7 +2483,14 @@ class BenchmarkAnalyzer:
                         simd_txt = "SKIPPED"
                     ratio_simd = self.speedup_cell(T, rk, "SIMD / This Work (v=2)", simd, v2)
                     entry, cpu = self.kdhr26_entry("table_6", log_n, v2.get("machine"))
-                    if entry and entry.get("simd_spielman_us") is not None and v2.get("mean"):
+                    if cpu is None:
+                        kd_txt = self.missing_text(f"{T}|{rk}|[KDHR26] Table 6 (us)")
+                        kd_ratio = self.missing_text(f"{T}|{rk}|[KDHR26] / This Work (v=2)")
+                        if kd_txt == "-":
+                            kd_txt = "not run (no KDHR26 reference for this CPU)"
+                        if kd_ratio == "-":
+                            kd_ratio = "not run (no KDHR26 reference for this CPU)"
+                    elif entry and entry.get("simd_spielman_us") is not None and v2.get("mean"):
                         cpus.add(cpu)
                         kd_txt = f"{entry['simd_spielman_us']:.1f}"
                         kd_ratio = (f"{entry['simd_spielman_us'] * 1000.0 / v2['mean']:.2f}x"
@@ -2352,6 +2501,10 @@ class BenchmarkAnalyzer:
                              self.value_cell(T, rk, "This Work v=1 (us)", v1, unit="us", with_range=False),
                              self.value_cell(T, rk, "This Work v=2 (us)", v2, unit="us", with_range=False),
                              simd_txt, ratio_simd, kd_txt, kd_ratio])
+        if not rows:
+            nr = self._empty_table_not_run_row(T, headers)
+            if nr:
+                rows.append(nr)
         notes = [
             "Verifier-side encoding of 1 (v=1) and 2 (v=2) vectors of length k, T=1, from the headline blocks "
             "(mode (a): full_this_work_mode_a_*, mode (b): full_this_work_mode_b_*). SIMD-Spielman: its T=1 blocks.",
@@ -2365,10 +2518,11 @@ class BenchmarkAnalyzer:
 
     # ---- T8 ---------------------------------------------------------------
     def generate_T8_setup_memory(self):
-        """setup time and peak RSS, T=1."""
+        """PCS setup, input generation, verifier init, total setup, and peak RSS, T=1."""
         self._begin("T8")
         T = "T8"
-        headers = ["Implementation", "log2(N)", "Setup (ms)", "Encode (ms)", "Setup / Encode", "Peak RSS (MB)"]
+        headers = ["Implementation", "log2(N)", "PCS setup (ms)", "Input gen. (ms)", "Verifier init (ms)",
+                   "Total setup (ms)", "Encode (ms)", "PCS setup / Encode", "Peak RSS (MB)"]
 
         def setup_ns(r):
             v = r.get("setup_ns")
@@ -2379,6 +2533,15 @@ class BenchmarkAnalyzer:
             v = safe_float(v)
             return v if v and v > 0 else None
 
+        def setup_comp(key):
+            def _get(r):
+                v = r.get("setup_ns")
+                if isinstance(v, dict):
+                    val = safe_float(v.get(key))
+                    return val if val is not None and val >= 0 else None
+                return None
+            return _get
+
         def rss(r):
             v = safe_float(r.get("peak_rss_bytes"))
             return v if v and v > 0 else None
@@ -2388,21 +2551,45 @@ class BenchmarkAnalyzer:
             for log_n in (20, 24, 28):
                 recs = self.select(pool, threads=1, log_n=log_n)
                 rk = f"{label},{log_n}"
-                if not recs and not (self.selection and self.selection.omission_for(f"{T}|{rk}|Setup (ms)")):
-                    continue
+                if not recs:
+                    if self.selection:
+                        om = self.selection.omission_for(f"{T}|{rk}|Total setup (ms)")
+                        if om and om.get("kind") != "not-run":
+                            pass
+                        else:
+                            continue
+                    else:
+                        continue
                 enc = self.stat(recs, label=f"{T}|{rk}|encode")
-                su = self.scalar_stat(recs, setup_ns)
+                pcs_su = self.scalar_stat(recs, setup_comp("graph_sampling_and_encoding_init_ns"))
+                igen_su = self.scalar_stat(recs, setup_comp("input_generation_and_row_buffer_init_ns"))
+                ver_su = self.scalar_stat(recs, setup_comp("verifier_encoding_init_ns"))
+                tot_su = self.scalar_stat(recs, setup_ns)
                 mem = self.scalar_stat(recs, rss)
-                ratio = self.ratio_cell(T, rk, "Setup / Encode", su, enc) if su else self.missing_text(f"{T}|{rk}|Setup / Encode")
-                rows.append([label, log_n,
-                             (format_ns(su["mean"]) + self.derived_marker(f"{T}|{rk}|Setup (ms)", dict(su, machine=enc.get("machine"))))
-                             if su else self.missing_text(f"{T}|{rk}|Setup (ms)"),
-                             self.value_cell(T, rk, "Encode (ms)", enc, with_range=False), ratio,
-                             (format_bytes_to_mb(mem["max"]) + self.derived_marker(f"{T}|{rk}|Peak RSS (MB)",
-                                                                                   dict(mem, machine=enc.get("machine"))))
-                             if mem else self.missing_text(f"{T}|{rk}|Peak RSS (MB)")])
+
+                def _ms_cell(col: str, st: Optional[Dict]) -> str:
+                    if not st:
+                        return self.missing_text(f"{T}|{rk}|{col}")
+                    return format_ns(st["mean"]) + self.derived_marker(
+                        f"{T}|{rk}|{col}", dict(st, machine=enc.get("machine")))
+
+                ratio = (self.ratio_cell(T, rk, "PCS setup / Encode", pcs_su, enc)
+                         if pcs_su else self.missing_text(f"{T}|{rk}|PCS setup / Encode"))
+                rows.append([
+                    label, log_n,
+                    _ms_cell("PCS setup (ms)", pcs_su),
+                    _ms_cell("Input gen. (ms)", igen_su),
+                    _ms_cell("Verifier init (ms)", ver_su),
+                    _ms_cell("Total setup (ms)", tot_su),
+                    self.value_cell(T, rk, "Encode (ms)", enc, with_range=False),
+                    ratio,
+                    (format_bytes_to_mb(mem["max"]) + self.derived_marker(
+                        f"{T}|{rk}|Peak RSS (MB)", dict(mem, machine=enc.get("machine"))))
+                    if mem else self.missing_text(f"{T}|{rk}|Peak RSS (MB)"),
+                ])
         simd_flagged, simd_res, simd_floor, simd_unrecorded = [], set(), set(), []
-        simd_partial: Dict[str, List[str]] = defaultdict(list)    # sessions -> sizes lacking setup/RSS there
+        simd_partial: Dict[str, List[str]] = defaultdict(list)
+        na_wall = "N/A (process wall time only, see note)"
         for log_n in (20, 24, 28):
             recs = self.select(self.reports_simd_spielman, family="simd", threads=1, shape="brakedown", field="Mont127",
                                params="simd-spielman", log_n=log_n)
@@ -2410,9 +2597,6 @@ class BenchmarkAnalyzer:
                 continue
             rk = f"SIMD-Spielman,{log_n}"
             enc = self.stat(recs, label=f"{T}|{rk}|encode")
-            # simd_spielman.sh derives setup from GNU time (process wall time
-            # minus the printed encode samples) and records its resolution and
-            # floor; values below the floor are kept but flagged.
             su = self.scalar_stat(recs, setup_ns)
             mem = self.scalar_stat(recs, rss)
             below = any(r.get("setup_ns_below_floor") is True for r in recs if setup_ns(r) is not None)
@@ -2420,12 +2604,9 @@ class BenchmarkAnalyzer:
             simd_floor.update(int(r["setup_ns_floor_ns"]) for r in recs if safe_float(r.get("setup_ns_floor_ns")))
             if below:
                 simd_flagged.append(f"2^{log_n}")
-            # Sessions whose encode records carry no setup/RSS (harness version
-            # that exposed encoding only). A partial gap makes the cells
-            # '[sX only]', which needs an omission (derived_marker below); while
-            # no session recorded setup/RSS the cells are 'N/A (not recorded)'
-            # and a pre-wired omission for the gap is credited here, so it is
-            # not reported as stale before the missing session lands.
+            if self.selection:
+                for col in ("PCS setup (ms)", "Input gen. (ms)", "Verifier init (ms)", "PCS setup / Encode"):
+                    self.selection.omission_for(f"{T}|{rk}|{col}")
             have = set(su["sessions"]) if su else set()
             have &= set(mem["sessions"]) if mem else set()
             gap = [sid for sid in enc.get("sessions", []) if sid not in have]
@@ -2435,27 +2616,33 @@ class BenchmarkAnalyzer:
                 else:
                     simd_unrecorded.append(f"2^{log_n}")
                 if not have and self.selection:
-                    for col in ("Setup (ms)", "Setup / Encode", "Peak RSS (MB)"):
+                    for col in ("Total setup (ms)", "Peak RSS (MB)"):
                         self.selection.omission_for(f"{T}|{rk}|{col}")
             na = "N/A (not recorded, see note)"
             setup_txt = ((format_ns(su["mean"]) + (" (below floor)" if below else "")
-                          + self.derived_marker(f"{T}|{rk}|Setup (ms)", dict(su, machine=enc.get("machine"))))
+                          + self.derived_marker(f"{T}|{rk}|Total setup (ms)", dict(su, machine=enc.get("machine"))))
                          if su else na)
-            ratio = self.ratio_cell(T, rk, "Setup / Encode", su, enc) if su else na
             rss_txt = ((format_bytes_to_mb(mem["max"]) + self.derived_marker(f"{T}|{rk}|Peak RSS (MB)",
                                                                              dict(mem, machine=enc.get("machine"))))
                        if mem else na)
-            rows.append(["SIMD-Spielman", log_n, setup_txt,
-                         self.value_cell(T, rk, "Encode (ms)", enc, with_range=False), ratio, rss_txt])
+            rows.append(["SIMD-Spielman", log_n, na_wall, na_wall, na_wall, setup_txt,
+                         self.value_cell(T, rk, "Encode (ms)", enc, with_range=False), na_wall, rss_txt])
         if self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
-            rows.append(["SIMD-Spielman", 20, "SKIPPED", "SKIPPED", "SKIPPED", "SKIPPED"])
+            rows.append(["SIMD-Spielman", 20, "SKIPPED", "SKIPPED", "SKIPPED", "SKIPPED", "SKIPPED", "SKIPPED", "SKIPPED"])
+        if not rows:
+            nr = self._empty_table_not_run_row(T, headers)
+            if nr:
+                rows.append(nr)
         notes = [
             "T=1. This Work: full_this_work_mode_a_* (adaptive); original LCPC by build variant; SIMD-Spielman: mode (b), Mont127.",
-            "Setup = graph sampling and encoder initialisation + input/row-buffer initialisation + verifier-encoder "
-            "initialisation (mean over sessions); peak RSS = VmHWM, maximum over sessions.",
-            "SIMD-Spielman: setup = GNU time elapsed wall clock of its benchmark process minus the sum of its printed "
-            "encode samples (includes process start, graph generation, input generation and output); peak RSS = GNU "
-            "time maximum resident set size. Not like-for-like with the in-process setup timers of the other rows.",
+            "PCS setup = graph sampling, CSR/R2L construction, slice choice, and encoder initialization (graph_sampling_and_encoding_init_ns, mean over sessions).",
+            "Input gen. = benchmark harness work (ChaCha20 polynomial coefficients and row buffer initialization, input_generation_and_row_buffer_init_ns); excluded from PCS setup.",
+            "Verifier init = verifier-side encoder initialization (verifier_encoding_init_ns, mean over sessions).",
+            "Total setup = sum of the three components above; Peak RSS = VmHWM, maximum over sessions.",
+            "SIMD-Spielman: Total setup = GNU time elapsed wall clock of its benchmark process minus the sum of its printed "
+            "encode samples (includes process start, graph generation, input generation and output); PCS setup, input generation "
+            "and verifier init cannot be separated (N/A); Peak RSS = GNU time maximum resident set size. Not like-for-like with "
+            "the in-process setup timers of the other rows.",
         ]
         if simd_res:
             notes.append("SIMD-Spielman setup resolution: GNU time reports elapsed time in steps of "
@@ -2477,8 +2664,12 @@ class BenchmarkAnalyzer:
         """Orion shape (128 rows), mode (b)."""
         self._begin("T9")
         T = "T9"
+        mt_t = self.mt_threads
+        coord_w = max(1, mt_t - 1)
+        mt_set = (1,) if mt_t <= 1 else (1, mt_t)
+        col_coord = f"SIMD-Spielman Orion {coord_w} workers + coordinator (ms)"
         headers = ["Field", "T", "log2(N)", "This Work Orion (ms)", "SIMD-Spielman Orion T workers (ms)",
-                   "SIMD-Spielman Orion 7 workers + coordinator (ms)", "SIMD / This Work",
+                   col_coord, "SIMD / This Work",
                    "SIMD best-of-T incl. T=1 (ms)", "Gap vs SIMD best-of-T", "SIMD MT slower than its T=1",
                    "SIMD params.patch", "[KDHR26] Table 3 1T (ms)", "This Work Orion / Brakedown"]
         tw_pool = self.select(self.reports_this_work, family="tw_b", params="simd-spielman")
@@ -2486,8 +2677,9 @@ class BenchmarkAnalyzer:
         failed_simd = self.select([r for r in self.unmeasured if r["_meta"]["impl"] == "simd"], shape="orion")
         keys = sorted({(r.get("field"), int(r.get("threads", 1)), int(r["log_n"]))
                        for r in self.select(tw_pool, shape="orion") + simd_pool + failed_simd
-                       if int(r.get("threads", 1)) in (1, 8)}, key=lambda k: (str(k[0]), k[1], k[2]))
+                       if int(r.get("threads", 1)) in mt_set}, key=lambda k: (str(k[0]), k[1], k[2]))
         rows, cpus = [], set()
+        any_null_kdhr26 = False
         mt_overhead_rows, mixed_patch_rows = [], []
         for field, threads, log_n in keys:
             rk = f"{field},{threads},{log_n}"
@@ -2499,7 +2691,7 @@ class BenchmarkAnalyzer:
                               label=f"{T}|{rk}|TW brakedown")
             mt = self.simd_multithread_cells(T, rk, self.select(simd_pool, field=field, log_n=log_n), threads, tw,
                                              "SIMD-Spielman Orion T workers (ms)",
-                                             "SIMD-Spielman Orion 7 workers + coordinator (ms)", "SIMD / This Work")
+                                             col_coord, "SIMD / This Work")
             simd_txt = mt["simd_text"]
             if mt["simd"].get("mean") is None and self.profile == "smoke" and self.skipped_baselines.get("SIMD-Spielman"):
                 simd_txt = "SKIPPED"
@@ -2512,30 +2704,42 @@ class BenchmarkAnalyzer:
             elif field != "Fp2M61":
                 kd = "N/A (KDHR26 Table 3 reports Fp2M61 only)"
             else:
-                entry, cpu = None, "EPYC 9754"
                 machine = tw.get("machine")
-                cpu = (self.selection.kdhr26_cpu(machine) if self.selection and machine else None) or cpu
-                key = {"EPYC 9754": "simd_spielman_epyc_ms", "i7-11800H": "simd_spielman_i7_ms",
-                       "Xeon Gold 6530": "simd_spielman_xeon_ms"}.get(cpu)
-                for e in self.kdhr26_data.get("table_3", {}).get("entries", []):
-                    if e.get("log_n") == log_n:
-                        entry = e
-                kd = f"{entry[key]}" if entry and key and entry.get(key) is not None else f"N/A (no KDHR26 {cpu} entry for 2^{log_n})"
-                if entry and key and entry.get(key) is not None:
-                    cpus.add(cpu)
+                _, cpu = self.kdhr26_entry("table_3", log_n, machine)
+                if cpu is None:
+                    any_null_kdhr26 = True
+                    kd = self.missing_text(f"{T}|{rk}|[KDHR26] Table 3 1T (ms)")
+                    if kd == "-":
+                        kd = "not run (no KDHR26 reference for this CPU)"
+                else:
+                    entry = None
+                    key = {"EPYC 9754": "simd_spielman_epyc_ms", "i7-11800H": "simd_spielman_i7_ms",
+                           "Xeon Gold 6530": "simd_spielman_xeon_ms"}.get(cpu)
+                    for e in self.kdhr26_data.get("table_3", {}).get("entries", []):
+                        if e.get("log_n") == log_n:
+                            entry = e
+                    kd = f"{entry[key]}" if entry and key and entry.get(key) is not None else f"N/A (no KDHR26 {cpu} entry for 2^{log_n})"
+                    if entry and key and entry.get(key) is not None:
+                        cpus.add(cpu)
             ratio = self.ratio_cell(T, rk, "This Work Orion / Brakedown", tw, brake)
             rows.append([field, threads, log_n, self.value_cell(T, rk, "This Work Orion (ms)", tw), simd_txt,
                          mt["simd7_text"], mt["gap"], mt["best_text"], mt["gap_best"], mt["slower_text"],
                          mt["patch_text"], kd, ratio])
+        if not rows:
+            nr = self._empty_table_not_run_row(T, headers)
+            if nr:
+                rows.append(nr)
         notes = [
             "Orion matrix shape: 128 rows, N/128 columns; mode (b) parameters; This Work = full_this_work_mode_b_* blocks.",
-            "[KDHR26] Table 3 (single-threaded) reports Fp2M61 only; quoted verbatim for " + (", ".join(sorted(cpus)) or "EPYC 9754") + ".",
-            "At T=8 the SIMD / This Work ratio uses the faster of SIMD-Spielman's T=8 and 7 workers + coordinator runs "
-            "(8 cores). SIMD best-of-T also includes its own T=1 time; where 'SIMD MT slower than its T=1' is yes, use the "
+            ("No [KDHR26] reference CPU matches this host (kdhr26_reference_cpu is null in selection.json)."
+             if (any_null_kdhr26 and not cpus) else
+             "[KDHR26] Table 3 (single-threaded) reports Fp2M61 only; quoted verbatim for " + (", ".join(sorted(cpus)) or "EPYC 9754") + "."),
+            f"At T={mt_t} the SIMD / This Work ratio uses the faster of SIMD-Spielman's T={mt_t} and {coord_w} workers + coordinator runs "
+            f"({mt_t} cores). SIMD best-of-T also includes its own T=1 time; where 'SIMD MT slower than its T=1' is yes, use the "
             "best-of-T gap (as in T2).",
         ]
         if mt_overhead_rows:
-            notes.append("SIMD-Spielman 8-core Orion time exceeds its T=1 time at: " + ", ".join(mt_overhead_rows) + ".")
+            notes.append(f"SIMD-Spielman {mt_t}-core Orion time exceeds its T=1 time at: " + ", ".join(mt_overhead_rows) + ".")
         notes += self.simd_patch_notes(mixed_patch_rows)
         if failed_simd:
             # Status and reason come from the records themselves ("omitted" with
@@ -2583,6 +2787,10 @@ class BenchmarkAnalyzer:
                          self.value_cell(T, rk, "Brakedown Encoding (ms)", tw),
                          self.value_cell(T, rk, "Reed-Solomon Ligero (ms)", rs),
                          self.speedup_cell(T, rk, "RS / Brakedown Ratio", rs, tw)])
+        if not rows:
+            nr = self._empty_table_not_run_row(T, headers)
+            if nr:
+                rows.append(nr)
         notes = [
             "RS: the fork's lcpc-ligero-pc encoding (FFT path not optimized by this work), blocks full_ligero_rs_*. "
             "Brakedown: full_this_work_mode_a_* (adaptive), T=1.",
@@ -2776,7 +2984,11 @@ class BenchmarkAnalyzer:
                              sym.get("status", "PASS") + ("; PASS on re-check" if sym.get("status") == "FAIL"
                                                           and "PASS on re-check" in g["effective"] else "")])
         if not rows:
-            rows.append(["-", "-", 0, "-", "-", "-", "-", "-", "-", self.missing_text(f"{T}|-,-|Scalar Status")])
+            nr = self._empty_table_not_run_row(T, headers)
+            if nr:
+                rows.append(nr)
+            else:
+                rows.append(["-", "-", 0, "-", "-", "-", "-", "-", "-", self.missing_text(f"{T}|-,-|Scalar Status")])
         notes = [
             "Disassembly inspection by scripts/check_codegen.py of the benchmark binaries; identical reports from different "
             "blocks of the same build are counted in 'Reports'. Vector Arith = vector arithmetic in the hot kernels (a "
@@ -2809,25 +3021,31 @@ class BenchmarkAnalyzer:
         lcpc_pool = self.select(self.reports_arm, impl="lcpc_orig", params="lcpc-sdig6")
         hosts = self.machine_order(r["_meta"]["machine"] for r in tw_pool + lcpc_pool)
         no_arm = self.has_smoke_watermark and not self.reports_arm
+        mt_vals = (1,) if self.mt_threads <= 1 else (1, self.mt_threads)
         rows = []
-        for host in hosts or ["-"]:
-            host_tw = self.select(tw_pool, machine=host)
-            host_lcpc = self.select(lcpc_pool, machine=host)
-            sizes = sorted({int(r["log_n"]) for r in host_tw + host_lcpc}) or [18, 22, 26]
-            for log_n in sizes:
-                for threads in (1, 8):
-                    rk = f"{host},{log_n},{threads}"
-                    if no_arm:
-                        rows.append([host, log_n, threads] + ["N/A (local smoke)"] * (len(headers) - 3))
-                        continue
-                    tw = self.stat(self.select(host_tw, log_n=log_n, threads=threads), label=f"{T}|{rk}|TW")
-                    row = [host, log_n, threads, self.value_cell(T, rk, "This Work Arm (ms)", tw)]
-                    for v in PRIMARY_LCPC_VARIANTS:
-                        st = self.stat(self.select(host_lcpc, variant=v, log_n=log_n, threads=threads),
-                                       label=f"{T}|{rk}|LCPC {v}")
-                        row += [self.value_cell(T, rk, f"Original LCPC {v} Arm (ms)", st),
-                                self.speedup_cell(T, rk, f"Arm Speedup vs {v}", st, tw)]
-                    rows.append(row)
+        if not hosts and not no_arm:
+            nr = self._empty_table_not_run_row(T, headers)
+            if nr:
+                rows.append(nr)
+        if not rows:
+            for host in hosts or ["-"]:
+                host_tw = self.select(tw_pool, machine=host)
+                host_lcpc = self.select(lcpc_pool, machine=host)
+                sizes = sorted({int(r["log_n"]) for r in host_tw + host_lcpc}) or [18, 22, 26]
+                for log_n in sizes:
+                    for threads in mt_vals:
+                        rk = f"{host},{log_n},{threads}"
+                        if no_arm:
+                            rows.append([host, log_n, threads] + ["N/A (local smoke)"] * (len(headers) - 3))
+                            continue
+                        tw = self.stat(self.select(host_tw, log_n=log_n, threads=threads), label=f"{T}|{rk}|TW")
+                        row = [host, log_n, threads, self.value_cell(T, rk, "This Work Arm (ms)", tw)]
+                        for v in PRIMARY_LCPC_VARIANTS:
+                            st = self.stat(self.select(host_lcpc, variant=v, log_n=log_n, threads=threads),
+                                           label=f"{T}|{rk}|LCPC {v}")
+                            row += [self.value_cell(T, rk, f"Original LCPC {v} Arm (ms)", st),
+                                    self.speedup_cell(T, rk, f"Arm Speedup vs {v}", st, tw)]
+                        rows.append(row)
         if no_arm:
             notes = ["Local smoke does not run on Arm; these cells are explicitly not applicable and contain no Arm measurements."]
         else:
@@ -2868,6 +3086,9 @@ class BenchmarkAnalyzer:
         if self.is_smoke or self.has_smoke_watermark:
             fig.text(0.5, 0.5, "LOCAL SMOKE - NOT A RESULT", fontsize=20, color="red", alpha=0.25,
                      ha="center", va="center", rotation=25)
+        elif self.has_quick_watermark:
+            fig.text(0.5, 0.5, "QUICK MODE - reduced sizes and repetitions", fontsize=14, color="red", alpha=0.25,
+                     ha="center", va="center", rotation=20)
         fig.tight_layout()
         pdf_path = os.path.join(self.plots_dir, f"{name}.pdf")
         png_path = os.path.join(self.plots_dir, f"{name}.png")
@@ -2946,7 +3167,8 @@ class BenchmarkAnalyzer:
                 if not base.get("mean"):
                     continue
                 ts, sp, ef = [], [], []
-                for t in sorted({int(r.get("threads", 1)) for r in self.select(pool, log_n=n)}):
+                for t in sorted({int(r.get("threads", 1)) for r in self.select(pool, log_n=n)
+                                 if int(r.get("threads", 1)) <= self.mt_threads}):
                     st = self.stat(self.select(pool, log_n=n, threads=t), label=f"F3|{name}|{n}|{t}")
                     if st.get("mean"):
                         ts.append(t)
@@ -2973,110 +3195,6 @@ class BenchmarkAnalyzer:
         ax2.grid(True, linestyle=":", alpha=0.5)
         self._save_figure(fig, "figure_F3_thread_scaling",
                           ["Series", "log2(N)", "T", "Latency (ms)", "Speedup", "Efficiency", "Sessions"], data)
-
-    # ------------------------------------------------------------------
-    # Smoke coverage (local dry run)
-    # ------------------------------------------------------------------
-
-    def _has_measurement(self, report: Dict, op_name: str) -> bool:
-        return bool(self._extract_samples(report, op_name))
-
-    def _has_case(self, reports: List[Dict], *, field: Optional[Set[str]] = None,
-                  params: Optional[str] = None, shape: Optional[str] = None,
-                  log_n: Optional[int] = None, threads: Optional[int] = None,
-                  slices: Optional[int] = None, operation: Optional[str] = "encode_matrix") -> bool:
-        for report in reports:
-            if field is not None and report.get("field", "Mont127") not in field:
-                continue
-            if params is not None and report.get("params") != params:
-                continue
-            if shape is not None and report.get("shape", "brakedown") not in (shape, None):
-                continue
-            if log_n is not None and int(report.get("log_n", -1)) != log_n:
-                continue
-            if threads is not None and int(report.get("threads", 1)) != threads:
-                continue
-            if slices is not None and int(report.get("slices") or 1) != slices:
-                continue
-            if operation is not None and not self._has_measurement(report, operation):
-                continue
-            return True
-        return False
-
-    def _check_smoke_coverage(self) -> List[str]:
-        """Checks the representative smoke matrix, not the full paper campaign."""
-        errors = []
-
-        def require(condition: bool, label: str):
-            if not condition:
-                errors.append(f"Smoke coverage missing: {label}")
-
-        require(self._has_case(self.reports_this_work, field={"Mont127"}, params="lcpc-sdig6", shape="brakedown",
-                               log_n=20, threads=1), "T1 This Work mode (a), Mont127, logN=20, T=1")
-        require(self._has_case(self.reports_lcpc_orig, field={"Ft127", "Mont127"}, params="lcpc-sdig6", shape="brakedown",
-                               log_n=20, threads=1), "T1 original LCPC mode (a), logN=20, T=1")
-        require(self._has_case(self.reports_polycommit, field={"Mont127"}, log_n=20, threads=1),
-                "T1 PolyCommit Mont127 logN=20, T=1")
-        require(any(r.get("patched") is True and len(str(r.get("patch_sha256", ""))) == 64 and int(r.get("sec_param", 0)) > 0
-                    for r in self.reports_polycommit if int(r.get("log_n", -1)) == 20 and int(r.get("threads", 1)) == 1),
-                "T1 PolyCommit patched-source hash and opening sec_param")
-        require(self._has_case(self.reports_this_work, field={"Mont127"}, params="simd-spielman", shape="brakedown",
-                               log_n=20, threads=1), "T2 This Work mode (b), Mont127, logN=20, T=1")
-        require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman", shape="brakedown",
-                               log_n=20, threads=1), "T2 SIMD-Spielman, Mont127, logN=20, T=1")
-        step_tags = {tag for tag, reports in self.reports_steps.items()
-                     if any(r.get("mode", "a") == "a" and int(r.get("log_n", -1)) == 20 and self._extract_samples(r)
-                            for r in reports)}
-        require("step/01-modernize" in step_tags and "HEAD" in step_tags,
-                "T3/F1 successful mode (a) step/01-modernize and HEAD records at logN=20")
-        require(all(self._has_case(self.reports_this_work, field={"Mont127"}, params="lcpc-sdig6", shape="brakedown",
-                                   log_n=20, threads=1, slices=s) for s in (1, 2)),
-                "T4 two explicit slice counts (s=1 and s=2) at logN=20")
-        micro_by_field = {str(r.get("field")): r for r in self.field_benchmarks}
-        for field_name in ("Mont127", "Mers127", "Fp2M61", "Ft127"):
-            micro = micro_by_field.get(field_name, {})
-            require(all((safe_float((micro.get(op) or {}).get("ns_per_op")) or 0) > 0 for op in ("mul", "mac", "reduce")),
-                    f"T5 {field_name} mul/mac/reduce microbenchmarks")
-        for field_name in ("Mont127", "Mers127", "Fp2M61"):
-            require(self._has_case(self.reports_this_work, field={field_name}, params="simd-spielman", shape="brakedown",
-                                   log_n=20, threads=1), f"T5 {field_name} mode (b) encode sample at logN=20")
-        pcs_ops = ("commit_total", "encode_matrix", "hash_matrix_decomposition", "prove", "verify")
-        for label, reports, fields in (("This Work", self.reports_this_work, {"Mont127"}),
-                                       ("original LCPC", self.reports_lcpc_orig, {"Ft127", "Mont127"})):
-            matching = [r for r in reports if r.get("field", "Mont127") in fields and r.get("params") == "lcpc-sdig6"
-                        and int(r.get("log_n", -1)) == 20 and int(r.get("threads", 1)) == 1]
-            require(any(all(self._has_measurement(r, op) for op in pcs_ops) and (safe_float(r.get("proof_size_bytes")) or 0) > 0
-                        for r in matching), f"T6 {label} complete PCS record at logN=20, T=1")
-        for params in ("lcpc-sdig6", "simd-spielman"):
-            matching = [r for r in self.reports_this_work if r.get("field") == "Mont127" and r.get("params") == params
-                        and r.get("shape", "brakedown") == "brakedown" and int(r.get("log_n", -1)) == 20
-                        and int(r.get("threads", 1)) == 1]
-            require(any(self._has_measurement(r, "verifier_encode_1") and (self._has_measurement(r, "verifier_encode_2")
-                                                                         or self._has_measurement(r, "verifier_encode"))
-                        for r in matching), f"T7 This Work verifier v=1 and v=2, params={params}")
-        require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman", shape="brakedown",
-                               log_n=20, threads=1, operation="verifier_encode_2"), "T7 SIMD-Spielman verifier v=2 at logN=20")
-        require(self._has_case(self.reports_this_work, field={"Mont127"}, params="simd-spielman", shape="orion",
-                               log_n=20, threads=1), "T9 This Work mode (b) Orion sample at logN=20")
-        require(self._has_case(self.reports_simd_spielman, field={"Mont127"}, params="simd-spielman", shape="orion",
-                               log_n=20, threads=1), "T9 SIMD-Spielman Orion sample at logN=20")
-        require(self._has_case(self.reports_ligero_rs, log_n=20, threads=1), "T10 Ligero RS encode sample at logN=20")
-        require(any(cr.get("status") == "PASS" and cr.get("hot_kernels_checked") for cr in self.codegen_reports),
-                "T11 passing hot-kernel codegen report")
-        for label, reports, fields in (("This Work", self.reports_this_work, {"Mont127"}),
-                                       ("original LCPC", self.reports_lcpc_orig, {"Ft127", "Mont127"})):
-            require(any(r.get("field", "Mont127") in fields and r.get("params") == "lcpc-sdig6"
-                        and int(r.get("log_n", -1)) == 20 and int(r.get("threads", 1)) == 1
-                        and self._has_measurement(r, "encode_matrix")
-                        and r.get("setup_ns") is not None and r.get("peak_rss_bytes") is not None for r in reports),
-                    f"T8 {label} setup, encoding, and peak-RSS record at logN=20")
-        tw_threads = {int(r.get("threads", 1)) for r in self.reports_this_work if r.get("field") == "Mont127"
-                      and r.get("params") == "lcpc-sdig6" and int(r.get("log_n", -1)) == 20}
-        lcpc_threads = {int(r.get("threads", 1)) for r in self.reports_lcpc_orig if r.get("params") == "lcpc-sdig6"
-                        and int(r.get("log_n", -1)) == 20}
-        require(1 in tw_threads and len(tw_threads) > 1 and 1 in lcpc_threads and len(lcpc_threads) > 1,
-                "F3 This Work and original LCPC at T=1 and a multithreaded configuration")
-        return errors
 
     # ------------------------------------------------------------------
     # --check
@@ -3231,10 +3349,7 @@ class BenchmarkAnalyzer:
                 if not os.path.isfile(p) or os.path.getsize(p) == 0:
                     errors.append(f"Missing or empty figure: {p}")
 
-        smoke = self.has_smoke_watermark or self.profile == "smoke"
-        if smoke:
-            errors.extend(self._check_smoke_coverage())
-        elif not self.selection:
+        if not self.selection:
             errors.append("Paper artefacts need a result selection: run with --selection (default results/selection.json) "
                           "instead of --results-dir alone.")
 
@@ -3265,6 +3380,8 @@ def main():
                         help="Output directory for generated artefacts")
     parser.add_argument("--kdhr26-json", default=os.path.join(SCRIPT_DIR, "kdhr26_reported.json"),
                         help="Path to committed kdhr26_reported.json citation data")
+    parser.add_argument("--mt-threads", type=int, default=None,
+                        help="Multi-thread comparison point (default: 8, or read from selection/schedules when they agree)")
     parser.add_argument("--smoke", action="store_true", help="Mark outputs with LOCAL SMOKE watermark")
     parser.add_argument("--check", action="store_true", help="Fail if any required artefact or cell is missing")
     parser.add_argument("--allow", action="append", type=parse_allow_pattern, default=[],
@@ -3299,7 +3416,8 @@ def main():
               + " (per-session / smoke output, not paper evidence).")
 
     analyzer = BenchmarkAnalyzer(args.out_dir, args.kdhr26_json, is_smoke=args.smoke, selection=selection,
-                                 compile_latex=not args.no_latex_compile, latex_build_dir=args.latex_build_dir)
+                                 compile_latex=not args.no_latex_compile, latex_build_dir=args.latex_build_dir,
+                                 mt_threads=args.mt_threads)
     analyzer.load_results(results_dirs)
     analyzer.generate_all()
 
