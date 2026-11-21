@@ -4,10 +4,13 @@
 
 set -eu
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/common.sh"
-. "${CARGO_HOME:-$HOME/.cargo}/env"
+if [ -f "${CARGO_HOME:-$HOME/.cargo}/env" ]; then
+    # shellcheck disable=SC1091
+    . "${CARGO_HOME:-$HOME/.cargo}/env"
+fi
 parse_args "$@"
 
 for tool in cargo rustc taskset python3 sha256sum; do
@@ -22,13 +25,18 @@ case "$OUT" in
     *) OUT_ROOT="$CODE_DIR/$OUT" ;;
 esac
 
-CODE_SHA=$(git -C "$CODE_DIR" rev-parse --short=12 HEAD)
+CODE_SHA=$(git -C "$CODE_DIR" rev-parse --short=12 HEAD 2>/dev/null || echo "detached")
 RUN_ID=$(date -u +%Y-%m-%d)-$CODE_SHA
 DEST="$OUT_ROOT/$HOST_NAME/$RUN_ID/this_work"
 mkdir -p "$DEST"
 
 TARGET_DIR="${CARGO_TARGET_DIR:-$CODE_DIR/target-harness}"
 mkdir -p "$TARGET_DIR"
+
+OFFLINE_FLAG=""
+if [ "${RBD_OFFLINE:-0}" = "1" ] || [ -f "${RBD_DEPS_DIR:-$CODE_DIR/deps}/.offline" ]; then
+    OFFLINE_FLAG="--offline"
+fi
 
 log_info "=========================================================="
 log_info "This Work (LCPC Fork HEAD): Build, Test, Codegen, Benchmark"
@@ -38,16 +46,22 @@ log_info "=========================================================="
 
 # 1. Build
 log_info "Step 1/5: Building workspace in release mode..."
+# shellcheck disable=SC2086
 env CARGO_TARGET_DIR="$TARGET_DIR" taskset -c "$CORES" \
-    cargo build --workspace --release --locked
+    cargo build --workspace --release --locked $OFFLINE_FLAG
 
-# 2. Correctness tests (abort on failure!)
-log_info "Step 2/5: Running workspace correctness test suite..."
-env CARGO_TARGET_DIR="$TARGET_DIR" taskset -c "$CORES" \
-    cargo test --workspace --release --locked || {
-    log_error "Workspace tests failed! Aborting benchmark run."
-    exit 1
-}
+# 2. Correctness tests (abort on failure; skip only when RBD_TEST_STAMP matches this checkout/host)
+if test_stamp_matches; then
+    log_info "Step 2/5: Workspace correctness tests already verified by matching RBD_TEST_STAMP ($RBD_TEST_STAMP)."
+else
+    log_info "Step 2/5: Running workspace correctness test suite..."
+    # shellcheck disable=SC2086
+    env CARGO_TARGET_DIR="$TARGET_DIR" taskset -c "$CORES" \
+        cargo test --workspace --release --locked $OFFLINE_FLAG || {
+        log_error "Workspace tests failed! Aborting benchmark run."
+        exit 1
+    }
+fi
 
 # 3. Disassembly inspection / codegen verification
 log_info "Step 3/5: Checking disassembly for scalar codegen..."
@@ -109,7 +123,7 @@ else
     run_benchmark_shape "$SHAPE" "$RAW_OUT"
 fi
 
-# Also run field microbenchmarks
+# 5. Field microbenchmarks
 log_info "Step 5/5: Running field arithmetic microbenchmarks..."
 FIELD_OUT="$DEST/field_microbenchmarks.json"
 env taskset -c "$CORES" \
@@ -118,7 +132,6 @@ env taskset -c "$CORES" \
     --runs "$((RUNS * 10000))" \
     --output "$FIELD_OUT"
 
-# 5. Write manifest
 log_info "Writing run manifest..."
 write_manifest "$DEST/manifest.json" "$RAW_OUT"
 

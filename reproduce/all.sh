@@ -15,12 +15,10 @@
 
 set -eu
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-CODE_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+CODE_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/common.sh"
-# CARGO_HOME selects a per-architecture toolchain on hosts whose home
-# directory is shared between x86-64 and aarch64 nodes (reproduce/soc/).
 if [ -f "${CARGO_HOME:-$HOME/.cargo}/env" ]; then
     # shellcheck disable=SC1091
     . "${CARGO_HOME:-$HOME/.cargo}/env"
@@ -37,61 +35,48 @@ PASSTHROUGH_ARGS=""
 BLOCK_FILTER=""
 LOGN_FILTER=""
 WARMUP_OVERRIDE=""
+RUNS_OVERRIDE=""
 STAGE_NAME=""
 RUN_DATE_OVERRIDE=""
 
 usage() {
     cat <<EOF
-Usage: $0 [--profile full|arm|smoke] [--session <id>] [--seed <int>] [options]
+Usage: $0 [--profile quick|full|arm] [--session <id>] [--seed <int>] [options]
 
-Master campaign orchestrator for the RealBrakedownPerf evaluation:
-  - full:  x86-64 primary campaign (E1-E13, logN 16..28, T 1..8 on the host
-           profile's 8-core benchmark set, all baselines; SIMD-Spielman Orion
-           shape up to 2^26, see simd_spielman.sh --max-orion-logn)
-  - arm:   Arm portability campaign (E14: This Work + Original LCPC, logN 18,22,26, T 1,8)
-  - smoke: Tiny dry-run across all targets, outputs watermarked "LOCAL SMOKE — NOT A RESULT"
+Campaign block orchestrator for the RealBrakedownPerf evaluation:
+  - quick: Reduced sizes and repetitions covering all claim families; outputs
+           watermarked "QUICK MODE - reduced sizes and repetitions; not comparable
+           cell-by-cell with the paper"
+  - full:  Full x86-64 campaign (logN 16..28, T 1..Tmt, all baselines)
+  - arm:   Full AArch64 campaign (This Work + Original LCPC, logN 18,22,26, T 1,Tmt)
 
 Options:
-  --profile full|arm|smoke Campaign workload profile (default: detected or smoke on local)
-  --session <id>           Session ID recorded in every JSON report (default: session-YYYYMMDD-HHMMSS)
-  --seed <int>             Random seed for interleaving block execution order (default: auto-generated)
-  --host <name>            Host profile from reproduce/hosts/<name>.sh
-  --out <dir>              Output directory (default: results)
+  --profile quick|full|arm Campaign workload profile (default: quick)
+  --session <id>           Session ID recorded in every JSON report
+  --seed <int>             Random seed for interleaving block execution order
+  --host-label <name>      Host label naming the output directory (alias: --host)
+  --host-profile <file>    Optional external host profile script (or env RBD_HOST_PROFILE)
+  --cores <list>           Explicit core list (autodetected from CPU affinity if omitted)
+  --max-threads <n>        Maximum multi-thread point Tmt (default: 8)
+  --out <dir>              Output root directory (default: out)
   --tags <tags>            Comma-separated step tags for steps.sh progression
-  --blocks <regex>         Run only blocks whose id matches (staged campaigns)
-  --logn <list>            Keep only these logN values; a block's id and output dir get a
-                           _n<list> suffix so stages never overwrite each other
+  --blocks <regex>         Run only blocks whose id matches
+  --logn <list>            Keep only these logN values; appends _n<list> to block ids
   --warmup <int>           Override every block's warm-up count
-  --lcpc-variants <list>   Original-LCPC build variants to measure (default: all four)
-  --stage <name>           Stage label for a staged campaign (default: a hash of the
-                           stage arguments). Each invocation writes its schedule,
-                           manifest and execution log under
-                           <session>/stages/<UTC time>_<stage>/ and never overwrites
-                           an earlier stage's records; <session>/schedule.json is
-                           append-only and lists every stage of the session.
-  --run-date YYYY-MM-DD    Date part of the run id <date>-<commit> (default: today,
-                           UTC); a staged driver passes its start date so that a
-                           session crossing midnight stays in one run dir
+  --runs <int>             Override every block's timed run count
+  --lcpc-variants <list>   Original-LCPC build variants to measure
+  --stage <name>           Stage label for a staged campaign
+  --run-date YYYY-MM-DD    Date part of the run id <date>-<commit> (default: UTC today)
   --dry-run                Print scheduled execution blocks and exit without running
-
-Each block is pinned by its thread count: T=1 blocks use the host's single
-benchmark core; T>1 blocks use the first T cores of the multi-core set (T+1 for
-SIMD-Spielman, whose spin-waiting coordinator is pinned after its T workers).
-Before a block runs, an existing output dir of the same block id is moved to
-<out>.prev-<UTC time> inside the session (analysis excludes "*.prev-*"), so a
-re-run never mixes records of two stages; every record of the block's own
-output dir is (re-)tagged with the block id, stage and block status.
-The exit status is 1 if any block failed (listed in <session>/failed_blocks.tsv).
   -h, --help               Show this help message
 EOF
 }
 
 ANY_BLOCK_FAILED=0
-SMOKE_ANALYSIS_FAILED=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --profile)
-            [ $# -ge 2 ] || { log_error "Option --profile requires an argument (full|arm|smoke)"; exit 1; }
+            [ $# -ge 2 ] || { log_error "Option --profile requires an argument (quick|full|arm)"; exit 1; }
             PROFILE="$2"
             shift 2
             ;;
@@ -123,6 +108,11 @@ while [ $# -gt 0 ]; do
         --warmup)
             [ $# -ge 2 ] || { log_error "Option --warmup requires an integer"; exit 1; }
             WARMUP_OVERRIDE="$2"
+            shift 2
+            ;;
+        --runs)
+            [ $# -ge 2 ] || { log_error "Option --runs requires an integer"; exit 1; }
+            RUNS_OVERRIDE="$2"
             shift 2
             ;;
         --lcpc-variants)
@@ -167,10 +157,6 @@ done
 parse_args $PASSTHROUGH_ARGS
 export CORES
 
-# parse_args resolves CORES for its default threads=1, i.e. a single core.
-# Blocks pin per thread count: T=1 blocks use one benchmark core, T>1 blocks
-# use the multi-core benchmark set (an explicit --cores list, else the host
-# profile's default set).
 if [ "$EXPLICIT_CORES" -eq 1 ]; then
     MULTI_CORES="$CORES"
     SINGLE_CORE="$(expand_cores "$CORES" | awk '{print $1}')"
@@ -180,31 +166,35 @@ else
 fi
 export MULTI_CORES SINGLE_CORE
 
-# Auto-detect profile if not provided
-if [ -z "$PROFILE" ]; then
-    if [ "$HOST_NAME" = "soc-xcnh" ]; then
-        PROFILE="full"
-    elif [ "$HOST_NAME" = "soc-xcng" ]; then
-        PROFILE="arm"
-    else
-        PROFILE="smoke"
-    fi
+# Compute Tmt = min(MAX_THREADS, #benchmark cores)
+_MULTI_COUNT=$(expand_cores "$MULTI_CORES" | wc -w | tr -d ' ')
+if [ "$_MULTI_COUNT" -lt 1 ]; then
+    _MULTI_COUNT=1
 fi
+if [ "$MAX_THREADS" -lt "$_MULTI_COUNT" ]; then
+    TMT="$MAX_THREADS"
+else
+    TMT="$_MULTI_COUNT"
+fi
+export TMT
+export RBD_MT_THREADS="$TMT"
 
+if [ -z "$PROFILE" ]; then
+    PROFILE="quick"
+fi
 case "$PROFILE" in
-    full|arm|smoke) ;;
+    quick|full|arm) ;;
     *)
-        log_error "Invalid --profile '$PROFILE'; must be full, arm, or smoke"
+        log_error "Invalid --profile '$PROFILE'; must be quick, full, or arm"
         exit 1
         ;;
 esac
+export RBD_MODE="${RBD_MODE:-$PROFILE}"
 
-# Session ID
 if [ -z "$SESSION_ID" ]; then
     SESSION_ID="session-$(date -u +%Y%m%d-%H%M%S)"
 fi
 
-# Seed for block randomization
 if [ -z "$SEED" ]; then
     SEED=$(python3 -c 'import secrets; print(secrets.randbelow(1_000_000_000))' 2>/dev/null || date +%s)
 fi
@@ -220,46 +210,47 @@ RUN_ID="${RUN_DATE}-${CODE_SHA}"
 SESSION_DIR="$OUT_ROOT/$HOST_NAME/$RUN_ID/$SESSION_ID"
 mkdir -p "$SESSION_DIR"
 
-# Staged campaigns call all.sh several times for the same session directory.
-# Each invocation (stage) keeps its own schedule, manifest and execution log
-# under stages/<UTC start time>_<stage label>/, so later stages never
-# overwrite the provenance of earlier ones. Without --stage the label is a
-# hash of the stage-defining arguments.
-STAGE_ARGS_STRING="profile=$PROFILE blocks=$BLOCK_FILTER logn=$LOGN_FILTER warmup=$WARMUP_OVERRIDE lcpc_variants=${LCPC_VARIANTS:-} tags=$SPECIFIC_TAGS seed=$SEED"
+STAGE_ARGS_STRING="profile=$PROFILE blocks=$BLOCK_FILTER logn=$LOGN_FILTER warmup=$WARMUP_OVERRIDE runs=$RUNS_OVERRIDE lcpc_variants=${LCPC_VARIANTS:-} tags=$SPECIFIC_TAGS max_threads=$MAX_THREADS seed=$SEED"
 STAGE_HASH=$(printf '%s' "$STAGE_ARGS_STRING" | sha256sum | cut -c1-8)
 STAGE_LABEL=${STAGE_NAME:-h$STAGE_HASH}
 STAGE_STARTED_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 STAGE_TAG="$(date -u +%Y%m%dT%H%M%SZ)_$STAGE_LABEL"
 STAGE_DIR="$SESSION_DIR/stages/$STAGE_TAG"
 mkdir -p "$STAGE_DIR"
+export RBD_STAGE_DIR="$STAGE_DIR"
 INSTANCE_NAME=$(host_instance_name)
 
+# Write generic host-profile-<instance>.json inside the stage directory (never results/).
+HOST_PROFILE_JSON="$STAGE_DIR/host-profile-${INSTANCE_NAME}.json"
+if [ ! -f "$HOST_PROFILE_JSON" ]; then
+    if [ "$EXPLICIT_CORES" -eq 1 ]; then
+        RBD_CORE_SELECTION_JSON=$(python3 "$SCRIPT_DIR/lib/cores.py" --max-threads "$MAX_THREADS" \
+            --cores "$CORES" --host-label "$HOST_NAME" --manifest "$HOST_PROFILE_JSON" --json)
+    else
+        RBD_CORE_SELECTION_JSON=$(python3 "$SCRIPT_DIR/lib/cores.py" --max-threads "$MAX_THREADS" \
+            --host-label "$HOST_NAME" --manifest "$HOST_PROFILE_JSON" --json)
+    fi
+    export RBD_CORE_SELECTION_JSON
+fi
+
 WATERMARK=""
-if [ "$PROFILE" = "smoke" ]; then
-    WATERMARK="LOCAL SMOKE — NOT A RESULT"
+if [ "$PROFILE" = "quick" ]; then
+    WATERMARK="QUICK MODE - reduced sizes and repetitions; not comparable cell-by-cell with the paper"
 fi
 
 log_info "=========================================================="
-log_info "Master Benchmark Campaign: reproduce/all.sh"
-log_info "Profile:       $PROFILE"
+log_info "Benchmark Campaign Orchestrator: reproduce/all.sh"
+log_info "Profile:       $PROFILE (Tmt=$TMT, max_threads=$MAX_THREADS)"
 log_info "Session ID:    $SESSION_ID"
 log_info "Stage:         $STAGE_TAG"
 log_info "Random Seed:   $SEED"
-log_info "Host:          $HOST_NAME (test_only=$HOST_IS_TEST_ONLY, instance=$INSTANCE_NAME)"
+log_info "Host:          $HOST_NAME (instance=$INSTANCE_NAME)"
+log_info "Cores:         single=$SINGLE_CORE multi=$MULTI_CORES"
 log_info "Session Dir:   $SESSION_DIR"
 if [ -n "$WATERMARK" ]; then
     log_info "Watermark:     $WATERMARK"
 fi
 log_info "=========================================================="
-
-# Per-node evidence: keep a copy of this node's host profile and first-run
-# record with the stage, so it travels with the session's results.
-for _evidence in "$CODE_DIR/results/$HOST_NAME/host-profile-$INSTANCE_NAME.json" \
-                 "$CODE_DIR/results/$HOST_NAME/first-run-$INSTANCE_NAME.json"; do
-    if [ -f "$_evidence" ]; then
-        cp "$_evidence" "$STAGE_DIR/"
-    fi
-done
 
 SCHEDULE_FILE="$STAGE_DIR/schedule.json"
 BLOCKS_TSV="$STAGE_DIR/blocks.tsv"
@@ -267,24 +258,15 @@ TAG_SCRIPT="$STAGE_DIR/tag_json.py"
 SESSION_SCHEDULE="$SESSION_DIR/schedule.json"
 MOVED_TSV="$STAGE_DIR/moved_blocks.tsv"
 
-# Tags the JSON records of ONE block's own output directory (never other
-# blocks' outputs), for failed blocks too, with the block id and status. The
-# directory only holds this run's records (an earlier run's dir was moved to
-# <out>.prev-<UTC>), so every record is (re-)tagged.
 cat > "$TAG_SCRIPT" << 'PY_TAG'
 import json, os, sys
 
-# Legacy This Work binaries (before bench/src/lib.rs recorded cpu_mhz_source)
-# computed cycles_per_mac from the same reading.
 LEGACY_MHZ_SOURCE = "/proc/cpuinfo first 'cpu MHz' entry (CPU 0); nominal, not the pinned core's measured clock"
 
 def tag_item(item, fields):
     if not isinstance(item, dict):
         return False
     item.update({k: v for k, v in fields.items() if v is not None})
-    # cycles_per_mac comes from the benchmark's own /proc/cpuinfo MHz reading
-    # (cpu_mhz_source), never from the block-level freq_* fields above, so it
-    # is always nominal: flag it from that same source, on every host.
     if item.get("cycles_per_mac") is not None:
         item["cycles_per_mac_is_nominal"] = True
         item.setdefault("cpu_mhz_source", LEGACY_MHZ_SOURCE)
@@ -328,256 +310,34 @@ if __name__ == "__main__":
                 tag_file(os.path.join(root, fname), fields)
 PY_TAG
 
-# Build execution block schedule in Python (stage filters are passed through
-# the environment so regexes need no quoting inside the Python source).
-STAGE_BLOCK_FILTER="$BLOCK_FILTER" STAGE_LOGN_FILTER="$LOGN_FILTER" STAGE_WARMUP_OVERRIDE="$WARMUP_OVERRIDE" \
+STAGE_BLOCK_FILTER="$BLOCK_FILTER" STAGE_LOGN_FILTER="$LOGN_FILTER" \
+STAGE_WARMUP_OVERRIDE="$WARMUP_OVERRIDE" STAGE_RUNS_OVERRIDE="$RUNS_OVERRIDE" \
 STAGE_TAG="$STAGE_TAG" STAGE_LABEL="$STAGE_LABEL" STAGE_STARTED_UTC="$STAGE_STARTED_UTC" \
 SCHEDULE_FILE="$SCHEDULE_FILE" BLOCKS_TSV="$BLOCKS_TSV" \
-python3 - << PY_SCHED
-import json, random, os
+SCHED_PROFILE="$PROFILE" SCHED_SEED="$SEED" SCHED_HOST="$HOST_NAME" \
+SCHED_HOST_PROFILE="$HOST_PROFILE" SCHED_SESSION_DIR="$SESSION_DIR" \
+SCHED_SESSION_ID="$SESSION_ID" SCHED_SCRIPT_DIR="$SCRIPT_DIR" \
+SCHED_CODE_DIR="$CODE_DIR" SCHED_TAGS="$SPECIFIC_TAGS" SCHED_TMT="$TMT" \
+SCHED_MAX_THREADS="$MAX_THREADS" \
+python3 - << 'PY_SCHED'
+import json, os, platform, random, re, shutil, subprocess
 
-profile = "$PROFILE"
-seed = int("$SEED")
-host = "$HOST_NAME"
-session_dir = "$SESSION_DIR"
-session_id = "$SESSION_ID"
-script_dir = "$SCRIPT_DIR"
-tags_arg = "$SPECIFIC_TAGS"
+profile = os.environ["SCHED_PROFILE"]
+seed = int(os.environ["SCHED_SEED"])
+host = os.environ["SCHED_HOST"]
+host_profile = os.environ.get("SCHED_HOST_PROFILE", "")
+session_dir = os.environ["SCHED_SESSION_DIR"]
+session_id = os.environ["SCHED_SESSION_ID"]
+script_dir = os.environ["SCHED_SCRIPT_DIR"]
+code_dir = os.environ["SCHED_CODE_DIR"]
+tags_arg = os.environ.get("SCHED_TAGS", "")
+tmt = int(os.environ["SCHED_TMT"])
+max_threads = int(os.environ["SCHED_MAX_THREADS"])
+arch = platform.machine()
 
-blocks = []
+prof_flag = f"--host-profile '{host_profile}'" if host_profile else ""
+host_flags = f"--host-label '{host}' {prof_flag}".strip()
 
-if profile == "smoke":
-    # Representative, small local runs covering every experiment family.
-    # These outputs are watermarked and are never publishable measurements.
-    smoke_cores = os.environ.get("CORES", "0")
-    step_tags_flag = f"--tags '{tags_arg}'" if tags_arg else ""
-    blocks.append({
-        "id": "smoke_this_work_mode_a_t1",
-        "description": "This Work mode (a) tiny smoke T=1",
-        "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 16,20 --threads 1 --runs 2 --warmup 1 --slices adaptive --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_mode_a_t1'"
-    })
-    blocks.append({
-        "id": "smoke_lcpc_orig_a_t1",
-        "description": "Original LCPC baseline tiny smoke T=1",
-        "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 16,20 --threads 1 --runs 2 --warmup 1 --cores '{smoke_cores}' --host '{host}' --out '{session_dir}/smoke_lcpc_orig_a_t1'"
-    })
-    blocks.append({
-        "id": "smoke_this_work_mode_b_mont127_t1",
-        "description": "This Work mode (b) tiny smoke T=1",
-        "cmd": f"'{script_dir}/this_work.sh' --params simd-spielman --field mont127 --logN 20 --threads 1 --runs 2 --warmup 1 --slices adaptive --shape both --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_mode_b_mont127_t1'"
-    })
-    blocks.append({
-        "id": "smoke_this_work_ft127_t1",
-        "description": "This Work mode (a) Ft127 tiny smoke T=1",
-        "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field ft127 --logN 16,20 --threads 1 --runs 2 --warmup 1 --slices adaptive --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_ft127_t1'"
-    })
-    for smoke_field in ["mers127", "fp2m61"]:
-        blocks.append({
-            "id": f"smoke_this_work_mode_b_{smoke_field}_t1",
-            "description": f"This Work mode (b) {smoke_field} smoke T=1",
-            "cmd": f"'{script_dir}/this_work.sh' --params simd-spielman --field {smoke_field} --logN 20 --threads 1 --runs 2 --warmup 1 --slices adaptive --shape both --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_mode_b_{smoke_field}_t1'"
-        })
-    blocks.append({
-        "id": "smoke_steps",
-        "description": "All tagged steps progression smoke",
-        "cmd": f"'{script_dir}/steps.sh' --logN 16,20,24 --threads 1 --runs 2 --warmup 1 {step_tags_flag} --cores '{smoke_cores}' --session-id '{session_id}' --smoke --host '{host}' --out '{session_dir}/smoke_steps'"
-    })
-    blocks.append({
-        "id": "smoke_simd_spielman",
-        "description": "SIMD-Spielman baseline smoke (Brakedown and Orion)",
-        "cmd": f"'{script_dir}/simd_spielman.sh' --shape both --logN 16,20 --threads 1 --runs 2 --warmup 1 --cores '{smoke_cores}' --host '{host}' --out '{session_dir}/smoke_simd_spielman'"
-    })
-    blocks.append({
-        "id": "smoke_polycommit",
-        "description": "PolyCommit baseline smoke",
-        "cmd": f"sh '{script_dir}/polycommit.sh' --field mont127 --logN 16,20 --threads 1 --runs 2 --warmup 1 --cores '{smoke_cores}' --host '{host}' --out '{session_dir}/smoke_polycommit'"
-    })
-    for smoke_threads in [2, 4, 7]:
-        blocks.append({
-            "id": f"smoke_this_work_threads_t{smoke_threads}",
-            "description": f"This Work thread-scaling smoke T={smoke_threads}",
-            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20 --threads {smoke_threads} --runs 2 --warmup 1 --slices adaptive --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_threads_t{smoke_threads}'"
-        })
-        blocks.append({
-            "id": f"smoke_lcpc_orig_threads_t{smoke_threads}",
-            "description": f"Original LCPC thread-scaling smoke T={smoke_threads}",
-            "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 20 --threads {smoke_threads} --runs 2 --warmup 1 --cores '{smoke_cores}' --host '{host}' --out '{session_dir}/smoke_lcpc_orig_threads_t{smoke_threads}'"
-        })
-    for smoke_slices in [1, 2]:
-        blocks.append({
-            "id": f"smoke_this_work_slice_s{smoke_slices}",
-            "description": f"This Work slice sweep smoke s={smoke_slices}",
-            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20 --threads 1 --runs 2 --warmup 1 --slices {smoke_slices} --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_this_work_slice_s{smoke_slices}'"
-        })
-    blocks.append({
-        "id": "smoke_ligero_rs",
-        "description": "Same-library Ligero Reed-Solomon encoding smoke",
-        "cmd": f"'{script_dir}/this_work.sh' --params rs-ligero --field mont127 --logN 20 --threads 1 --runs 2 --warmup 1 --cores '{smoke_cores}' --test-only --host '{host}' --out '{session_dir}/smoke_ligero_rs'"
-    })
-elif profile == "arm":
-    # E14: Arm portability campaign (SoC cluster xcng, Neoverse-N1)
-    # This Work + Original LCPC only; logN 18, 22, 26; T 1, 8
-    blocks.append({
-        "id": "arm_this_work_t1",
-        "description": "This Work mode (a) on Arm T=1 (logN 18,22,26)",
-        "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 1 --runs 5 --warmup 2 --slices adaptive --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/arm_this_work_t1'"
-    })
-    blocks.append({
-        "id": "arm_lcpc_orig_t1",
-        "description": "Original LCPC mode (a) on Arm T=1 (logN 18,22,26)",
-        "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 1 --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/arm_lcpc_orig_t1'"
-    })
-    blocks.append({
-        "id": "arm_this_work_t8",
-        "description": "This Work mode (a) on Arm T=8 (logN 18,22,26)",
-        "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 8 --runs 5 --warmup 2 --slices adaptive --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/arm_this_work_t8'"
-    })
-    blocks.append({
-        "id": "arm_lcpc_orig_t8",
-        "description": "Original LCPC mode (a) on Arm T=8 (logN 18,22,26)",
-        "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 8 --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/arm_lcpc_orig_t8'"
-    })
-else:
-    # full: x86-64 primary campaign (SoC cluster xcnh, E1-E13, logN 16..28)
-    # E1: Headline comparison mode (a) Mont127 T=1 and T=8
-    blocks.append({
-        "id": "full_this_work_mode_a_t1",
-        "description": "E1: This Work mode (a) Mont127 T=1 (logN 16..28)",
-            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26,28 --threads 1 --runs 5 --warmup 2 --slices adaptive --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_this_work_mode_a_t1'"
-    })
-    blocks.append({
-        "id": "full_lcpc_orig_mode_a_t1",
-        "description": "E1: Original LCPC mode (a) Ft127 T=1 (logN 16..28)",
-            "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26,28 --threads 1 --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_lcpc_orig_mode_a_t1'"
-    })
-    blocks.append({
-        "id": "full_this_work_mode_a_t8",
-        "description": "E1: This Work mode (a) Mont127 T=8 (logN 16..28)",
-            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26,28 --threads 8 --runs 5 --warmup 2 --slices adaptive --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_this_work_mode_a_t8'"
-    })
-    blocks.append({
-        "id": "full_lcpc_orig_mode_a_t8",
-        "description": "E1: Original LCPC mode (a) Ft127 T=8 (logN 16..28)",
-            "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26,28 --threads 8 --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_lcpc_orig_mode_a_t8'"
-    })
-    # This Work over LCPC's own field Ft127 with the headline parameters, for a
-    # same-node commit/prove/verify comparison with Mont127 and original LCPC.
-    for t_count in [1, 8]:
-        blocks.append({
-            "id": f"full_this_work_ft127_t{t_count}",
-            "description": f"E8: This Work mode (a) Ft127 T={t_count} (logN 20,24)",
-            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field ft127 --logN 20,24 --threads {t_count} --runs 5 --warmup 2 --slices adaptive --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_this_work_ft127_t{t_count}'"
-        })
-
-    # E2: Comparison with SIMD-Spielman (mode b, Mont127, Mers127, Fp2M61)
-    for field_name in ["mont127", "mers127", "fp2m61"]:
-        blocks.append({
-            "id": f"full_this_work_mode_b_{field_name}_t1",
-            "description": f"E2: This Work mode (b) {field_name} T=1 (logN 16..28)",
-            "cmd": f"'{script_dir}/this_work.sh' --params simd-spielman --field {field_name} --logN 16,18,20,22,24,26,28 --threads 1 --runs 5 --warmup 2 --slices adaptive --shape both --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_this_work_mode_b_{field_name}_t1'"
-        })
-        blocks.append({
-            "id": f"full_this_work_mode_b_{field_name}_t8",
-            "description": f"E2: This Work mode (b) {field_name} T=8 (logN 16..28)",
-            "cmd": f"'{script_dir}/this_work.sh' --params simd-spielman --field {field_name} --logN 16,18,20,22,24,26,28 --threads 8 --runs 5 --warmup 2 --slices adaptive --shape both --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_this_work_mode_b_{field_name}_t8'"
-        })
-        blocks.append({
-            "id": f"full_simd_spielman_{field_name}_t1",
-            "description": f"E2: SIMD-Spielman AVX-512 {field_name} T=1 (logN 16..28)",
-            "cmd": f"'{script_dir}/simd_spielman.sh' --field {field_name} --max-orion-logn 26 --logN 16,18,20,22,24,26,28 --threads 1 --runs 5 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_simd_spielman_{field_name}_t1'"
-        })
-        blocks.append({
-            "id": f"full_simd_spielman_{field_name}_t8",
-            "description": f"E2: SIMD-Spielman AVX-512 {field_name} T=8 (logN 16..28)",
-            "cmd": f"'{script_dir}/simd_spielman.sh' --field {field_name} --max-orion-logn 26 --logN 16,18,20,22,24,26,28 --threads 8 --runs 5 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_simd_spielman_{field_name}_t8'"
-        })
-        # Upstream's MT encoder adds a spin-waiting coordinator thread to its workers;
-        # on an 8-core host the fair 8-core point is 7 workers + coordinator (E2).
-        blocks.append({
-            "id": f"full_simd_spielman_{field_name}_t7",
-            "description": f"E2: SIMD-Spielman AVX-512 {field_name} 7 workers + coordinator on 8 cores (logN 16..28)",
-            "cmd": f"'{script_dir}/simd_spielman.sh' --field {field_name} --max-orion-logn 26 --logN 16,18,20,22,24,26,28 --threads 7 --runs 5 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_simd_spielman_{field_name}_t7'"
-        })
-
-    # E3: Per-technique breakdown, one block per mode: mode (a) lcpc-sdig6
-    # Mont127 (Ft127 at step/01-modernize, before lcpc-fields existed) and
-    # mode (b) simd-spielman Mers127 (N/A before step/04-r2l).
-    step_tags_flag = f"--tags '{tags_arg}'" if tags_arg else ""
-    blocks.append({
-        "id": "full_steps_mode_a",
-        "description": "E3: Tagged steps progression mode (a) Mont127 (logN 16,20,24,28)",
-        "cmd": f"'{script_dir}/steps.sh' --mode a --logN 16,20,24,28 --threads 1 --runs 5 --warmup 2 {step_tags_flag} --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_steps_mode_a'"
-    })
-    blocks.append({
-        "id": "full_steps_mode_b",
-        "description": "E3: Tagged steps progression mode (b) Mers127 (logN 16,20,24,28)",
-        "cmd": f"'{script_dir}/steps.sh' --mode b --logN 16,20,24,28 --threads 1 --runs 5 --warmup 2 {step_tags_flag} --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_steps_mode_b'"
-    })
-
-    # E5: Slice sweep on Mont127 (s in {1, 2, 4, 8, 16, 32, 64, 128, 256}, logN 20,22,24,26,28, T 1,8)
-    for t_count in [1, 8]:
-      for slice_val in [1, 2, 4, 8, 16, 32, 64, 128, 256]:
-        blocks.append({
-            "id": f"full_slice_sweep_s{slice_val}_t{t_count}",
-            "description": f"E5: Slice sweep s={slice_val} Mont127 T={t_count}",
-            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,22,24,26,28 --threads {t_count} --slices {slice_val} --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_slice_sweep_s{slice_val}_t{t_count}'"
-        })
-
-    # E6: Thread scaling T in {1, 2, 4, 8, 15} at logN 20, 24, 26, 28, limited to
-    # the physical cores the host profile exposes (8 benchmark cores -> T <= 8).
-    # Block ids equal their output directory names.
-    def _ncores(spec):
-        n = 0
-        for part in str(spec).split(','):
-            part = part.strip()
-            if not part:
-                continue
-            if '-' in part:
-                lo, hi = part.split('-', 1)
-                n += int(hi) - int(lo) + 1
-            else:
-                n += 1
-        return n
-    _avail = _ncores(os.environ.get('MULTI_CORES', '0'))
-    for t_count in [t for t in [1, 2, 4, 8, 15] if t <= max(1, _avail)]:
-        blocks.append({
-            "id": f"full_this_work_threads_t{t_count}",
-            "description": f"E6: Thread scaling This Work T={t_count}",
-            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26,28 --threads {t_count} --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_this_work_threads_t{t_count}'"
-        })
-        blocks.append({
-            "id": f"full_lcpc_orig_threads_t{t_count}",
-            "description": f"E6: Thread scaling Original LCPC T={t_count}",
-            "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26,28 --threads {t_count} --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_lcpc_orig_threads_t{t_count}'"
-        })
-
-    # E7: Field microbenchmarks
-    # PolyCommit baseline; invoke through sh because the source file need not be executable.
-    polycommit_script = os.path.join(script_dir, "polycommit.sh")
-    blocks.append({
-        "id": "full_polycommit_t1",
-        "description": "E1: PolyCommit baseline comparison",
-        "cmd": f"sh '{polycommit_script}' --field mont127 --logN 16,18,20,22,24,26,28 --threads 1 --runs 5 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_polycommit_t1'"
-    })
-    blocks.append({
-        "id": "full_polycommit_t8",
-        "description": "E1: PolyCommit baseline comparison T=8",
-        "cmd": f"sh '{polycommit_script}' --field mont127 --logN 16,18,20,22,24,26,28 --threads 8 --runs 5 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_polycommit_t8'"
-    })
-
-    blocks.append({
-        "id": "full_ligero_rs",
-        "description": "E12: Same-library Ligero Reed-Solomon encoding",
-        "cmd": f"'{script_dir}/this_work.sh' --params rs-ligero --field mont127 --logN 20,22,24 --threads 1 --runs 5 --warmup 2 --cores '{os.environ.get('CORES', '0')}' --host '{host}' --out '{session_dir}/full_ligero_rs'"
-    })
-
-# Pin each block by its thread count (see MULTI_CORES/SINGLE_CORE above):
-# T=1 -> the single benchmark core; T>1 -> the first T cores of the multi-core
-# set for every implementation (This Work pins worker i to core i; LCPC/rayon
-# and PolyCommit threads then float over exactly T cores); SIMD-Spielman gets
-# T+1 cores because its spin-waiting coordinator is pinned after the workers
-# (capped at the set size, where the coordinator shares a worker's core).
-import re
 
 def expand(spec):
     cores = []
@@ -592,7 +352,238 @@ def expand(spec):
             cores.append(int(part))
     return sorted(set(cores))
 
+
 multi = expand(os.environ["MULTI_CORES"])
+avail = max(1, len(multi))
+mt_points = [1] if tmt <= 1 else [1, tmt]
+thread_sweep = sorted({t for t in (1, 2, 4, 8, tmt) if 1 <= t <= min(max_threads, avail)})
+simd_mt_points = sorted({t for t in ([1] + ([tmt, tmt - 1] if tmt > 1 else [])) if t >= 1})
+
+# Detect host capabilities for per-block capability skipping
+cpuinfo = ""
+try:
+    with open("/proc/cpuinfo", "r", encoding="utf-8", errors="replace") as f:
+        cpuinfo = f.read()
+except OSError:
+    pass
+has_ifma = bool(re.search(r"\bavx512ifma\b", cpuinfo))
+has_cmake_gxx = bool(shutil.which("cmake") and shutil.which("g++"))
+has_step_tags = False
+if shutil.which("git") and os.path.exists(os.path.join(code_dir, ".git")):
+    try:
+        out = subprocess.run(["git", "-C", code_dir, "tag", "--list", "step/*"],
+                             capture_output=True, text=True, check=True).stdout
+        has_step_tags = len([t for t in out.splitlines() if t and t != "step/00-import"]) >= 9
+    except Exception:
+        pass
+
+blocks = []
+step_tags_flag = f"--tags '{tags_arg}'" if tags_arg else ""
+
+if profile == "quick":
+    if arch in ("aarch64", "arm64"):
+        for t in mt_points:
+            blocks.append({
+                "id": f"quick_arm_this_work_t{t}",
+                "description": f"Quick Arm This Work mode (a) T={t} (logN 18,20)",
+                "requires": ["aarch64"],
+                "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 18,20 --threads {t} --runs 3 --warmup 1 --slices adaptive --cores '0' {host_flags} --out '{session_dir}/quick_arm_this_work_t{t}'",
+            })
+            blocks.append({
+                "id": f"quick_arm_lcpc_orig_t{t}",
+                "description": f"Quick Arm Original LCPC mode (a) T={t} (logN 18,20)",
+                "requires": ["aarch64"],
+                "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 18,20 --threads {t} --runs 3 --warmup 1 --cores '0' {host_flags} --out '{session_dir}/quick_arm_lcpc_orig_t{t}'",
+            })
+    else:
+        # QA: This Work modes (a) and (b), Ft127, LCPC, PolyCommit, Ligero; logN 16,18,20; T in {1, Tmt}
+        for t in mt_points:
+            blocks.append({
+                "id": f"quick_this_work_mode_a_t{t}",
+                "description": f"Quick This Work mode (a) Mont127 T={t} (logN 16,18,20)",
+                "requires": ["x86_64"],
+                "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20 --threads {t} --runs 3 --warmup 1 --slices adaptive --cores '0' {host_flags} --out '{session_dir}/quick_this_work_mode_a_t{t}'",
+            })
+            blocks.append({
+                "id": f"quick_lcpc_orig_mode_a_t{t}",
+                "description": f"Quick Original LCPC mode (a) Ft127 T={t} (logN 16,18,20)",
+                "requires": ["x86_64"],
+                "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20 --threads {t} --runs 3 --warmup 1 --cores '0' {host_flags} --out '{session_dir}/quick_lcpc_orig_mode_a_t{t}'",
+            })
+            blocks.append({
+                "id": f"quick_this_work_ft127_t{t}",
+                "description": f"Quick This Work mode (a) Ft127 T={t} (logN 20)",
+                "requires": ["x86_64"],
+                "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field ft127 --logN 20 --threads {t} --runs 3 --warmup 1 --slices adaptive --cores '0' {host_flags} --out '{session_dir}/quick_this_work_ft127_t{t}'",
+            })
+            blocks.append({
+                "id": f"quick_polycommit_t{t}",
+                "description": f"Quick PolyCommit baseline T={t} (logN 16,18,20)",
+                "requires": ["x86_64"],
+                "cmd": f"sh '{script_dir}/polycommit.sh' --field mont127 --logN 16,18,20 --threads {t} --runs 3 --warmup 1 --cores '0' {host_flags} --out '{session_dir}/quick_polycommit_t{t}'",
+            })
+        for field_name in ("mont127", "mers127", "fp2m61"):
+            for t in mt_points:
+                blocks.append({
+                    "id": f"quick_this_work_mode_b_{field_name}_t{t}",
+                    "description": f"Quick This Work mode (b) {field_name} T={t} (logN 16,18,20)",
+                    "requires": ["x86_64"],
+                    "cmd": f"'{script_dir}/this_work.sh' --params simd-spielman --field {field_name} --logN 16,18,20 --threads {t} --runs 3 --warmup 1 --slices adaptive --shape both --cores '0' {host_flags} --out '{session_dir}/quick_this_work_mode_b_{field_name}_t{t}'",
+                })
+            for t in simd_mt_points:
+                blocks.append({
+                    "id": f"quick_simd_spielman_{field_name}_t{t}",
+                    "description": f"Quick SIMD-Spielman {field_name} T={t} (logN 16,20)",
+                    "requires": ["x86_64", "avx512ifma", "cmake"],
+                    "cmd": f"'{script_dir}/simd_spielman.sh' --field {field_name} --shape both --logN 16,20 --threads {t} --runs 3 --warmup 1 --cores '0' {host_flags} --out '{session_dir}/quick_simd_spielman_{field_name}_t{t}'",
+                })
+        blocks.append({
+            "id": "quick_ligero_rs",
+            "description": "Quick same-library Ligero Reed-Solomon encoding (logN 20)",
+            "requires": ["x86_64"],
+            "cmd": f"'{script_dir}/this_work.sh' --params rs-ligero --field mont127 --logN 20 --threads 1 --runs 3 --warmup 1 --cores '0' {host_flags} --out '{session_dir}/quick_ligero_rs'",
+        })
+        # QC: slices s in {1, 4, 16, adaptive} at logN 20,22
+        for t in mt_points:
+            for slice_val in (1, 4, 16):
+                blocks.append({
+                    "id": f"quick_slice_sweep_s{slice_val}_t{t}",
+                    "description": f"Quick slice sweep s={slice_val} T={t} (logN 20,22)",
+                    "requires": ["x86_64"],
+                    "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,22 --threads {t} --slices {slice_val} --runs 3 --warmup 1 --cores '0' {host_flags} --out '{session_dir}/quick_slice_sweep_s{slice_val}_t{t}'",
+                })
+            blocks.append({
+                "id": f"quick_slice_sweep_sadaptive_t{t}",
+                "description": f"Quick slice sweep adaptive T={t} (logN 20,22)",
+                "requires": ["x86_64"],
+                "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,22 --threads {t} --slices adaptive --runs 3 --warmup 1 --cores '0' {host_flags} --out '{session_dir}/quick_slice_sweep_sadaptive_t{t}'",
+            })
+        # QT: threads T in {1, 2, 4, Tmt} cap cores at logN 20,22
+        for t in thread_sweep:
+            blocks.append({
+                "id": f"quick_this_work_threads_t{t}",
+                "description": f"Quick thread scaling This Work T={t} (logN 20,22)",
+                "requires": ["x86_64"],
+                "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,22 --threads {t} --runs 3 --warmup 1 --slices adaptive --cores '0' {host_flags} --out '{session_dir}/quick_this_work_threads_t{t}'",
+            })
+            blocks.append({
+                "id": f"quick_lcpc_orig_threads_t{t}",
+                "description": f"Quick thread scaling Original LCPC T={t} (logN 20,22)",
+                "requires": ["x86_64"],
+                "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 20,22 --threads {t} --runs 3 --warmup 1 --cores '0' {host_flags} --out '{session_dir}/quick_lcpc_orig_threads_t{t}'",
+            })
+        # QD: steps mode a and b at logN 16,20 with runs 2
+        blocks.append({
+            "id": "quick_steps_mode_a",
+            "description": "Quick tagged steps progression mode (a) Mont127 (logN 16,20)",
+            "requires": ["x86_64", "git-tags"],
+            "cmd": f"'{script_dir}/steps.sh' --mode a --logN 16,20 --threads 1 --runs 2 --warmup 1 --quick {step_tags_flag} --cores '0' --host-label '{host}' --out '{session_dir}/quick_steps_mode_a'",
+        })
+        blocks.append({
+            "id": "quick_steps_mode_b",
+            "description": "Quick tagged steps progression mode (b) Mers127 (logN 16,20)",
+            "requires": ["x86_64", "git-tags"],
+            "cmd": f"'{script_dir}/steps.sh' --mode b --logN 16,20 --threads 1 --runs 2 --warmup 1 --quick {step_tags_flag} --cores '0' --host-label '{host}' --out '{session_dir}/quick_steps_mode_b'",
+        })
+elif profile == "arm":
+    for t in mt_points:
+        blocks.append({
+            "id": f"arm_this_work_t{t}",
+            "description": f"This Work mode (a) on Arm T={t} (logN 18,22,26)",
+            "requires": ["aarch64"],
+            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads {t} --runs 5 --warmup 2 --slices adaptive --cores '0' {host_flags} --out '{session_dir}/arm_this_work_t{t}'",
+        })
+        blocks.append({
+            "id": f"arm_lcpc_orig_t{t}",
+            "description": f"Original LCPC mode (a) on Arm T={t} (logN 18,22,26)",
+            "requires": ["aarch64"],
+            "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads {t} --runs 5 --warmup 2 --cores '0' {host_flags} --out '{session_dir}/arm_lcpc_orig_t{t}'",
+        })
+else:
+    # full: x86-64 campaign (logN 16..28)
+    for t in mt_points:
+        blocks.append({
+            "id": f"full_this_work_mode_a_t{t}",
+            "description": f"Headline This Work mode (a) Mont127 T={t} (logN 16..28)",
+            "requires": ["x86_64"],
+            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26,28 --threads {t} --runs 5 --warmup 2 --slices adaptive --cores '0' {host_flags} --out '{session_dir}/full_this_work_mode_a_t{t}'",
+        })
+        blocks.append({
+            "id": f"full_lcpc_orig_mode_a_t{t}",
+            "description": f"Headline Original LCPC mode (a) Ft127 T={t} (logN 16..28)",
+            "requires": ["x86_64"],
+            "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 16,18,20,22,24,26,28 --threads {t} --runs 5 --warmup 2 --cores '0' {host_flags} --out '{session_dir}/full_lcpc_orig_mode_a_t{t}'",
+        })
+        blocks.append({
+            "id": f"full_this_work_ft127_t{t}",
+            "description": f"This Work mode (a) Ft127 T={t} (logN 20,24)",
+            "requires": ["x86_64"],
+            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field ft127 --logN 20,24 --threads {t} --runs 5 --warmup 2 --slices adaptive --cores '0' {host_flags} --out '{session_dir}/full_this_work_ft127_t{t}'",
+        })
+    for field_name in ("mont127", "mers127", "fp2m61"):
+        for t in mt_points:
+            blocks.append({
+                "id": f"full_this_work_mode_b_{field_name}_t{t}",
+                "description": f"This Work mode (b) {field_name} T={t} (logN 16..28)",
+                "requires": ["x86_64"],
+                "cmd": f"'{script_dir}/this_work.sh' --params simd-spielman --field {field_name} --logN 16,18,20,22,24,26,28 --threads {t} --runs 5 --warmup 2 --slices adaptive --shape both --cores '0' {host_flags} --out '{session_dir}/full_this_work_mode_b_{field_name}_t{t}'",
+            })
+        for t in simd_mt_points:
+            blocks.append({
+                "id": f"full_simd_spielman_{field_name}_t{t}",
+                "description": f"SIMD-Spielman AVX-512 {field_name} T={t} (logN 16..28)",
+                "requires": ["x86_64", "avx512ifma", "cmake"],
+                "cmd": f"'{script_dir}/simd_spielman.sh' --field {field_name} --max-orion-logn 26 --logN 16,18,20,22,24,26,28 --threads {t} --runs 5 --cores '0' {host_flags} --out '{session_dir}/full_simd_spielman_{field_name}_t{t}'",
+            })
+    blocks.append({
+        "id": "full_steps_mode_a",
+        "description": "Tagged steps progression mode (a) Mont127 (logN 16,20,24,28)",
+        "requires": ["x86_64", "git-tags"],
+        "cmd": f"'{script_dir}/steps.sh' --mode a --logN 16,20,24,28 --threads 1 --runs 5 --warmup 2 {step_tags_flag} --cores '0' --host-label '{host}' --out '{session_dir}/full_steps_mode_a'",
+    })
+    blocks.append({
+        "id": "full_steps_mode_b",
+        "description": "Tagged steps progression mode (b) Mers127 (logN 16,20,24,28)",
+        "requires": ["x86_64", "git-tags"],
+        "cmd": f"'{script_dir}/steps.sh' --mode b --logN 16,20,24,28 --threads 1 --runs 5 --warmup 2 {step_tags_flag} --cores '0' --host-label '{host}' --out '{session_dir}/full_steps_mode_b'",
+    })
+    for t in mt_points:
+        for slice_val in (1, 2, 4, 8, 16, 32, 64, 128, 256):
+            blocks.append({
+                "id": f"full_slice_sweep_s{slice_val}_t{t}",
+                "description": f"Slice sweep s={slice_val} Mont127 T={t}",
+                "requires": ["x86_64"],
+                "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,22,24,26,28 --threads {t} --slices {slice_val} --runs 5 --warmup 2 --cores '0' {host_flags} --out '{session_dir}/full_slice_sweep_s{slice_val}_t{t}'",
+            })
+    for t in thread_sweep:
+        blocks.append({
+            "id": f"full_this_work_threads_t{t}",
+            "description": f"Thread scaling This Work T={t}",
+            "requires": ["x86_64"],
+            "cmd": f"'{script_dir}/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26,28 --threads {t} --runs 5 --warmup 2 --cores '0' {host_flags} --out '{session_dir}/full_this_work_threads_t{t}'",
+        })
+        blocks.append({
+            "id": f"full_lcpc_orig_threads_t{t}",
+            "description": f"Thread scaling Original LCPC T={t}",
+            "requires": ["x86_64"],
+            "cmd": f"'{script_dir}/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 20,24,26,28 --threads {t} --runs 5 --warmup 2 --cores '0' {host_flags} --out '{session_dir}/full_lcpc_orig_threads_t{t}'",
+        })
+    polycommit_script = os.path.join(script_dir, "polycommit.sh")
+    for t in mt_points:
+        blocks.append({
+            "id": f"full_polycommit_t{t}",
+            "description": f"PolyCommit baseline comparison T={t}",
+            "requires": ["x86_64"],
+            "cmd": f"sh '{polycommit_script}' --field mont127 --logN 16,18,20,22,24,26,28 --threads {t} --runs 5 --cores '0' {host_flags} --out '{session_dir}/full_polycommit_t{t}'",
+        })
+    blocks.append({
+        "id": "full_ligero_rs",
+        "description": "Same-library Ligero Reed-Solomon encoding",
+        "requires": ["x86_64"],
+        "cmd": f"'{script_dir}/this_work.sh' --params rs-ligero --field mont127 --logN 20,22,24 --threads 1 --runs 5 --warmup 2 --cores '0' {host_flags} --out '{session_dir}/full_ligero_rs'",
+    })
+
+# Pin each block by thread count and evaluate capability requirements
 for b in blocks:
     m = re.search(r"--threads (\d+)", b["cmd"])
     threads = int(m.group(1)) if m else 1
@@ -600,19 +591,31 @@ for b in blocks:
     if threads > 1:
         need = threads + 1 if "simd_spielman.sh" in b["cmd"] else threads
         cores = ",".join(str(c) for c in multi[:need])
-        # Fewer cores than threads (a small local core set): the block still
-        # runs, but its threads share cores; analysis rejects such records.
         if len(multi) < threads:
             b["oversubscribed"] = True
     else:
         cores = os.environ["SINGLE_CORE"]
     b["cores"] = cores
     b["cmd"] = re.sub(r"--cores '[^']*'", f"--cores '{cores}'", b["cmd"])
+    skip_reasons = []
+    for req in b.get("requires") or []:
+        if req == "x86_64" and arch != "x86_64":
+            skip_reasons.append("needs x86_64")
+        elif req == "aarch64" and arch not in ("aarch64", "arm64"):
+            skip_reasons.append("needs aarch64")
+        elif req == "avx512ifma" and not has_ifma:
+            skip_reasons.append("needs avx512ifma")
+        elif req == "cmake" and not has_cmake_gxx:
+            skip_reasons.append("needs cmake")
+        elif req == "git-tags" and not has_step_tags:
+            skip_reasons.append("needs git-tags")
+    b["skip_reason"] = "; ".join(skip_reasons) if skip_reasons else ""
 
-# Staged campaigns: select blocks, intersect logN lists, override warm-ups.
+# Staged campaign filters
 block_filter = os.environ.get("STAGE_BLOCK_FILTER", "")
 logn_filter = [x for x in os.environ.get("STAGE_LOGN_FILTER", "").split(",") if x]
 warmup_override = os.environ.get("STAGE_WARMUP_OVERRIDE", "")
+runs_override = os.environ.get("STAGE_RUNS_OVERRIDE", "")
 if block_filter:
     blocks = [b for b in blocks if re.search(block_filter, b["id"])]
 if logn_filter:
@@ -624,8 +627,6 @@ if logn_filter:
         keep = [x for x in m.group(1).split(",") if x in logn_filter]
         if not keep:
             continue
-        # The suffix names the logN values the block actually runs (not the
-        # whole filter), so block ids and output dirs describe their content.
         suffix = "_n" + "-".join(keep)
         b["cmd"] = b["cmd"].replace(m.group(0), "--logN " + ",".join(keep))
         b["cmd"] = re.sub(r"--out '([^']*)'", lambda o: f"--out '{o.group(1)}{suffix}'", b["cmd"])
@@ -637,43 +638,35 @@ if warmup_override:
         b["cmd"] = re.sub(r"--warmup \d+", f"--warmup {warmup_override}", b["cmd"])
         if "--warmup" not in b["cmd"]:
             b["cmd"] = b["cmd"].replace(" --runs ", f" --warmup {warmup_override} --runs ", 1)
+if runs_override:
+    for b in blocks:
+        b["cmd"] = re.sub(r"--runs \d+", f"--runs {runs_override}", b["cmd"])
 
 for b in blocks:
     m = re.search(r"--out '([^']*)'", b["cmd"])
     b["out"] = m.group(1) if m else session_dir
-    # Block ids equal their output directory names (joinable to result paths),
-    # and every block writes into its own directory directly below the session.
     if os.path.basename(b["out"]) != b["id"]:
         raise SystemExit(f"block id {b['id']} does not match its output dir {b['out']}")
     if os.path.dirname(b["out"]) != session_dir:
         raise SystemExit(f"block {b['id']} output dir {b['out']} is not directly below {session_dir}")
 
-for b in blocks:
-    if b.get("oversubscribed"):
-        print(f"[WARN] Block {b['id']}: T={b['threads']} on cores {b['cores']} is oversubscribed")
-
-# A block whose base id (without the _n<logN> suffix) already has an output
-# dir with a different logN list in this session is a sibling: both dirs may
-# hold the same configuration, so analysis must not select both (audit F8).
 def base_id(block_id):
     return re.sub(r"_n[0-9]+(?:-[0-9]+)*$", "", block_id)
+
 existing = []
 if os.path.isdir(session_dir):
     existing = [d for d in os.listdir(session_dir)
                 if os.path.isdir(os.path.join(session_dir, d)) and ".prev-" not in d and d != "stages"]
 for b in blocks:
     b["siblings"] = sorted(d for d in existing if d != b["id"] and base_id(d) == base_id(b["id"]))
-    if b["siblings"]:
-        print(f"[WARN] Block {b['id']}: this session already has output dirs {b['siblings']} of the same "
-              "block with a different logN list; select only one per configuration in analysis.")
 
-# Randomize block order using the recorded seed (interleaving targets)
 rng = random.Random(seed)
 rng.shuffle(blocks)
 
 schedule = {
     "profile": profile,
     "session_id": session_id,
+    "mt_threads": tmt,
     "stage": os.environ["STAGE_TAG"],
     "stage_label": os.environ["STAGE_LABEL"],
     "stage_started_utc": os.environ["STAGE_STARTED_UTC"],
@@ -682,41 +675,41 @@ schedule = {
         "blocks": block_filter or None,
         "logn": ",".join(logn_filter) or None,
         "warmup": warmup_override or None,
+        "runs": runs_override or None,
         "lcpc_variants": os.environ.get("LCPC_VARIANTS") or None,
         "tags": tags_arg or None,
         "multi_cores": os.environ["MULTI_CORES"],
         "single_core": os.environ["SINGLE_CORE"],
+        "mt_threads": tmt,
     },
     "total_blocks": len(blocks),
-    "blocks": blocks
+    "blocks": blocks,
 }
 with open(os.environ["SCHEDULE_FILE"], "w", encoding="utf-8") as f:
     json.dump(schedule, f, indent=2)
-# Tab-separated block list for the shell loop (fields never contain tabs).
 with open(os.environ["BLOCKS_TSV"], "w", encoding="utf-8") as f:
     for b in blocks:
-        f.write("\t".join([b["id"], b["out"], b["cores"].split(",")[0], b["description"], b["cmd"]]) + "\n")
+        f.write("\t".join([
+            b["id"], b["out"], b["cores"].split(",")[0], b["skip_reason"], b["description"], b["cmd"]
+        ]) + "\n")
 
 print(f"[INFO] Generated schedule of {len(blocks)} blocks randomized with seed {seed}.")
 PY_SCHED
 
 if [ "$DRY_RUN" -eq 1 ]; then
     log_info "Dry-run mode enabled. Scheduled block execution order:"
-    python3 -c "
+    python3 -c '
 import json, sys
 with open(sys.argv[1]) as f:
     sched = json.load(f)
-for i, b in enumerate(sched['blocks'], 1):
-    print(f'  [{i}/{len(sched[\"blocks\"])}] {b[\"id\"]} (T={b[\"threads\"]}, cores {b[\"cores\"]}): {b[\"description\"]}')
-" "$SCHEDULE_FILE"
+for i, b in enumerate(sched["blocks"], 1):
+    sk = f" [SKIP: {b[\"skip_reason\"]}]" if b.get("skip_reason") else ""
+    print(f"  [{i}/{len(sched[\"blocks\"])}] {b[\"id\"]} (T={b[\"threads\"]}, cores {b[\"cores\"]}){sk}: {b[\"description\"]}")
+' "$SCHEDULE_FILE"
     log_info "Schedule: $SCHEDULE_FILE"
     exit 0
 fi
 
-# Session-level schedule.json: append-only list of every stage run in this
-# session (tag, filters, warm-up, variants, seed, block ids, per-block status
-# and exit status). Analysis takes the session from this file's directory;
-# stages/<tag>/schedule.json is the stage's own full schedule.
 SESSION_SCHED_SCRIPT="$STAGE_DIR/session_schedule.py"
 cat > "$SESSION_SCHED_SCRIPT" << 'PY_SESS'
 import json, os, sys, datetime
@@ -750,6 +743,7 @@ if data is None or "stages" not in data:
         "format": "rbd-session-schedule-v1",
         "session_id": stage_sched["session_id"],
         "profile": stage_sched["profile"],
+        "mt_threads": stage_sched.get("mt_threads"),
         "host": env["SESS_HOST"],
         "run_id": env["SESS_RUN_ID"],
         "note": ("Append-only: one entry per all.sh invocation (stage) of this session; each stage's "
@@ -759,6 +753,8 @@ if data is None or "stages" not in data:
     }
     if legacy is not None:
         data["legacy_schedule"] = legacy
+if stage_sched.get("mt_threads") is not None:
+    data["mt_threads"] = stage_sched["mt_threads"]
 profiles = data.setdefault("profiles", [])
 if stage_sched["profile"] not in profiles:
     profiles.append(stage_sched["profile"])
@@ -780,6 +776,7 @@ if sys.argv[1] == "begin":
         "started_utc": stage_sched["stage_started_utc"],
         "finished_utc": None,
         "profile": stage_sched["profile"],
+        "mt_threads": stage_sched.get("mt_threads"),
         "seed": stage_sched["seed"],
         "code_sha": env["SESS_CODE_SHA"],
         "instance": env["SESS_INSTANCE"],
@@ -817,6 +814,8 @@ else:
             b["status"] = item["status"]
             b["exit_code"] = item["exit_code"]
             b["duration_s"] = item["duration_s"]
+            if item.get("skip_reason"):
+                b["skip_reason"] = item["skip_reason"]
         elif b.get("status") == "scheduled":
             b["status"] = "not_run"
         if b["id"] in moved:
@@ -825,6 +824,7 @@ else:
     entry["exit_status"] = rc
     entry["state"] = state
     entry["failed_blocks"] = [b["id"] for b in entry.get("blocks", []) if b.get("status") == "failed"]
+    entry["skipped_blocks"] = [b["id"] for b in entry.get("blocks", []) if b.get("status") == "skipped"]
 save(path, data)
 PY_SESS
 
@@ -851,15 +851,9 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 TAB=$(printf '\t')
-
-# Execute scheduled blocks
 TOTAL_BLOCKS=$(wc -l < "$BLOCKS_TSV" | tr -d ' ')
 CURRENT_INDEX=1
 
-# CPU frequency of the block's first pinned core. With a cpufreq driver this is
-# the observed scaling_cur_freq; without one (e.g. many virtual machines) only the
-# constant 'cpu MHz' of /proc/cpuinfo exists, which is a nominal value and is
-# labelled as such (freq_source / freq_is_nominal in every record).
 cpu_freq_source() {
     if [ -r "/sys/devices/system/cpu/cpu$1/cpufreq/scaling_cur_freq" ]; then
         echo "observed: cpufreq scaling_cur_freq of CPU $1"
@@ -877,27 +871,38 @@ get_cpu_freq() {
     fi
 }
 
-# Load and allocation snapshot of a shared node (host profiles that define
-# host_noise_snapshot, e.g. the SoC cluster profiles); empty elsewhere.
 noise_snapshot() {
     if command -v host_noise_snapshot >/dev/null 2>&1; then
         host_noise_snapshot
     fi
 }
 
-# execution_log.jsonl gets one line per finished block (crash-safe); it is
-# converted to execution_log.json at the end of the stage.
 EXECUTION_LOG_JSONL="$STAGE_DIR/execution_log.jsonl"
 
-# Read the block list from a file, not a pipeline: a pipeline would run the
-# loop in a subshell (dash) and lose ANY_BLOCK_FAILED. Block commands get
-# </dev/null so they cannot consume the block list.
-while IFS="$TAB" read -r block_id block_out block_core block_desc block_cmd; do
+while IFS="$TAB" read -r block_id block_out block_core block_skip_reason block_desc block_cmd; do
     log_info ""
+    if [ -n "$block_skip_reason" ]; then
+        log_info ">>> Skipping Block [$CURRENT_INDEX/$TOTAL_BLOCKS]: $block_id ($block_skip_reason) <<<"
+        START_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        python3 -c '
+import json, sys
+entry = {
+    "block_id": sys.argv[2], "out": sys.argv[3], "status": "skipped", "skip_reason": sys.argv[4],
+    "exit_code": 0, "start_utc": sys.argv[5], "end_utc": sys.argv[5], "duration_s": 0,
+    "core_for_frequency": sys.argv[6], "freq_before_mhz": None, "freq_after_mhz": None,
+    "freq_source": None, "moved_previous_to": None, "cmd": sys.argv[7],
+    "noise_before": None, "noise_after": None,
+}
+with open(sys.argv[1], "a", encoding="utf-8") as f:
+    f.write(json.dumps(entry) + "\n")
+' "$EXECUTION_LOG_JSONL" "$block_id" "$block_out" "$block_skip_reason" "$START_UTC" "$block_core" "$block_cmd"
+        CURRENT_INDEX=$((CURRENT_INDEX + 1))
+        continue
+    fi
+
     log_info ">>> Running Block [$CURRENT_INDEX/$TOTAL_BLOCKS]: $block_id <<<"
     log_info "Description: $block_desc"
 
-    # Never mix two runs of a block: move an earlier output dir aside.
     BLOCK_PREV=""
     if [ -e "$block_out" ]; then
         _prev_ts=$(date -u +%Y%m%dT%H%M%SZ)
@@ -931,9 +936,6 @@ while IFS="$TAB" read -r block_id block_out block_core block_desc block_cmd; do
     DURATION=$((TIME_END - TIME_START))
 
     if [ "$BLOCK_RC" -ne 0 ]; then
-        # Record the failure and continue: every block runs its own correctness
-        # gate before timing, and one failing baseline must not discard the rest
-        # of a multi-hour session. Its outputs are tagged block_status=failed.
         BLOCK_STATUS=failed
         log_error "Block '$block_id' failed (exit $BLOCK_RC, duration: ${DURATION}s)! Continuing with the next block."
         printf '%s\t%s\t%s\t%s\n' "$block_id" "$DURATION" "$BLOCK_RC" "$STAGE_TAG" >> "$SESSION_DIR/failed_blocks.tsv"
@@ -943,7 +945,6 @@ while IFS="$TAB" read -r block_id block_out block_core block_desc block_cmd; do
         log_info "Block '$block_id' completed successfully in ${DURATION}s (CPU $block_core: ${FREQ_BEFORE:-?} MHz -> ${FREQ_AFTER:-?} MHz, $FREQ_SOURCE)."
     fi
 
-    # Tag this block's own JSON records only (session, stage, block, status, frequency).
     python3 "$TAG_SCRIPT" "$block_out" "$SESSION_ID" "$SEED" "$WATERMARK" "$FREQ_BEFORE" "$FREQ_AFTER" \
         "$FREQ_SOURCE" "$block_id" "$BLOCK_STATUS" "$STAGE_TAG" || \
         log_warn "Could not tag the JSON records of block '$block_id'"
@@ -981,10 +982,6 @@ with open(sys.argv[2], "w", encoding="utf-8") as f:
     f.write("\n")
 ' "$EXECUTION_LOG_JSONL" "$STAGE_DIR/execution_log.json"
 
-# Stage manifest: host/toolchain/git provenance plus the stage's real
-# arguments. Per-block parameters (threads, cores, logN, warm-ups) are in each
-# block's own manifest and in schedule.json; the session-level pinning fields
-# give the union of benchmark cores and the largest thread count scheduled.
 log_info ""
 log_info "Writing stage manifest..."
 STAGE_MAX_THREADS=$(python3 -c 'import json,sys; b=json.load(open(sys.argv[1]))["blocks"]; print(max([x["threads"] for x in b] or [1]))' "$SCHEDULE_FILE")
@@ -999,6 +996,7 @@ extra = {
     "stage_label": sched["stage_label"],
     "stage_started_utc": sched["stage_started_utc"],
     "profile": sched["profile"],
+    "mt_threads": sched.get("mt_threads"),
     "session_id": sched["session_id"],
     "seed": sched["seed"],
     "instance": os.environ["STAGE_INSTANCE"],
@@ -1013,50 +1011,24 @@ with open(os.environ["STAGE_EXTRA_FILE"], "w", encoding="utf-8") as f:
     f.write("\n")
 PY
 CORES="$MULTI_CORES"
+# shellcheck disable=SC2034 # Consumed by write_manifest in common.sh
 THREADS="$STAGE_MAX_THREADS"
+# shellcheck disable=SC2034
 LOGN="${LOGN_FILTER:-per-block}"
+# shellcheck disable=SC2034
 WARMUP="${WARMUP_OVERRIDE:-per-block}"
+# shellcheck disable=SC2034
 RUNS="per-block"
+# shellcheck disable=SC2034
 PARAMS="per-block"
+# shellcheck disable=SC2034
 FIELD="per-block"
+# shellcheck disable=SC2034
 SLICES="per-block"
 write_manifest "$STAGE_DIR/manifest.json" "$STAGE_EXTRA"
 
-if [ "$PROFILE" = "smoke" ]; then
-    # Smoke runs check that the analysis pipeline accepts every experiment
-    # family. Campaign profiles do not analyse a single stage: paper artefacts
-    # come from analyze.py over the selected run dirs (results/selection.json).
-    log_info ""
-    log_info "Generating smoke analysis tables via analyze.py..."
-    ANALYSIS_DIR="$STAGE_DIR/analysis"
-    mkdir -p "$ANALYSIS_DIR"
-    mkdir -p "$CARGO_TARGET_DIR/matplotlib"
-    MPLCONFIGDIR="$CARGO_TARGET_DIR/matplotlib" python3 "$CODE_DIR/scripts/analyze.py" \
-        --results-dir "$SESSION_DIR" \
-        --out-dir "$ANALYSIS_DIR" \
-        --allow 'T2|Mers127|*KDHR26*' \
-        --allow 'T2|Mers127|*LCPC*' \
-        --allow 'T2|Fp2M61|*KDHR26*' \
-        --allow 'T2|Fp2M61|*LCPC*' \
-        --allow 'T5|Ft127|Encode N=2^* T=1 (ms)' \
-        --allow 'T5|Ft127|Cost N=2^* (ns/MAC)' \
-        --allow 'T5|*|Encode N=2^24 T=1 (ms)' \
-        --allow 'T5|*|Cost N=2^24 (ns/MAC)' \
-        --allow 'T8|SIMD-Spielman|Setup (ms)' \
-        --allow 'T8|SIMD-Spielman|Setup / Encode' \
-        --allow 'T8|SIMD-Spielman|Peak RSS (MB)' \
-        --allow 'T9|Mont127|*Table 3*' \
-        --allow 'T9|Mers127|*Table 3*' \
-        --allow 'T12|*|This Work Arm (ms)' \
-        --allow 'T12|*|Original LCPC * Arm (ms)' \
-        --allow 'T12|*|Arm Speedup vs *' \
-        --check || SMOKE_ANALYSIS_FAILED=1
-else
-    log_info "Analyse the campaign with scripts/analyze.py --selection results/selection.json --check over all selected run dirs."
-fi
-
 STAGE_RC=0
-[ "$ANY_BLOCK_FAILED" -eq 0 ] && [ "$SMOKE_ANALYSIS_FAILED" -eq 0 ] || STAGE_RC=1
+[ "$ANY_BLOCK_FAILED" -eq 0 ] || STAGE_RC=1
 session_schedule end "$STAGE_RC" finished || log_warn "Could not finalize $SESSION_SCHEDULE"
 SESSION_SCHEDULE_FINALIZED=1
 
@@ -1064,12 +1036,9 @@ log_info "=========================================================="
 if [ "$ANY_BLOCK_FAILED" -ne 0 ]; then
     log_error "Stage finished with FAILED blocks; see $SESSION_DIR/failed_blocks.tsv"
 else
-    log_info "Stage completed: all blocks succeeded."
+    log_info "Stage completed: all scheduled blocks succeeded."
 fi
-if [ "$SMOKE_ANALYSIS_FAILED" -ne 0 ]; then
-    log_error "Smoke analysis (analyze.py --check) failed; see the [FAIL] list above"
-fi
-log_info "Profile:     $PROFILE"
+log_info "Profile:     $PROFILE (Tmt=$TMT)"
 log_info "Session ID:  $SESSION_ID"
 log_info "Stage:       $STAGE_TAG"
 log_info "Seed:        $SEED"

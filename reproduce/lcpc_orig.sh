@@ -4,9 +4,13 @@
 
 set -eu
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+# shellcheck disable=SC1091
 . "$SCRIPT_DIR/common.sh"
-. "${CARGO_HOME:-$HOME/.cargo}/env"
+if [ -f "${CARGO_HOME:-$HOME/.cargo}/env" ]; then
+    # shellcheck disable=SC1091
+    . "${CARGO_HOME:-$HOME/.cargo}/env"
+fi
 parse_args "$@"
 
 if [ "$PARAMS" != "lcpc-sdig6" ] && [ "$PARAMS" != "lcpc-sdig3" ]; then
@@ -41,15 +45,19 @@ case "$OUT" in
     /*) OUT_ROOT="$OUT" ;;
     *) OUT_ROOT="$CODE_DIR/$OUT" ;;
 esac
-CODE_SHA=$(git -C "$CODE_DIR" rev-parse --short=12 HEAD)
+CODE_SHA=$(git -C "$CODE_DIR" rev-parse --short=12 HEAD 2>/dev/null || echo "detached")
 RUN_ID=$(date -u +%Y-%m-%d)-$CODE_SHA
 DEST="$OUT_ROOT/$HOST_NAME/$RUN_ID/lcpc_orig"
 mkdir -p "$DEST"
 TARGET_ROOT="${CARGO_TARGET_DIR:-$CODE_DIR/target-lcpc-orig}"
 mkdir -p "$TARGET_ROOT/tmp"
 # Absolute, because the builds run from / (see build_variant).
-TARGET_ROOT=$(CDPATH= cd -- "$TARGET_ROOT" && pwd)
+TARGET_ROOT=$(CDPATH='' cd -- "$TARGET_ROOT" && pwd)
 export TMPDIR="$TARGET_ROOT/tmp"
+OFFLINE_FLAG=""
+if [ "${RBD_OFFLINE:-0}" = "1" ] || [ -f "${RBD_DEPS_DIR:-$CODE_DIR/deps}/.offline" ]; then
+    OFFLINE_FLAG="--offline"
+fi
 
 # The fork-flags variants use exactly the rustflags that the fork's committed
 # .cargo/config.toml applies to This Work on this host (target-cpu=native and
@@ -86,10 +94,10 @@ build_variant() {
     # Without the wrapper, the crate-scoped bootstrap for the pinned upstream
     # crate's `#![feature(test)]` is passed directly.
     log_info "Building original LCPC: $variant_name (cargo profile $cargo_profile, RUSTFLAGS='$variant_rustflags', cwd /)"
-    # shellcheck disable=SC2086 # feature_args is empty or two words
+    # shellcheck disable=SC2086 # feature_args and OFFLINE_FLAG are empty or flag words
     (cd / && env CARGO_BUILD_JOBS=2 CARGO_TARGET_DIR="$target_dir" RUSTC_BOOTSTRAP=lcpc_brakedown_pc \
         RUSTFLAGS="$variant_rustflags" RAYON_NUM_THREADS="$THREADS" taskset -c "$CORES" cargo build \
-        --manifest-path "$DRIVER_DIR/Cargo.toml" --locked --profile "$cargo_profile" $feature_args)
+        --manifest-path "$DRIVER_DIR/Cargo.toml" --locked $OFFLINE_FLAG --profile "$cargo_profile" $feature_args)
     binary="$target_dir/$cargo_profile/lcpc-orig-driver"
 
     [ -x "$binary" ] || {
@@ -205,7 +213,9 @@ rm -f "$VARIANT_RECORDS"
 
 # The driver is not built under code/.cargo/config.toml; record that instead of
 # the fork's configured flags (per-variant flags are in extra.baseline.variants).
+# shellcheck disable=SC2089 # JSON payload passed via environment variable
 MANIFEST_RUST_OVERRIDES_JSON='{"effective_rustflags": null, "rustflags_source": "per build variant: extra.baseline.variants.<variant>.effective_rustflags (built from /, code/.cargo/config.toml not applied)", "cargo_rustc_wrapper": null}'
+# shellcheck disable=SC2090
 export MANIFEST_RUST_OVERRIDES_JSON
 write_manifest "$DEST/manifest.json" "$EXTRA_FILE"
 log_info "Original LCPC raw JSON and manifest written under $DEST"

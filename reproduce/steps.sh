@@ -4,15 +4,22 @@
 
 set -eu
 
-# The repository pins rustc through rustup; load Cargo before resolving it.
-. "${CARGO_HOME:-$HOME/.cargo}/env"
+if [ -f "${CARGO_HOME:-$HOME/.cargo}/env" ]; then
+    # shellcheck disable=SC1091
+    . "${CARGO_HOME:-$HOME/.cargo}/env"
+fi
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-CODE_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
-REPO_DIR=$(CDPATH= cd -- "$CODE_DIR/.." && pwd)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+CODE_DIR=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 DRIVER_SRC="$CODE_DIR/external/steps-driver"
 TARGET_ROOT="${CARGO_TARGET_DIR:-$CODE_DIR/target-eval-steps}"
 WORKTREE_ROOT="$TARGET_ROOT/worktrees"
+
+_STEPS_DEPS_DIR="${RBD_DEPS_DIR:-$CODE_DIR/deps}"
+if [ -f "$_STEPS_DEPS_DIR/env.sh" ]; then
+    # shellcheck disable=SC1090
+    . "$_STEPS_DEPS_DIR/env.sh"
+fi
 
 SPECIFIC_TAGS=""
 LOGN="16,20,24,28"
@@ -20,9 +27,9 @@ RUNS=5
 WARMUP_OVERRIDE=""
 SESSION_ID_OVERRIDE=""
 THREADS=1
-CORES="0,1,3-7"
-OUT="$CODE_DIR/results"
-HOST_NAME=$(hostname -s 2>/dev/null || echo generic)
+CORES=""
+OUT="out"
+HOST_NAME=""
 TIMEOUT_SEC=1800
 RUN_CLASS="campaign"
 MODE=both
@@ -31,22 +38,23 @@ usage() {
     cat <<EOF
 Usage: $0 [options]
 
-Runs E3 at step/01-modernize through HEAD with the external steps-driver.
+Runs per-technique breakdown at step/01-modernize through HEAD with external/steps-driver.
 Options:
   --tags <list>       Comma-separated tags (default: all step/* tags, then HEAD)
   --mode a|b|both     Mode (a) lcpc-sdig6 Mont127 (Ft127 at step/01-modernize),
                       mode (b) simd-spielman Mers127 (N/A before step/04-r2l), or
-                      both (default). Campaign blocks run one mode each.
+                      both (default).
   --logN <list>       Even log2(N) values (default: 16,20,24,28)
   --runs <n>          Timed runs (default: 5)
   --warmup <n>        Warm-ups (default: 2; automatically 1 for logN >= 26)
-  --threads <n>       E3 uses one thread; only 1 is accepted
+  --threads <n>       Fixed at T=1; only 1 is accepted
   --session-id <id>   Session label (default: this invocation's unique run ID)
-  --cores <list>      Explicit CPU affinity (default: 0,1,3-7); CPU 2 is forbidden
+  --cores <list>      Explicit CPU affinity (default: autodetected single core)
   --timeout-sec <n>   Per-configuration limit (default: 1800)
-  --host <name>       Result host label (default: hostname -s)
-  --out <dir>         Result root (default: code/results)
-  --smoke             Watermark records as local smoke, not research results
+  --host-label <name> Result host label (default: sanitized hostname -s; alias: --host)
+  --out <dir>         Result root (default: out)
+  --quick             Watermark records as quick mode
+  --smoke             Watermark records as local smoke (deprecated alias)
   -h, --help          Show this help
 EOF
 }
@@ -62,8 +70,9 @@ while [ $# -gt 0 ]; do
         --threads) [ $# -ge 2 ] || { echo "--threads requires a value" >&2; exit 2; }; THREADS=$2; shift 2 ;;
         --cores) [ $# -ge 2 ] || { echo "--cores requires a value" >&2; exit 2; }; CORES=$2; shift 2 ;;
         --timeout-sec) [ $# -ge 2 ] || { echo "--timeout-sec requires a value" >&2; exit 2; }; TIMEOUT_SEC=$2; shift 2 ;;
-        --host) [ $# -ge 2 ] || { echo "--host requires a value" >&2; exit 2; }; HOST_NAME=$2; shift 2 ;;
+        --host-label|--host) [ $# -ge 2 ] || { echo "$1 requires a value" >&2; exit 2; }; HOST_NAME=$2; shift 2 ;;
         --out) [ $# -ge 2 ] || { echo "--out requires a value" >&2; exit 2; }; OUT=$2; shift 2 ;;
+        --quick) RUN_CLASS="quick"; shift ;;
         --smoke) RUN_CLASS="local-smoke-not-a-result"; shift ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
@@ -80,7 +89,7 @@ case "$MODE" in a|both) RUN_MODE_A=1 ;; esac
 case "$MODE" in b|both) RUN_MODE_B=1 ;; esac
 
 if [ "$THREADS" != "1" ]; then
-    echo "E3 is fixed at T=1; --threads only accepts 1" >&2
+    echo "Per-step breakdown is fixed at T=1; --threads only accepts 1" >&2
     exit 2
 fi
 
@@ -92,6 +101,27 @@ fi
 for tool in cargo rustc taskset timeout python3 sha256sum git sort; do
     command -v "$tool" >/dev/null 2>&1 || { echo "Required command not found: $tool" >&2; exit 1; }
 done
+
+case "$OUT" in
+    results|./results|"$CODE_DIR/results")
+        echo "[WARN] Writing into archived results/ directory; omit --out to write to out/ instead." >&2
+        ;;
+esac
+
+if [ -z "$HOST_NAME" ]; then
+    _inst=$(hostname -s 2>/dev/null || echo unknown-host)
+    HOST_NAME=$(printf '%s' "$_inst" | tr -c 'A-Za-z0-9._-' '_')
+fi
+
+if [ -z "$CORES" ]; then
+    _cores_info=$(python3 "$SCRIPT_DIR/lib/cores.py" --max-threads 1) || {
+        echo "Failed to autodetect core via reproduce/lib/cores.py" >&2
+        exit 1
+    }
+    IFS='|' read -r CORES _rest <<CORES_EOF
+$_cores_info
+CORES_EOF
+fi
 
 case "$RUNS:$TIMEOUT_SEC" in
     *[!0-9:]*|:*) echo "--runs and --timeout-sec must be positive integers" >&2; exit 2 ;;
@@ -120,8 +150,6 @@ for part in raw.split(","):
         if not part.isdecimal():
             raise SystemExit(f"invalid core id: {part}")
         cores.add(int(part))
-if 2 in cores:
-    raise SystemExit("CPU 2 is reserved and must not be used")
 if not cores:
     raise SystemExit("--cores must select at least one CPU")
 print(",".join(str(core) for core in sorted(cores)))
@@ -141,10 +169,16 @@ print(" ".join(str(size) for size in sizes))
 PY
 ) || exit 2
 
-TV_DIR=${SIMD_SPIELMAN_TV_DIR:-"$REPO_DIR/SIMD-Spielman-for-ZKPs/tv"}
+DEPS_DIR="${RBD_DEPS_DIR:-$CODE_DIR/deps}"
+TV_DIR="${SIMD_SPIELMAN_TV_DIR:-$DEPS_DIR/SIMD-Spielman-for-ZKPs/tv}"
 if [ ! -f "$TV_DIR/bd_spielman_extension_N12_in.txt" ]; then
-    echo "SIMD-Spielman test vectors not found in $TV_DIR (set SIMD_SPIELMAN_TV_DIR)" >&2
+    echo "SIMD-Spielman test vectors not found in $TV_DIR (run reproduce/fetch_deps.sh or set SIMD_SPIELMAN_TV_DIR)" >&2
     exit 1
+fi
+
+OFFLINE_FLAG=""
+if [ "${RBD_OFFLINE:-0}" = "1" ] || [ -f "$DEPS_DIR/.offline" ]; then
+    OFFLINE_FLAG="--offline"
 fi
 
 mkdir -p "$TARGET_ROOT" "$WORKTREE_ROOT"
@@ -178,8 +212,8 @@ cleanup_worktree() {
 }
 trap cleanup_worktree EXIT HUP INT TERM
 
-echo "[steps] E3 per-tag comparison; mode=$MODE; T=1; logN=$LOGN; runs=$RUNS; cores=$CORES"
-echo "[steps] Same timing loop: steps-driver-v1; run class: $RUN_CLASS"
+echo "[steps] Per-tag comparison; mode=$MODE; T=1; logN=$LOGN; runs=$RUNS; cores=$CORES"
+echo "[steps] Timing loop: steps-driver-v1; run class: $RUN_CLASS"
 echo "[steps] Output: $DEST"
 echo "[steps] CARGO_TARGET_DIR: $TARGET_ROOT"
 
@@ -206,13 +240,19 @@ import json
 import os
 
 status = os.environ["PLACEHOLDER_STATUS"]
+rclass = os.environ["PLACEHOLDER_CLASS"]
+wm = None
+if rclass == "quick":
+    wm = "QUICK MODE - reduced sizes and repetitions; not comparable cell-by-cell with the paper"
+elif rclass == "local-smoke-not-a-result":
+    wm = "LOCAL SMOKE — NOT A RESULT"
 record = {
     "schema_version": "steps-bench-v1",
     "harness_version": "steps-driver-v1",
     "adapter_version": os.environ["PLACEHOLDER_ADAPTER"],
     "status": status,
-    "run_class": os.environ["PLACEHOLDER_CLASS"],
-    "watermark": "LOCAL SMOKE — NOT A RESULT" if os.environ["PLACEHOLDER_CLASS"] == "local-smoke-not-a-result" else None,
+    "run_class": rclass,
+    "watermark": wm,
     "tag": os.environ["PLACEHOLDER_TAG"],
     "session_id": os.environ["PLACEHOLDER_SESSION_ID"],
     "commit": os.environ["PLACEHOLDER_COMMIT"],
@@ -283,9 +323,10 @@ prepare_driver() {
     mkdir -p "$DRIVER_TARGET"
     DRIVER_BUILD_LOG="$STEP_DEST/build-${MODE_TO_BUILD}.log"
     echo "[steps] Building timing harness for $TAG ($MODE_TO_BUILD; $DRIVER_ADAPTER)"
+    # shellcheck disable=SC2086
     if ! (cd "$CURRENT_WORKTREE" && \
         env CARGO_TARGET_DIR="$DRIVER_TARGET" RAYON_NUM_THREADS=1 \
-        taskset -c "$CORES" cargo build --release --offline --manifest-path "$PROJECT/Cargo.toml") \
+        taskset -c "$CORES" cargo build --release --locked $OFFLINE_FLAG --manifest-path "$PROJECT/Cargo.toml") \
         > "$DRIVER_BUILD_LOG" 2>&1; then
         echo "Timing harness build failed for $TAG; see $DRIVER_BUILD_LOG" >&2
         tail -n 80 "$DRIVER_BUILD_LOG" >&2 || true
@@ -353,24 +394,25 @@ for TAG in $TAGS_TO_RUN; do
     git -C "$CODE_DIR" worktree add --detach "$CURRENT_WORKTREE" "$TAG" >/dev/null
     TAG_COMMIT=$(git -C "$CURRENT_WORKTREE" rev-parse HEAD)
     TAG_SUBJECT=$(git -C "$CURRENT_WORKTREE" log -1 --pretty=format:%s)
-    TAG_CLEAN=$(printf '%s' "$TAG" | tr '/ ' '__')
     TAG_TARGET="$TARGET_ROOT/cargo/workspace-$TAG_CLEAN"
     mkdir -p "$TAG_TARGET"
 
     echo "[steps] [$STEP_INDEX] $TAG ($TAG_COMMIT): $TAG_SUBJECT"
     TEST_LOG="$STEP_DEST/workspace-tests.log"
+    # shellcheck disable=SC2086
     if ! (cd "$CURRENT_WORKTREE" && \
         env CARGO_TARGET_DIR="$TAG_TARGET" RAYON_NUM_THREADS=1 SIMD_SPIELMAN_TV_DIR="$TV_DIR" \
-        taskset -c "$CORES" cargo test --workspace --release --locked) \
+        taskset -c "$CORES" cargo test --workspace --release --locked $OFFLINE_FLAG) \
         > "$TEST_LOG" 2>&1; then
         echo "Workspace tests failed at $TAG; refusing to time this tag. See $TEST_LOG" >&2
         tail -n 100 "$TEST_LOG" >&2 || true
         exit 1
     fi
 
+    # shellcheck disable=SC2086
     if ! (cd "$CURRENT_WORKTREE" && \
         env CARGO_TARGET_DIR="$TAG_TARGET" RAYON_NUM_THREADS=1 \
-        taskset -c "$CORES" cargo build --release --locked --bin lcpc-bench) \
+        taskset -c "$CORES" cargo build --release --locked $OFFLINE_FLAG --bin lcpc-bench) \
         > "$STEP_DEST/workspace-build.log" 2>&1; then
         echo "Workspace benchmark build failed at $TAG; see $STEP_DEST/workspace-build.log" >&2
         tail -n 80 "$STEP_DEST/workspace-build.log" >&2 || true
@@ -455,9 +497,6 @@ for TAG in $TAGS_TO_RUN; do
 import json
 import os
 
-# A codegen PASS is only evidence of scalar hot kernels when the checker
-# matched hot-kernel symbols; early steps (before the column-major kernels
-# existed) match none or few, so state that instead of a bare PASS.
 codegen_note = None
 try:
     with open(os.environ["STEP_CODEGEN"], encoding="utf-8") as f:
@@ -469,6 +508,12 @@ try:
         codegen_note = f"non-strict check (pre-runtime API); {checked} hot-kernel symbols matched"
 except (OSError, ValueError):
     codegen_note = "codegen report unreadable"
+rclass = os.environ["STEP_RUN_CLASS"]
+wm = None
+if rclass == "quick":
+    wm = "QUICK MODE - reduced sizes and repetitions; not comparable cell-by-cell with the paper"
+elif rclass == "local-smoke-not-a-result":
+    wm = "LOCAL SMOKE — NOT A RESULT"
 manifest = {
     "schema_version": "steps-tag-manifest-v1",
     "harness_version": "steps-driver-v1",
@@ -478,13 +523,12 @@ manifest = {
     "step_index": int(os.environ["STEP_INDEX"]),
     "session_id": os.environ["STEP_SESSION_ID"],
     "detected_api_stage": os.environ["STEP_STAGE"],
-    "run_class": os.environ["STEP_RUN_CLASS"],
-    "watermark": "LOCAL SMOKE — NOT A RESULT" if os.environ["STEP_RUN_CLASS"] == "local-smoke-not-a-result" else None,
+    "run_class": rclass,
+    "watermark": wm,
     "workspace_tests": os.environ["STEP_TEST_LOG"],
     "codegen_report": os.environ["STEP_CODEGEN"],
     "codegen_note": codegen_note,
     "modes_run": os.environ["STEP_MODE"],
-    # Only a run that included mode (a) has a mode (a) field.
     "mode_a_field": os.environ["STEP_MODE_A_FIELD"] if os.environ["STEP_MODE"] in ("a", "both") else None,
 }
 with open(os.environ["TAG_MANIFEST"], "w", encoding="utf-8") as output:
@@ -524,6 +568,12 @@ for path in sorted(glob.glob(os.path.join(root, "*", "mode-*", "mode-*-logN*.jso
         "harness_version": item.get("harness_version"),
         "adapter_version": item.get("adapter_version"),
     })
+rclass = os.environ["RUN_CLASS_VALUE"]
+wm = None
+if rclass == "quick":
+    wm = "QUICK MODE - reduced sizes and repetitions; not comparable cell-by-cell with the paper"
+elif rclass == "local-smoke-not-a-result":
+    wm = "LOCAL SMOKE — NOT A RESULT"
 manifest = {
     "schema_version": "steps-run-manifest-v1",
     "harness_version": "steps-driver-v1",
@@ -531,9 +581,10 @@ manifest = {
     "session_id": os.environ["RUN_SESSION_ID"],
     "source_checkout_head": os.environ["RUN_SOURCE_SHA"],
     "host": os.environ["RUN_HOST"],
-    "run_class": os.environ["RUN_CLASS_VALUE"],
-    "watermark": "LOCAL SMOKE — NOT A RESULT" if os.environ["RUN_CLASS_VALUE"] == "local-smoke-not-a-result" else None,
+    "run_class": rclass,
+    "watermark": wm,
     "machine": {"platform": platform.platform(), "uname": platform.uname()._asdict()},
+    "os_and_kernel": {"machine": platform.machine()},
     "configuration": {
         "modes": {"a": "lcpc-sdig6 / Mont127 (Ft127 at step/01-modernize)", "b": "simd-spielman / Mers127 from step/04-r2l"},
         "modes_run": os.environ["RUN_MODE_VALUE"],
@@ -561,6 +612,3 @@ with open(os.environ["RUN_MANIFEST"], "w", encoding="utf-8") as output:
 PY
 
 echo "[steps] Complete. Combined manifest: $DEST/manifest.json"
-if [ "$RUN_CLASS" = "local-smoke-not-a-result" ]; then
-    echo "[steps] These local smoke records are watermarked and must not be reported as benchmark results."
-fi
