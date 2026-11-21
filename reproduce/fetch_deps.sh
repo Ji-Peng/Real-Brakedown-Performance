@@ -28,6 +28,14 @@ if [ -f "${CARGO_HOME:-$HOME/.cargo}/env" ]; then
     . "${CARGO_HOME:-$HOME/.cargo}/env"
 fi
 
+if [ -z "${RUSTUP_TOOLCHAIN:-}" ] && [ -f "$CODE_DIR/rust-toolchain.toml" ]; then
+    _rbd_tc=$(sed -n 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$CODE_DIR/rust-toolchain.toml" | head -n 1)
+    if [ -n "$_rbd_tc" ]; then
+        RUSTUP_TOOLCHAIN="$_rbd_tc"
+        export RUSTUP_TOOLCHAIN
+    fi
+fi
+
 DEPS_DIR="${RBD_DEPS_DIR:-$CODE_DIR/deps}"
 SKIP_STEPS_FETCH=0
 

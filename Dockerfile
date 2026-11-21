@@ -56,8 +56,10 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 COPY . /rbd
 WORKDIR /rbd
 
-# Bake the pinned Rust toolchain from rust-toolchain.toml (1.99.1) without compiling.
-RUN cargo --version && rustc --version
+# Bake the pinned Rust toolchain from rust-toolchain.toml (1.99.1) without compiling,
+# and set it as default so out-of-tree cargo invocations (e.g. cd /) find it.
+RUN cargo --version && rustc --version \
+    && rustup default "$(rustc --version | awk '{print $2}')"
 
 # Prefetch pinned third-party baselines and all Cargo crates (workspace + baselines + step/* tags).
 RUN sh reproduce/fetch_deps.sh && touch deps/.offline

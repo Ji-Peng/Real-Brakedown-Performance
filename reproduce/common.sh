@@ -41,6 +41,16 @@ log_cmd() {
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 CODE_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)"
 
+# Pin rustup toolchain from rust-toolchain.toml so out-of-tree cargo calls (e.g. cd /) work
+# even when rustup was installed with --default-toolchain none.
+if [ -z "${RUSTUP_TOOLCHAIN:-}" ] && [ -f "$CODE_DIR/rust-toolchain.toml" ]; then
+    _rbd_tc=$(sed -n 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$CODE_DIR/rust-toolchain.toml" | head -n 1)
+    if [ -n "$_rbd_tc" ]; then
+        RUSTUP_TOOLCHAIN="$_rbd_tc"
+        export RUSTUP_TOOLCHAIN
+    fi
+fi
+
 # Source deps/env.sh whenever present (written by reproduce/fetch_deps.sh)
 _COMMON_DEPS_DIR="${RBD_DEPS_DIR:-$CODE_DIR/deps}"
 if [ -f "$_COMMON_DEPS_DIR/env.sh" ]; then
