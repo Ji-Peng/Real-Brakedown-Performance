@@ -13,8 +13,7 @@ The R2L kernels evaluate expander graphs via right-to-left sparse gathering (Alg
 In an unblocked gather ($B = 1$), for each output column $r$, incoming edges $(l_0, w_0), (l_1, w_1), \dots$ are processed sequentially across all rows in the batch:
 
 ```text
-for (left, weight) in incoming_edges:
-    w = prepare_weight(weight)
+for (left, w) in incoming_prepared_edges:
     for row in 0..n_rows:
         scratch[row] += w * in[left][row]
 ```
@@ -35,10 +34,8 @@ $$(l_0, w_0), (l_1, w_1), \dots, (l_{B-1}, w_{B-1})$$
 and processes them in a single unrolled inner loop pass over `row in 0..n_rows`:
 
 ```text
-for chunk in incoming_edges.chunks_exact(B):
-    w0 = prepare_weight(chunk[0].weight)
-    ...
-    w(B-1) = prepare_weight(chunk[B-1].weight)
+for chunk in incoming_prepared_edges.chunks_exact(B):
+    [w0, ..., w(B-1)] = chunk.weights
     
     for row in 0..n_rows:
         acc = scratch[row]              // 1 load
@@ -53,9 +50,8 @@ for chunk in incoming_edges.chunks_exact(B):
 1. **$B\times$ Reduction in Scratch Memory Traffic:**
    - Instead of $B$ loads and $B$ stores to `scratch[row]`, the blocked kernel performs **1 load** and **1 store** for every $B$ edges.
    - For $B = 4$, scratch read/write traffic is cut by **75%** (4× reduction).
-2. **Weight Preparation Hoisting:**
-   - `F::prepare_weight(w)` converts raw field weights (e.g., Montgomery form or precomputed multiplier format) once *outside* the inner `n_rows` loop.
-   - For a batch of $n_{\text{rows}} = 1024$, weight conversion cost is amortized over 1024 rows ($< 0.1\%$ overhead).
+2. **Once-per-Code Weight Preparation & Register Hoisting:**
+   - `ExpanderCode` transforms raw field weights via `F::prepare_weight` once on first use (`OnceLock`), and the blocked outer loop loads `w0..w(B-1)` once *outside* the inner `n_rows` loop without repeating `prepare_weight` per slice or per call.
 3. **Register Reuse:**
    - The multi-limb accumulator `acc` remains pinned in general-purpose registers (GPRs) across all $B$ MACs, chaining additions without touching stack or cache.
 4. **Intermediate Overflow & Fold Handling:**

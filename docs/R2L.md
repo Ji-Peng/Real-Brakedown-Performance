@@ -40,13 +40,14 @@ per-row encoder kept as a test-only reference (and upstream's
 
 ## Evaluation (`lcpc-brakedown-pc/src/encode.rs`)
 
-`encode_column_block(graph, input, output, n_rows)` evaluates one graph on a
-column-major block (SIMD-Spielman's Algorithm 3, right-to-left "gather"): for
-each right node `r`, the first incoming edge initializes output column `r`
-(`out[r][row] = w * in[l][row]`), the remaining edges accumulate into it, and a
-node without edges gets zeros. Each output column is written in one pass over
-its edges, and input columns are only read. Rows form the unit-stride inner
-loop (see [COLUMN_MAJOR.md](COLUMN_MAJOR.md)).
+`encode_column_block_prepared(graph, weights, input, output, n_rows)` (and the
+standalone wrapper `encode_column_block(graph, input, output, n_rows)`)
+evaluates one graph on a column-major block (SIMD-Spielman's Algorithm 3,
+right-to-left "gather"): for
+each right node `r`, its incoming edges `(l, w)` are accumulated across the
+column and reduced once into `out[r]`, while a node without edges gets zeros.
+Each output column is written in one pass over its edges, and input columns are
+only read. Rows form the unit-stride inner loop (see [COLUMN_MAJOR.md](COLUMN_MAJOR.md)).
 
 Field addition is associative and commutative, so the R2L gather produces the
 same field element as left-to-right scatter and is bit-exact with upstream
@@ -54,10 +55,15 @@ LCPC in mode (a).
 
 `encode_col_major(buf, n_rows, code)` and the single-vector
 `encode(xi, code)` now take an `ExpanderCode<F>`: the per-level precode and
-postcode graphs plus a `BaseCase`:
+postcode graphs plus a `BaseCase`, along with a `OnceLock` cache of prepared
+edge weights (`F::prepare_weight` in edge order) built on first use:
 
 - `BaseCase::ReedSolomon` (mode (a)): as upstream, the last precode output is a
-  temporary, Reed-Solomon encoded (Horner, column-major) into the codeword.
+  temporary, Reed-Solomon encoded into the codeword. On first use,
+  `ExpanderCode` builds a dense Vandermonde `R2lGraph` (incoming weights
+  `x_c^j` at `x_c = c + 1`) and its prepared weights so the base case runs
+  through the same lazy R2L kernel; `reed_solomon_column_block` (Horner,
+  column-major) stays public as a reference.
 - `BaseCase::Identity` (mode (b)): the last precode output is written into the
   codeword and the last postcode reads it directly (SIMD-Spielman's
   `r2l_runEncodeEfficient` returns at `rec >= num_graphs`).
@@ -71,10 +77,10 @@ an `LcEncoding` for the PCS. The `tv/` tests use this path to feed upstream's
 graphs (from the test-only glibc sampler in `lcpc-spielman-oracle`) to the
 fork's own transpose and encoder.
 
-**Codegen entry points.** `encode_column_block` and
-`reed_solomon_column_block` are public, generic, and `#[inline(never)]`, so
-each field gets its own symbol (e.g.
-`lcpc_brakedown_pc::encode::encode_column_block::<lcpc_fields::mont127::Mont127>`),
+**Codegen entry points.** `encode_column_block_prepared`,
+`encode_column_block`, and `reed_solomon_column_block` are public, generic, and
+`#[inline(never)]`, so each field gets its own symbol (e.g.
+`lcpc_brakedown_pc::encode::encode_column_block_prepared::<lcpc_fields::mont127::Mont127>`),
 which `scripts/check_codegen.py` finds by pattern.
 
 ## Runtime code parameters (`codespec.rs`, `matgen.rs`)

@@ -20,11 +20,12 @@ Because R2L gathers all incoming edges for each right (output) node $r$ before m
 
 ## 2. Kernel Design (`lcpc-brakedown-pc/src/encode.rs`)
 
-`encode_column_block<F: LazyField>` evaluates an expander graph on a column block:
+`encode_column_block_prepared<F: LazyField>` evaluates an expander graph (or the Reed-Solomon base-case Vandermonde graph) on a column block using edge weights pre-transformed once per code via `F::prepare_weight`:
 
 ```rust
-pub fn encode_column_block<F: LazyField>(
+pub fn encode_column_block_prepared<F: LazyField>(
     graph: &R2lGraph<F>,
+    weights: &[F],
     input: &[F],
     output: &mut [F],
     n_rows: usize,
@@ -32,16 +33,18 @@ pub fn encode_column_block<F: LazyField>(
     let mut scratch = vec![F::Acc::default(); n_rows];
 
     for (r, dst) in output.chunks_exact_mut(n_rows).enumerate() {
-        let (lefts, weights) = graph.incoming(r);
-        let num_edges = lefts.len();
-        if num_edges == 0 {
+        let start = graph.row_ptr()[r] as usize;
+        let end = graph.row_ptr()[r + 1] as usize;
+        let lefts = &graph.col_idx()[start..end];
+        let edge_weights = &weights[start..end];
+        if lefts.is_empty() {
             dst.fill(F::ZERO);
             continue;
         }
 
         let mut since_fold = 0;
 
-        for e in 0..num_edges {
+        for (&l_idx, &w) in lefts.iter().zip(edge_weights.iter()) {
             if since_fold >= F::MAX_ACCUMULATIONS {
                 for acc in scratch.iter_mut() {
                     F::fold(acc);
@@ -49,8 +52,7 @@ pub fn encode_column_block<F: LazyField>(
                 since_fold = 1;
             }
 
-            let w = F::prepare_weight(&weights[e]);
-            let l = lefts[e] as usize * n_rows;
+            let l = l_idx as usize * n_rows;
             let src = &input[l..l + n_rows];
 
             for (acc, s) in scratch.iter_mut().zip(src) {
@@ -71,9 +73,9 @@ pub fn encode_column_block<F: LazyField>(
 ### Key Principles:
 1. **Unblocked Reference Structure vs. Multi-Edge Blocking**: The snippet above shows the unblocked ($B = 1$) lazy reduction loop; the current implementation adds $B = 4$ multi-edge blocking on top of this same `LazyField` structure (see [BLOCKING.md](BLOCKING.md)).
 2. **Scratch Buffer in L1d**: `scratch` is allocated once and reused across all output columns $r$. For each column, it accumulates unreduced products and is zeroed upon reduction.
-3. **Weight Preparation**: `F::prepare_weight(&weights[e])` transforms raw edge weights into the representation expected by `F::mac` outside the inner row loop:
-   - For `Mont127`: computes $w \cdot R_{192} \bmod q$, enabling 3-word Montgomery reduction ($R = 2^{192}$).
-   - For `Mers127` and `Fp2M61`: identity operation.
+3. **Once-per-Code Weight Preparation & Lazy Reed-Solomon Base Case**: `ExpanderCode` caches derived data in a `OnceLock` on first use:
+   - `F::prepare_weight` of every edge weight of every precode and postcode graph in edge order (`Mont127` computes $w \cdot R_{192} \bmod q$ for 3-word Montgomery reduction; `Mers127` and `Fp2M61` are the identity). Preparing weights once per code eliminates repeated `prepare_weight` multiplications across horizontal LLC slices, repeated batch calls, and single-vector verifier encodings (`encode_column_block` remains available for standalone graphs and prepares a local weight vector).
+   - For `BaseCase::ReedSolomon` (mode (a)), a dense Vandermonde `R2lGraph` with incoming weights $x_c^j$ ($x_c = c + 1$) and its prepared weights, so the base case runs through the same lazy blocked kernel rather than eager Horner evaluation (`reed_solomon_column_block` stays public as a reference).
 4. **Intermediate Folding for Arbitrary Degrees**:
    - `Mont127` and `Mers127` have capacity for $D \le 2^{64}$ accumulations without overflow (`MAX_ACCUMULATIONS = usize::MAX`).
    - `Fp2M61` accumulates in two `u128` limbs with exact headroom for $D = 32$ edges (`MAX_ACCUMULATIONS = 32`). When `since_fold >= 32`, `F::fold` compresses both limbs back down to $< 2^{62}$ with 4 bitwise shift/mask instructions, restoring headroom for another 31 MACs.

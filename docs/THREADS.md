@@ -15,10 +15,10 @@ As analyzed in the SIMD-Spielman paper ([KDHR26] §3.5.2, Table 1), independent 
 ### Expander-Level Collaborative Parallelism
 
 In this work, our fork replaces row-level independent execution with **expander-level collaborative multithreading**:
-1. **Collaborative Execution on Slices**: All $T$ worker threads operate collaboratively on the **exact same slice and the exact same expander graph level**.
-2. **Right-Node Partitioning**: For an expander graph with $M_R = \text{graph.n\_right()}$ output columns, the right nodes are divided into $T$ contiguous, disjoint ranges:
+1. **Collaborative Execution on Slices**: All $T$ worker threads operate collaboratively on the **exact same slice and the exact same expander graph level** (including the Reed-Solomon base-case Vandermonde graph in mode (a)); the coordinator initializes `ExpanderCode`'s `OnceLock` of prepared edge weights and base-case graph before `pool.execute` so workers only read shared immutable data.
+2. **Right-Node Partitioning**: For an expander or base-case graph with $M_R = \text{graph.n\_right()}$ output columns, the right nodes are divided into $T$ contiguous, disjoint ranges:
    $$\text{Worker } t \in \{0, \dots, T-1\} \text{ computes } r \in [r_{\text{start}}(t), \; r_{\text{end}}(t))$$
-   where partition sizes differ by at most 1 (via `split_range(M_R, t, T)`).
+   balanced by cumulative edge and reduction cost (`split_right_nodes`).
 3. **Shared Read-Only Left Nodes in LLC**: All worker threads read concurrently from the **same left-node slice**, which remains hot in the shared LLC. Because left-node accesses are read-only, all CPU cores hit in shared cache with zero cache-coherency invalidations.
 4. **Disjoint Writes & Private L1d Accumulators**: Each worker thread $t$ maintains its private scratch accumulator buffer of size $R_s \times \text{size\_of::<F::Acc>()}$ (resident in core $t$'s private L1d cache) and writes to a strictly disjoint range of destination columns.
 5. **Zero Locks and Zero Atomics in Hot Kernels**: No locks, mutexes, or atomic instructions occur during inner-loop expander evaluation.

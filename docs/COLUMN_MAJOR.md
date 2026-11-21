@@ -15,16 +15,22 @@ position is one contiguous column of `n_rows` elements.
 - `encode_col_major(buf, n_rows, code)` follows the same recursion as upstream
   `encode` (precodes down, base case, postcodes back up), with every offset
   scaled by `n_rows`.
-- `encode_column_block` evaluates one R2L sparse graph on a column block: for
-  each right node `r`, incoming edges `(l, w)` are gathered across the entire
-  column `row in 0..n_rows` (`out[r][row] += w * in[l][row]`). Both columns are
-  unit-stride and consecutive rows are independent.
-- `reed_solomon_column_block` evaluates the Vandermonde base case with Horner's
-  rule element-wise across each column.
+- `encode_column_block_prepared` (and the standalone `encode_column_block`)
+  evaluates one R2L sparse graph on a column block using prepared edge weights
+  cached once per `ExpanderCode`: for each right node `r`, incoming edges
+  `(l, w)` are gathered across the entire column `row in 0..n_rows`
+  (`out[r][row] += w * in[l][row]`). Both columns are unit-stride and
+  consecutive rows are independent.
+- In `BaseCase::ReedSolomon`, `ExpanderCode` also caches a dense Vandermonde
+  `R2lGraph` and its prepared weights so the base case runs through
+  `encode_column_block_prepared`; `reed_solomon_column_block` (Horner's rule
+  element-wise across each column) stays public as a reference.
 - The single-vector `encode` is `encode_col_major` with `n_rows = 1`, so the
-  verifier's 1-vector encodings use the same kernel.
-- `encode_column_block` and `reed_solomon_column_block` are `#[inline(never)]`
-  so their disassembly can be inspected.
+  verifier's encodings use the same kernel and reuse the code's prepared
+  weights.
+- `encode_column_block_prepared`, `encode_column_block`, and
+  `reed_solomon_column_block` are `#[inline(never)]` so their disassembly can
+  be inspected.
 
 Field addition is associative and commutative, so the outputs are bit-exact
 with the per-row `sprs` products this replaces.
