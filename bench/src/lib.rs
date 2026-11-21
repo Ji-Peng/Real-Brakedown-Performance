@@ -12,6 +12,7 @@ use std::time::Instant;
 
 use digest::{FixedOutput, Output, Update};
 use ff::{Field, PrimeField};
+use lcpc_2d::chacha::{keystream_blocks, ChaCha20Stream};
 use lcpc_2d::{FieldHash, LcCommit, LcEncoding, SizedField};
 use lcpc_brakedown_pc::codespec::{CodeParams, SdigCode3, SdigCode6, SdigSpecification};
 use lcpc_brakedown_pc::{SdigEncodingS, SpielmanEncoding};
@@ -19,8 +20,7 @@ use lcpc_fields::{Fp2M61, LazyField, Mers127, Mont127};
 use lcpc_test_fields::{ft127::Ft127, ft63::Ft63, Blake3};
 use merlin::Transcript;
 use num_traits::Num;
-use rand::SeedableRng;
-use rand_chacha::ChaCha20Rng;
+use rand::{SeedableRng, TryRng};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -551,13 +551,144 @@ pub fn bytes_hex(bytes: &[u8]) -> String {
     output
 }
 
+const PAR_CHACHA_CHUNK_WORDS: usize = 65_536;
+
+/// Parallel-refill ChaCha20 keystream batcher used by the benchmark harness when
+/// `threads > 1`. Each refill populates `threads * 65536` `u32` words in
+/// parallel via [`keystream_blocks`], while `TryRng` serves the exact same
+/// sequential word stream as [`ChaCha20Stream`].
+struct ParallelChaCha20Batch {
+    key: [u32; 8],
+    stream: u64,
+    block: u64,
+    buf: Vec<u32>,
+    idx: usize,
+}
+
+impl ParallelChaCha20Batch {
+    fn new(rng: &ChaCha20Stream, threads: usize) -> Self {
+        let pos = rng.get_word_pos();
+        assert_eq!(
+            pos % 16,
+            0,
+            "ParallelChaCha20Batch requires a block-aligned starting position"
+        );
+        let buf_words = threads.max(1) * PAR_CHACHA_CHUNK_WORDS;
+        Self {
+            key: *rng.key(),
+            stream: rng.get_stream(),
+            block: (pos / 16) as u64,
+            buf: vec![0u32; buf_words],
+            idx: buf_words,
+        }
+    }
+
+    #[inline(never)]
+    fn refill(&mut self) {
+        const BLOCKS_PER_CHUNK: usize = PAR_CHACHA_CHUNK_WORDS / 16;
+        let base_block = self.block;
+        let key = self.key;
+        let stream = self.stream;
+        self.buf
+            .par_chunks_mut(PAR_CHACHA_CHUNK_WORDS)
+            .enumerate()
+            .for_each(|(chunk_idx, chunk)| {
+                let first_block = base_block.wrapping_add((chunk_idx * BLOCKS_PER_CHUNK) as u64);
+                keystream_blocks(&key, stream, first_block, chunk);
+            });
+        self.block = base_block.wrapping_add((self.buf.len() / 16) as u64);
+        self.idx = 0;
+    }
+
+    #[inline(never)]
+    fn next_u64_slow(&mut self) -> u64 {
+        let len = self.buf.len();
+        if self.idx + 1 == len {
+            let lo = self.buf[len - 1];
+            self.refill();
+            let hi = self.buf[0];
+            self.idx = 1;
+            (u64::from(hi) << 32) | u64::from(lo)
+        } else {
+            self.refill();
+            let lo = self.buf[0];
+            let hi = self.buf[1];
+            self.idx = 2;
+            (u64::from(hi) << 32) | u64::from(lo)
+        }
+    }
+
+    fn word_pos(&self) -> u128 {
+        if self.idx >= self.buf.len() {
+            u128::from(self.block) * 16
+        } else {
+            let buf_blocks = (self.buf.len() / 16) as u64;
+            u128::from(self.block.wrapping_sub(buf_blocks)) * 16 + self.idx as u128
+        }
+    }
+}
+
+impl TryRng for ParallelChaCha20Batch {
+    type Error = core::convert::Infallible;
+
+    #[inline]
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+        if self.idx >= self.buf.len() {
+            self.refill();
+        }
+        let w = self.buf[self.idx];
+        self.idx += 1;
+        Ok(w)
+    }
+
+    #[inline]
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+        let idx = self.idx;
+        if idx + 1 < self.buf.len() {
+            let lo = self.buf[idx];
+            let hi = self.buf[idx + 1];
+            self.idx = idx + 2;
+            return Ok((u64::from(hi) << 32) | u64::from(lo));
+        }
+        Ok(self.next_u64_slow())
+    }
+
+    #[inline]
+    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Self::Error> {
+        let mut offset = 0;
+        let len = self.buf.len();
+        while offset < dst.len() {
+            if self.idx >= len {
+                self.refill();
+            }
+            let avail_words = len - self.idx;
+            let rem_bytes = dst.len() - offset;
+            let full_words = (rem_bytes / 4).min(avail_words);
+            for i in 0..full_words {
+                let w = self.buf[self.idx + i];
+                dst[offset + 4 * i..offset + 4 * i + 4].copy_from_slice(&w.to_le_bytes());
+            }
+            self.idx += full_words;
+            offset += full_words * 4;
+            if offset < dst.len() && self.idx < len {
+                let tail = dst.len() - offset;
+                let w = self.buf[self.idx];
+                self.idx += 1;
+                dst[offset..].copy_from_slice(&w.to_le_bytes()[..tail]);
+                break;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Runs field microbenchmarks for mul, mac, and reduce on field `F`.
 pub fn field_microbenchmarks<F>(field_name: &'static str, iterations: usize) -> FieldMicrobenchReport
 where
     F: LazyField,
 {
     let iters = iterations.max(10_000);
-    let mut rng = ChaCha20Rng::seed_from_u64(0xfeed_cafe_1234_5678);
+    let mut rng = ChaCha20Stream::seed_from_u64(0xfeed_cafe_1234_5678);
 
     // 1. mul microbenchmark
     let mut a = F::random(&mut rng);
@@ -715,10 +846,19 @@ where
     }
 
     let input_setup_start = Instant::now();
-    let mut rng = ChaCha20Rng::seed_from_u64(HASH_SEED ^ u64::from(log_n));
-    let coefficients: Vec<F> = (0..coefficient_count)
-        .map(|_| F::random(&mut rng))
-        .collect();
+    let mut rng = ChaCha20Stream::seed_from_u64(HASH_SEED ^ u64::from(log_n));
+    let coefficients: Vec<F> = if threads > 1 {
+        let mut batch = ParallelChaCha20Batch::new(&rng, threads);
+        let coeffs: Vec<F> = (0..coefficient_count)
+            .map(|_| F::random(&mut batch))
+            .collect();
+        rng.set_word_pos(batch.word_pos());
+        coeffs
+    } else {
+        (0..coefficient_count)
+            .map(|_| F::random(&mut rng))
+            .collect()
+    };
     let mut matrix = vec![<F as Field>::ZERO; n_rows * n_cols];
     for row in 0..n_rows {
         matrix[row * n_cols..row * n_cols + n_per_row]
@@ -943,7 +1083,7 @@ pub fn run_ligero_rs_benchmark(
     let cpu_mhz_before = get_cpu_mhz();
 
     let input_setup_start = Instant::now();
-    let mut rng = ChaCha20Rng::seed_from_u64(seed);
+    let mut rng = ChaCha20Stream::seed_from_u64(seed);
     let coefficients: Vec<Ft127> = (0..coefficient_count)
         .map(|_| Ft127::random(&mut rng))
         .collect();
@@ -1143,7 +1283,7 @@ where
     let n_cols = codeword_length::<S>(n_per_row);
     let enc = SdigEncodingS::<F, S>::new_from_dims(n_per_row, n_cols, seed);
     let coefficient_count = n_per_row * n_rows;
-    let mut rng = ChaCha20Rng::seed_from_u64(seed);
+    let mut rng = ChaCha20Stream::seed_from_u64(seed);
     let coefficients: Vec<F> = (0..coefficient_count)
         .map(|_| F::random(&mut rng))
         .collect();
@@ -1162,7 +1302,7 @@ where
         return Err(format!("golden root mismatch for {field_name}/{spec_name}"));
     }
 
-    let mut point_rng = ChaCha20Rng::seed_from_u64(evaluation_seed);
+    let mut point_rng = ChaCha20Stream::seed_from_u64(evaluation_seed);
     let point = F::random(&mut point_rng);
     let (inner_tensor, outer_tensor) = tensors(point, n_per_row, n_rows);
     let expected_eval = evaluate_polynomial_tensors(&coefficients, &inner_tensor, &outer_tensor);
@@ -1397,4 +1537,50 @@ pub fn golden_json(golden: &GoldenFile) -> String {
     writeln!(out, "  ]").unwrap();
     out.push('}');
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::Rng;
+    use rand_chacha::ChaCha20Rng;
+
+    #[test]
+    fn parallel_chacha20_batch_matches_stream_and_chacha20rng() {
+        let seed = HASH_SEED ^ 20;
+        for &threads in &[2usize, 4, 8] {
+            let mut seq = ChaCha20Stream::seed_from_u64(seed);
+            let mut oracle = ChaCha20Rng::seed_from_u64(seed);
+            let mut batch = ParallelChaCha20Batch::new(&seq, threads);
+
+            // Sample enough Mont127 elements to cross at least one parallel batch refill.
+            let count = (threads * PAR_CHACHA_CHUNK_WORDS) / 4 + 257;
+            for i in 0..count {
+                let a = Mont127::random(&mut batch);
+                let b = Mont127::random(&mut seq);
+                let c = Mont127::random(&mut oracle);
+                assert_eq!(a, b, "Mont127 mismatch vs ChaCha20Stream at {i} (T={threads})");
+                assert_eq!(a, c, "Mont127 mismatch vs ChaCha20Rng at {i} (T={threads})");
+            }
+            assert_eq!(batch.word_pos(), seq.get_word_pos());
+            assert_eq!(batch.word_pos(), oracle.get_word_pos());
+
+            // Verify handoff back to ChaCha20Stream via set_word_pos produces identical point.
+            let mut handoff = ChaCha20Stream::seed_from_u64(seed);
+            handoff.set_word_pos(batch.word_pos());
+            assert_eq!(Mont127::random(&mut handoff), Mont127::random(&mut seq));
+
+            // Mixed u32 / u64 / fill_bytes across an odd word boundary.
+            let mut buf_a = [0u8; 37];
+            let mut buf_b = [0u8; 37];
+            for _ in 0..5 {
+                assert_eq!(batch.next_u32(), oracle.next_u32());
+                assert_eq!(batch.next_u64(), oracle.next_u64());
+                batch.fill_bytes(&mut buf_a);
+                oracle.fill_bytes(&mut buf_b);
+                assert_eq!(buf_a, buf_b);
+                assert_eq!(batch.word_pos(), oracle.get_word_pos());
+            }
+        }
+    }
 }
