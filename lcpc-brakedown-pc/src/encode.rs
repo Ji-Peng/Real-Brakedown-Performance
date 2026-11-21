@@ -9,7 +9,9 @@
 //
 // Modified 2026 by the RealBrakedownPerf authors (Apache-2.0, see NOTICE):
 // column-major batched encoding, R2L evaluation, lazy reduction,
-// multi-edge blocking, LLC slicing, expander-level worker pool, codegen tuning.
+// multi-edge blocking, LLC slicing, expander-level worker pool, codegen tuning,
+// tiled threaded transposes, edge-balanced right-node partitioning, reusable
+// encoding scratch.
 // The per-commit changes are in the git history since step/00-import
 // (upstream conroi/lcpc f0e2116).
 
@@ -398,14 +400,24 @@ impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
             let slice_buf = self.buf;
             let comm = self.comm;
 
-            // 1. Collaborative Transpose of messages from comm into slice_buf
-            let (c_start, c_end) = split_range(self.n_per_row, tid, num_threads);
-            for c in c_start..c_end {
-                for r in 0..h {
-                    unsafe {
-                        let val = *comm.add((r_start + r) * self.n_cols + c);
-                        *slice_buf.add(c * h + r) = val;
-                    }
+            // 1. Collaborative tiled transpose of messages from row-major `comm` into
+            //    column-major `slice_buf`.
+            // Safety: `comm` is only read during this phase (between the previous
+            // slice's final barrier / job entry and the barrier below), and the read
+            // span `[r_start * n_cols + c0 .. (r_start + h - 1) * n_cols + c1)` lies
+            // within `comm` (`0 .. n_rows * n_cols`) when `c0 < c1` and `h > 0`.
+            // Destination slices `[c0 * h .. c1 * h)` in `slice_buf` cover distinct
+            // message columns per worker and are therefore pairwise disjoint.
+            let (c0, c1) = split_range(self.n_per_row, tid, num_threads);
+            if c0 < c1 {
+                let cols = c1 - c0;
+                unsafe {
+                    let src = std::slice::from_raw_parts(
+                        comm.add(r_start * self.n_cols + c0),
+                        (h - 1) * self.n_cols + cols,
+                    );
+                    let dst = std::slice::from_raw_parts_mut(slice_buf.add(c0 * h), cols * h);
+                    transpose_into(src, self.n_cols, dst, h, h, cols);
                 }
             }
             barrier.wait();
@@ -523,14 +535,31 @@ impl<'a, F: LazyField> WorkerJob for RowMajorSliceJob<'a, F> {
                 out_start += postcode.n_right();
             }
 
-            // 3. Collaborative Transpose of redundancy from slice_buf into comm
-            let (row_start_t, row_end_t) = split_range(h, tid, num_threads);
-            for r in row_start_t..row_end_t {
-                for c in self.n_per_row..self.n_cols {
-                    unsafe {
-                        let val = *slice_buf.add(c * h + r);
-                        *comm.add((r_start + r) * self.n_cols + c) = val;
-                    }
+            // 3. Collaborative tiled transpose of redundancy from column-major
+            //    `slice_buf` back into row-major `comm`.
+            // Safety: `slice_buf` is only read during this phase (between the last
+            // postcode barrier above and the barrier below), and its read span
+            // `[n_per_row * h + ra .. (n_cols - 1) * h + rb)` lies within
+            // `0 .. n_cols * h` when `ra < rb` and `n_red > 0`. In `comm`, worker
+            // `tid`'s mutable destination slice starts at `(r_start + ra) * n_cols + n_per_row`
+            // and ends at `(r_start + rb - 1) * n_cols + n_cols = (r_start + rb) * n_cols`
+            // — the last element of its last row, before the message part of the
+            // next worker's first row — so destination slices of different workers
+            // are pairwise disjoint and within `0 .. n_rows * n_cols`.
+            let (ra, rb) = split_range(h, tid, num_threads);
+            let n_red = self.n_cols - self.n_per_row;
+            if ra < rb && n_red > 0 {
+                let rows_w = rb - ra;
+                unsafe {
+                    let src = std::slice::from_raw_parts(
+                        slice_buf.add(self.n_per_row * h + ra),
+                        (n_red - 1) * h + rows_w,
+                    );
+                    let dst = std::slice::from_raw_parts_mut(
+                        comm.add((r_start + ra) * self.n_cols + self.n_per_row),
+                        (rows_w - 1) * self.n_cols + n_red,
+                    );
+                    transpose_into(src, h, dst, self.n_cols, n_red, rows_w);
                 }
             }
             barrier.wait();

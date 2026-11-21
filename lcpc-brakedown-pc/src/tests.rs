@@ -8,7 +8,8 @@
 // except according to those terms.
 //
 // Modified 2026 by the RealBrakedownPerf authors (Apache-2.0, see NOTICE):
-// oracle, invariance, lazy linear-combination, and regression tests for the fork.
+// oracle, invariance, lazy linear-combination, encoder thread-scaling,
+// scratch-reuse, and regression tests for the fork.
 // The per-commit changes are in the git history since step/00-import
 // (upstream conroi/lcpc f0e2116).
 
@@ -2000,4 +2001,127 @@ fn test_lazy_lincomb_kernels_all_fields() {
     );
     check_field::<Ft127>(0x4444_dddd, None);
     check_field::<Ft63>(0x5555_eeee, None);
+}
+
+#[test]
+fn test_threaded_transposes_fewer_cols_or_rows_than_threads() {
+    use super::codespec::SdigCode6;
+    use super::encode::{
+        encode, encode_row_major_slices, encode_row_major_slices_mt, BaseCase, ExpanderCode,
+    };
+    use super::thread_pool::{get_affinity_cores, ThreadPool};
+
+    fn make_small_code<F: LazyField>(
+        k: usize,
+        base: BaseCase,
+        rng: &mut ChaCha20Rng,
+    ) -> ExpanderCode<F> {
+        let m0 = (k / 2).max(2);
+        let m1 = 2usize;
+        let rs_out = match base {
+            BaseCase::ReedSolomon => 4usize,
+            BaseCase::Identity => m1,
+        };
+        let post1_right = 3usize;
+        let post0_left = m0 + rs_out + post1_right;
+        let post0_right = 5usize;
+
+        let sample_graph = |n_left: usize, n_right: usize, deg: usize, rng: &mut ChaCha20Rng| {
+            let mut right_idx = Vec::with_capacity(n_left * deg);
+            let mut weights = Vec::with_capacity(n_left * deg);
+            for _ in 0..n_left * deg {
+                right_idx.push((rng.random::<u64>() as usize % n_right) as u32);
+                let mut w = F::random(&mut *rng);
+                if w == F::ZERO {
+                    w = F::ONE;
+                }
+                weights.push(w);
+            }
+            R2lGraph::from_left_edges_fixed_degree(n_left, n_right, deg, &right_idx, &weights)
+        };
+
+        let pre0 = sample_graph(k, m0, 2, rng);
+        let pre1 = sample_graph(m0, m1, 2, rng);
+        let post1 = sample_graph(rs_out, post1_right, 2, rng);
+        let post0 = sample_graph(post0_left, post0_right, 2, rng);
+
+        ExpanderCode::from_graphs(base, vec![pre0, pre1], vec![post0, post1])
+    }
+
+    fn verify_code_mt<F: LazyField>(
+        code: &ExpanderCode<F>,
+        n_rows_list: &[usize],
+        slices_list: &[usize],
+        pools: &[ThreadPool],
+        rng: &mut ChaCha20Rng,
+    ) {
+        let n_cols = code.codeword_len();
+        let k = code.n_per_row();
+        for &n_rows in n_rows_list {
+            // Fill entire matrix with random non-zero values so stale/untouched redundancy
+            // or clobbered systematic message positions are immediately caught.
+            let initial: Vec<F> = (0..n_rows * n_cols)
+                .map(|_| {
+                    let v = F::random(&mut *rng);
+                    if v == F::ZERO { F::ONE } else { v }
+                })
+                .collect();
+
+            let mut expected = initial.clone();
+            for row in expected.chunks_exact_mut(n_cols) {
+                encode(row, code);
+            }
+
+            let mut ref_sliced = initial.clone();
+            encode_row_major_slices(&mut ref_sliced, n_rows, code, 1);
+            assert_eq!(ref_sliced, expected);
+
+            for &slices in slices_list {
+                for pool in pools {
+                    let mut got = initial.clone();
+                    encode_row_major_slices_mt(&mut got, n_rows, code, slices, pool);
+                    assert_eq!(
+                        got,
+                        expected,
+                        "mismatch for {}, base={:?}, k={k}, n_cols={n_cols}, n_rows={n_rows}, slices={slices}, T={}",
+                        std::any::type_name::<F>(),
+                        code.base_case(),
+                        pool.num_threads()
+                    );
+                }
+            }
+        }
+    }
+
+    let allowed = get_affinity_cores();
+    let pools: Vec<ThreadPool> = [2usize, 4, 8, 9]
+        .into_iter()
+        .map(|t| ThreadPool::new(t, &allowed))
+        .collect();
+
+    fn run_for_field<F: LazyField>(seed: u64, pools: &[ThreadPool]) {
+        let mut rng = ChaCha20Rng::seed_from_u64(seed);
+        // 1. n_per_row < T (k in {1, 3, 5, 7} < T=8,9) with both h < T and h > T
+        for &base in &[BaseCase::ReedSolomon, BaseCase::Identity] {
+            for &k in &[1usize, 3, 5, 7] {
+                let code = make_small_code::<F>(k, base, &mut rng);
+                verify_code_mt(&code, &[1, 3, 7, 11, 25], &[1, 3, 5], pools, &mut rng);
+            }
+        }
+
+        // 2. Full SdigCode6 and SimdSpielman codes with h < T (n_rows / slices < 8, 9)
+        let enc_a = SpielmanEncoding::<F>::with_params(
+            CodeParams::Lcpc(LcpcParams::of::<SdigCode6>()),
+            64,
+            seed ^ 1,
+        );
+        verify_code_mt(enc_a.code(), &[1, 2, 3, 7, 11], &[1, 3, 5], pools, &mut rng);
+
+        let enc_b = SpielmanEncoding::<F>::with_params(CodeParams::SimdSpielman, 64, seed ^ 2);
+        verify_code_mt(enc_b.code(), &[1, 2, 3, 7, 11], &[1, 3, 5], pools, &mut rng);
+    }
+
+    run_for_field::<Mont127>(0x711ed_0001, &pools);
+    run_for_field::<Mers127>(0x711ed_0002, &pools);
+    run_for_field::<Fp2M61>(0x711ed_0003, &pools);
 }
