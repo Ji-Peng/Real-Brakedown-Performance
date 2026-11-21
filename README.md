@@ -64,7 +64,7 @@ docker run --rm --network none --cpuset-cpus 0-7 -v "$PWD/out:/rbd/out" \
   - **C3 (SIMD-Spielman)**: x86-64 with **AVX-512 IFMA** (`avx512ifma`), `g++`, `cmake`, and Boost headers.
   - **C11 (Arm portability)**: Linux **AArch64**.
   - **RAM**: quick mode ≥ 8 GB; full mode ≥ 64 GB (the $N=2^{28}$ stages `B` and `T28` peak around 34 GiB RSS and are dropped automatically with a documented `not-run` reason on hosts under 64 GB).
-  - **Disk**: `TODO(measure)` (build artifacts + Cargo cache + raw JSON outputs).
+  - **Disk**: about 2 GB for quick mode (1.9 GB Cargo target directory, 95 MB outputs), plus the Rust toolchain.
 - **OS**: Linux with `/sys` cache topology (`sysfs`) and `taskset` (`util-linux`).
 - **Toolchain**: `rustup` and Rust `1.99.1` (installed automatically via `rust-toolchain.toml`),
   Python ≥ 3.11 with `matplotlib`, `git`, GNU `time`, `objdump` (`binutils`), and `g++`/`cmake`/Boost
@@ -82,23 +82,24 @@ Generated from `reproduce/claims.tsv`, `scripts/claim_times.py`, and
 `scripts/paper_reference/claims.csv` via `reproduce/run.sh --list-claims --markdown`. Full-mode
 wall times are measured from the authors' archived `execution_log.json` files (full non-overlapping
 session totals: `soc-xcnh/s1` 9.5 h, `soc-xcnh/s2` 9.3 h, `soc-xcng/arm1` 56 min); quick-mode times
-remain `TODO(measure)` until archived from a dedicated benchmark host.
+were measured with one cold `reproduce/run.sh --mode quick` on an AMD EPYC 9755 host with 8 cores
+(28.5 min for all x86-64 claims; C4 and C11 not measured there).
 
 <!-- BEGIN CLAIMS TABLE -->
 | ID | Paper location | Command | Output (CSV / paper table) | Full-mode time | Quick-mode time | Requirements | Expected result and tolerance |
 | :--- | :--- | :--- | :--- | ---: | ---: | :--- | :--- |
-| **C0** | §Correctness | `reproduce/run.sh --mode quick --claims C0` | T0 / tab_correctness | ~2 min (tests) | TODO(measure) | any Linux | all PASS (hard: every row must PASS) |
-| **C1** | §Codegen | `reproduce/run.sh --mode quick --claims C0,C1` | T11 / tab_codegen | included in C2/C11 | TODO(measure) | any Linux | 0 vec arith, PASS (hard: 0 vector arithmetic and PASS) |
-| **C2** | §Headline | `reproduce/run.sh --mode quick --claims C0,C2` | T1 / tab_headline | 3.3 h | TODO(measure) | x86_64 | >1x (ref T=1 pub 7.06-8.87x, ff 5.92-7.39x, pc 3.10-5.80x) (directional: all measured speedups > 1 (strict: all faster)) |
-| **C3** | §SIMD | `reproduce/run.sh --mode quick --claims C0,C3` | T2,T9 / tab_simd | 5.3 h | TODO(measure) | x86_64,avx512ifma,boost,cmake | >1x (ref 1.57-4.36x); Brakedown MT not slower than T=1 (directional: SIMD faster at T=1 (N<=2^26) and MT <= T=1) |
-| **C4** | §Steps | `reproduce/run.sh --mode quick --claims C0,C4` | T3,F1 / tab_steps | 1.0 h | TODO(measure) | x86_64,git-tags | >1x (ref a=5.69x, b=2.07x) (directional: cumulative speedup > 1 at HEAD) |
-| **C5** | §Slicing | `reproduce/run.sh --mode quick --claims C0,C5` | T4,F2 / tab_slices,fig_llc | 30 min | TODO(measure) | x86_64 | >=1x (ref T=1 1.01-1.15x, T=8 1.10-2.26x) (directional: s=1/best >= 1 and adaptive close to best) |
-| **C6** | §Threads | `reproduce/run.sh --mode quick --claims C0,C6` | F3 / fig_threads | 2.5 h | TODO(measure) | x86_64,cores>=8(full) | >1x (ref T=8 6.57-7.17x, eff 0.82-0.90) (directional: S(Tmt) > 1) |
-| **C7** | §Fields | `reproduce/run.sh --mode quick --claims C0,C7` | T5 / tab_fields | 51 min | TODO(measure) | x86_64 | >1x (ref 2^20 1.24x) (directional: Mont127 / Fp2M61 > 1) |
-| **C8** | §PCS | `reproduce/run.sh --mode quick --claims C0,C8` | T6,T7 / tab_pcs | 3.4 h | TODO(measure) | x86_64 | >1x (ref T=1 4.74-4.97x, T=8 2.91-3.04x) (directional: commit speedup > 1 and hash share rises) |
-| **C9** | §Setup | `reproduce/run.sh --mode quick --claims C0,C9` | T8 / tab_setup | 5.3 h | TODO(measure) | x86_64 | PCS setup < Input gen. (ref PCS/enc 0.00-0.05x, ratio 1.18-1.39x) (directional: PCS setup < Input gen.) |
-| **C10** | §Ligero | `reproduce/run.sh --mode quick --claims C0,C10` | T10 (artifact CSV only) | 51 min | TODO(measure) | x86_64 | >1x (directional: RS / Brakedown > 1) |
-| **C11** | §Arm | `reproduce/run.sh --mode quick --claims C0,C11` | T12 / tab_arm | 56 min | TODO(measure) | aarch64 | >1x (ref T=1 pub 3.03-3.17x, ff 2.73-2.86x) (directional: Arm speedup > 1) |
+| **C0** | §Correctness | `reproduce/run.sh --mode quick --claims C0` | T0 / tab_correctness | ~2 min (tests) | 3 min | any Linux | all PASS (hard: every row must PASS) |
+| **C1** | §Codegen | `reproduce/run.sh --mode quick --claims C0,C1` | T11 / tab_codegen | included in C2/C11 | 3 min | any Linux | 0 vec arith, PASS (hard: 0 vector arithmetic and PASS) |
+| **C2** | §Headline | `reproduce/run.sh --mode quick --claims C0,C2` | T1 / tab_headline | 3.3 h | 6 min | x86_64 | >1x (ref T=1 pub 7.06-8.87x, ff 5.92-7.39x, pc 3.10-5.80x) (directional: all measured speedups > 1 (strict: all faster)) |
+| **C3** | §SIMD | `reproduce/run.sh --mode quick --claims C0,C3` | T2,T9 / tab_simd | 5.3 h | 24 min | x86_64,avx512ifma,boost,cmake | >1x (ref 1.57-4.36x); Brakedown MT not slower than T=1 (directional: SIMD faster at T=1 (N<=2^26) and MT <= T=1) |
+| **C4** | §Steps | `reproduce/run.sh --mode quick --claims C0,C4` | T3,F1 / tab_steps | 1.0 h | not measured | x86_64,git-tags | >1x (ref a=5.69x, b=2.07x) (directional: cumulative speedup > 1 at HEAD) |
+| **C5** | §Slicing | `reproduce/run.sh --mode quick --claims C0,C5` | T4,F2 / tab_slices,fig_llc | 30 min | 4 min | x86_64 | >=1x (ref T=1 1.01-1.15x, T=8 1.10-2.26x) (directional: s=1/best >= 1 and adaptive close to best) |
+| **C6** | §Threads | `reproduce/run.sh --mode quick --claims C0,C6` | F3 / fig_threads | 2.5 h | 5 min | x86_64,cores>=8(full) | >1x (ref T=8 6.57-7.17x, eff 0.82-0.90) (directional: S(Tmt) > 1) |
+| **C7** | §Fields | `reproduce/run.sh --mode quick --claims C0,C7` | T5 / tab_fields | 51 min | 6 min | x86_64 | >1x (ref 2^20 1.24x) (directional: Mont127 / Fp2M61 > 1) |
+| **C8** | §PCS | `reproduce/run.sh --mode quick --claims C0,C8` | T6,T7 / tab_pcs | 3.4 h | 7 min | x86_64 | >1x (ref T=1 4.74-4.97x, T=8 2.91-3.04x) (directional: commit speedup > 1 and hash share rises) |
+| **C9** | §Setup | `reproduce/run.sh --mode quick --claims C0,C9` | T8 / tab_setup | 5.3 h | 6 min (24 min with IFMA) | x86_64 | PCS setup < Input gen. (ref PCS/enc 0.00-0.05x, ratio 1.18-1.39x) (directional: PCS setup < Input gen.) |
+| **C10** | §Ligero | `reproduce/run.sh --mode quick --claims C0,C10` | T10 (artifact CSV only) | 51 min | 6 min | x86_64 | >1x (directional: RS / Brakedown > 1) |
+| **C11** | §Arm | `reproduce/run.sh --mode quick --claims C0,C11` | T12 / tab_arm | 56 min | not measured | aarch64 | >1x (ref T=1 pub 3.03-3.17x, ff 2.73-2.86x) (directional: Arm speedup > 1) |
 <!-- END CLAIMS TABLE -->
 
 ---

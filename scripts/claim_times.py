@@ -32,6 +32,24 @@ SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 CODE_DIR = SCRIPT_DIR.parent
 
 
+
+# Quick-mode wall times measured with `reproduce/run.sh --mode quick` (all claims, cold
+# build) on one AMD EPYC 9755 (Zen 5) host with 8 physical cores: 28.5 min in total, of
+# which build, tests and report took 2.9 min and the stages QA 3.0, QH 1.1, QS 18.5,
+# QC 0.9 and QT 2.0 min. A claim's time is the shared 2.9 min plus its stages.
+QUICK_TIMES = {
+    "C0": "3 min",
+    "C1": "3 min",
+    "C2": "6 min",
+    "C3": "24 min",
+    "C5": "4 min",
+    "C6": "5 min",
+    "C7": "6 min",
+    "C8": "7 min",
+    "C9": "6 min (24 min with IFMA)",
+    "C10": "6 min",
+}
+
 def load_tsv(path):
     rows = []
     with open(path, "r", encoding="utf-8") as f:
@@ -150,7 +168,7 @@ def compute_claim_times(results_dir=None, code_dir=None):
             "host": host_used,
             "full_seconds": round(secs) if secs is not None else "",
             "full_time": full_str,
-            "quick_time": "TODO(measure)",
+            "quick_time": QUICK_TIMES.get(cid, "not measured"),
         })
 
     totals = {

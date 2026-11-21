@@ -262,8 +262,9 @@ class TestReportPipeline(unittest.TestCase):
     def test_claim_times_archived(self):
         rows, totals = claim_times.compute_claim_times(CODE_DIR / "results", CODE_DIR)
         self.assertEqual(len(rows), 12)
-        for r in rows:
-            self.assertEqual(r["quick_time"], "TODO(measure)")
+        quick = {r["claim_id"]: r["quick_time"] for r in rows}
+        self.assertEqual(quick["C2"], claim_times.QUICK_TIMES["C2"])
+        self.assertEqual(quick["C11"], "not measured")
         self.assertGreater(totals["x86_mean_seconds"], 30000)
         self.assertGreater(totals["arm_primary_seconds"], 3000)
 
