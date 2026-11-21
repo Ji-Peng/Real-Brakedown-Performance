@@ -15,7 +15,7 @@
 
 set -eu
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/common.sh"
 
@@ -83,19 +83,12 @@ if [ -n "$SIMD_EXTRA_INCLUDE" ]; then
     CPLUS_INCLUDE_PATH="$SIMD_EXTRA_INCLUDE${CPLUS_INCLUDE_PATH:+:$CPLUS_INCLUDE_PATH}"
     export CPLUS_INCLUDE_PATH
 fi
-if [ "$HOST_NAME" = generic ]; then
-    HOST_NAME=$(hostname -s)
-fi
 # Upstream splits right nodes into THREADS parts (the last takes the remainder),
 # so any count works; 7 = 8-core point (7 workers + spin-waiting coordinator).
 case "$THREADS" in
     ''|*[!0-9]*|0) log_error "Unsupported --threads value '$THREADS'; use a positive integer <= 16."; exit 1 ;;
     *) [ "$THREADS" -le 16 ] || { log_error "Unsupported --threads value '$THREADS'; use a positive integer <= 16."; exit 1; } ;;
 esac
-if [ "$THREADS" -gt 1 ] && [ "$EXPLICIT_CORES" -ne 1 ]; then
-    log_error "SIMD-Spielman multithreaded runs require an explicit --cores list."
-    exit 1
-fi
 case "$RUNS" in
     ''|*[!0-9]*) log_error "--runs must be a positive integer."; exit 1 ;;
     0) log_error "--runs must be a positive integer."; exit 1 ;;
@@ -150,9 +143,9 @@ if [ "$OUT_WAS_SET" -eq 1 ]; then
         *) OUT_DIR="$CODE_DIR/$OUT" ;;
     esac
 else
-    CODE_GIT_SHA=$(git -C "$CODE_DIR" rev-parse --short=12 HEAD)
+    CODE_GIT_SHA=$(git -C "$CODE_DIR" rev-parse --short=12 HEAD 2>/dev/null || echo "detached")
     RUN_DATE=$(date -u +%Y%m%d)
-    OUT_DIR="$CODE_DIR/results/$HOST_NAME/$RUN_DATE-$CODE_GIT_SHA/simd_spielman"
+    OUT_DIR="$CODE_DIR/out/$HOST_NAME/$RUN_DATE-$CODE_GIT_SHA/simd_spielman"
 fi
 
 TARGET_ROOT="${CARGO_TARGET_DIR:-$CODE_DIR/target-simd-spielman}/simd-spielman"
@@ -598,8 +591,15 @@ case "$CPU_MODEL" in
 esac
 log_info "SELECTED_CPU=$SELECTED_CPU ($CPU_MODEL)"
 
-SOURCE_REPO="$(dirname -- "$CODE_DIR")/SIMD-Spielman-for-ZKPs"
+DEPS_DIR="${RBD_DEPS_DIR:-$CODE_DIR/deps}"
+SOURCE_REPO="$DEPS_DIR/SIMD-Spielman-for-ZKPs"
 if [ ! -e "$SOURCE_REPO/.git" ] || [ "$(git -C "$SOURCE_REPO" rev-parse HEAD 2>/dev/null || true)" != "$UPSTREAM_SHA" ]; then
+    if [ "${RBD_OFFLINE:-0}" = "1" ] || [ -f "$DEPS_DIR/.offline" ]; then
+        RUN_STATUS=failed
+        FAILURE_REASON="Offline mode and pinned SIMD-Spielman repo missing at $SOURCE_REPO (run reproduce/fetch_deps.sh online)"
+        log_error "$FAILURE_REASON"
+        exit 1
+    fi
     SOURCE_REPO="$RUN_ROOT/upstream-clone"
     if [ ! -d "$SOURCE_REPO/.git" ]; then
         log_info "Cloning upstream for the pinned source commit"
@@ -646,7 +646,6 @@ fi
 # (and they read ../tv/), so the test build must live there.
 TEST_BUILD="$PATCHED_SOURCE/build"
 BENCH_BUILD="$RUN_ROOT/build-bench-$THREADS"
-TEST_JOBS=$(count_cores "$TEST_CORES")
 LOGN_CMAKE=$(printf '%s' "$LOGN" | tr ',' ';')
 
 run_logged() {

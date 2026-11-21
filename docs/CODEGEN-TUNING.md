@@ -2,16 +2,16 @@
 
 # Portable Codegen Tuning and Optimization Report (Step 09)
 
-This document describes the microarchitectural analysis, portable Rust source transformations, compiler code generation, and directional local benchmark results for **Step 09 (Compiler Code Generation & Tuning)**.
+This document describes the microarchitectural analysis, portable Rust source transformations, and compiler code generation for **Step 09 (Compiler Code Generation & Tuning)**.
 
-All optimizations adhere strictly to the portable Rust rule ([AGENTS.md](../../AGENTS.md)):
+All optimizations adhere strictly to the portable scalar Rust policy:
 - **No inline assembly** (`no asm!`);
 - **No architecture-specific intrinsics or SIMD libraries** (`no std::arch`, `no core::simd`);
 - **No conditional optimization tiers or variant build flags**;
 - Stable compiler `rustc 1.99.1`.
 
 > [!NOTE]
-> All local execution timings reported in this document were measured on a local test workstation (Intel Core i7-11700K) pinned under `taskset -c 3` with CPU 2 strictly excluded. These timings are for directional validation only and are labelled **unpublishable**. Canonical benchmark results are produced on the NUS SoC Slurm cluster: x86-64 node class `xcnh` (AMD EPYC 9755, Zen 5) and Arm node class `xcng` (Neoverse-N1); see [README.md](../README.md), "Benchmark machines (SoC cluster)".
+> Microarchitectural tuning decisions below were guided by exploratory measurements during development and are not part of the paper's evaluation. Canonical benchmark results are archived in `results/` and reproduced via `reproduce/run.sh`.
 
 ---
 
@@ -19,7 +19,7 @@ All optimizations adhere strictly to the portable Rust rule ([AGENTS.md](../../A
 
 | Component | Inefficiency Identified | Optimization Applied | Codegen & Disassembly Result |
 | :--- | :--- | :--- | :--- |
-| **`Mont127` & `Mers127` MAC** (`mac_mont127`, `mac_mers127`) | Writing limb addition as `(acc.c[i] as u128) + (t_i as u128) + carry` caused LLVM to lower carry addition into two separate steps (`adcq $0` + `addq`), forcing boolean carry materialization (`setb`, `movzbl`, `xorl`) and callee-saved register pressure (`%rbp`). | Replaced with stable `u64::carrying_add`. | **Zero boolean materializations.** Collapsed 20 scalar instructions into a single uninterrupted 5-instruction hardware carry chain (`addq`, `adcq`, `adcq`, `adcq`, `adcq $0`). Eliminated `%rbp` frame overhead. **16.8% faster field MAC**. |
+| **`Mont127` & `Mers127` MAC** (`mac_mont127`, `mac_mers127`) | Writing limb addition as `(acc.c[i] as u128) + (t_i as u128) + carry` caused LLVM to lower carry addition into two separate steps (`adcq $0` + `addq`), forcing boolean carry materialization (`setb`, `movzbl`, `xorl`) and callee-saved register pressure (`%rbp`). | Replaced with stable `u64::carrying_add`. | **Zero boolean materializations.** Collapsed 20 scalar instructions into a single uninterrupted 5-instruction hardware carry chain (`addq`, `adcq`, `adcq`, `adcq`, `adcq $0`). Eliminated `%rbp` frame overhead. |
 | **`Mont127` & `Mers127` Acc Add** (`add_*_acc`) | 5-iteration loop with 128-bit integer casting and shift. | Unrolled 5-limb hardware carry chain using `u64::carrying_add`. | Direct 5-instruction `addq`/`adcq` chain with zero loop branching or shift instructions. |
 | **`Mont127` Reduction** (`reduce_mont127`) | 3-iteration nested loop with array indexing in CIOS Montgomery reduction. | Fully unrolled 3-word CIOS reduction with register-pinned limbs and `carrying_add`. | Complete loop unrolling into straight-line assembly; zero array bounds checks; branchless conditional move (`cmovbq`). |
 | **Expander Graph Traversal** (`encode_column_block_range_shard`) | Multi-edge loop ($B=4$) computed index arithmetic `e, e+1, e+2, e+3` and performed redundant slice indexing on `weights[e]` and `lefts[e]`. Output destination computed per-row slice indexing. | Used `chunks_exact(4)` and `.remainder()` for edge blocking; used `output.chunks_exact_mut(n_rows)` for disjoint column outputs. | Eliminated edge indexing bounds checks and destination column index calculations. |
@@ -153,7 +153,7 @@ The current implementation destructures the 5-limb accumulator into scalar local
    - *Option A:* Iterator enumerate `for (row, slot) in scratch_slice.iter_mut().enumerate()`
    - *Option B:* Indexed loop `for row in 0..n_rows { let mut acc = scratch_slice[row]; ... scratch_slice[row] = acc; }`
 
-   *Measurement Finding:* Option B is **~4% faster** (7.62 ms vs 7.88 ms at $\log N = 16$). Under Option B, all five buffers (`scratch_slice`, `src0`, `src1`, `src2`, `src3`) share a single 64-bit induction variable `%rax` (`row`) with hardware scaled index addressing (`(%rdi, %rax, 8)`). Option A introduces separate pointer tracking registers that increase register pressure under $B = 4$. Option B is retained.
+   *Design Finding:* Under Option B, all five buffers (`scratch_slice`, `src0`, `src1`, `src2`, `src3`) share a single 64-bit induction variable `%rax` (`row`) with hardware scaled index addressing (`(%rdi, %rax, 8)`). Option A introduces separate pointer tracking registers that increase register pressure under $B = 4$. Option B is retained.
 
 #### In `reed_solomon_column_block_range_shard`
 Replaced dynamic indexing with:
@@ -198,54 +198,9 @@ On modern out-of-order 64-bit cores, integer multipliers operate with 1-cycle th
 
 ---
 
-## 3. Directional Benchmark Results (Local Test Machine)
+## 3. Portability Verification Across Target Architectures
 
-> [!WARNING]
-> Machine: Intel Core i7-11700K (Rocket Lake / Cypress Cove).
-> Execution pinned via `taskset -c 3` (CPU 2 strictly excluded).
-> Timings are unpublishable directional indicators only.
+Scalar codegen is verified across target architectures via `scripts/check_codegen.py` (see `reproduce/run.sh --claims C0,C1` and archived table `T11`):
 
-### 3.1 Field Arithmetic Microbenchmarks (`lcpc-bench --field-bench`)
-
-| Field | Operation | Baseline Before (ns/op) | Tuned Step 09 (ns/op) | Relative Speedup |
-| :--- | :--- | :---: | :---: | :---: |
-| **`Mont127`** | `mul` | 10.84 | 10.95 | $\approx$ flat |
-| | **`mac`** | **3.28** | **2.73** | **+16.8% faster** |
-| | `reduce` | 5.07 | 5.20 | $\approx$ flat |
-| **`Mers127`** | `mul` | 6.02 | 6.06 | $\approx$ flat |
-| | **`mac`** | **3.33** | **2.74** | **+17.7% faster** |
-| | `reduce` | 0.70 | 0.70 | flat |
-| **`Fp2M61`** | `mul` | 5.66 | 5.62 | flat |
-| | **`mac`** | **2.22** | **2.23** | flat |
-| | `reduce` | 0.56 | 0.56 | flat |
-| **`Ft127`** | `mul` | 8.93 | 8.97 | flat |
-| | **`mac`** | **3.31** | **2.73** | **+17.5% faster** |
-| | `reduce` | 5.05 | 5.02 | flat |
-
-### 3.2 End-to-End Matrix Encoding (`encode_matrix` median)
-
-| Field & Parameters | Problem Size ($\log N$) | Baseline Before | Tuned Step 09 | Speedup |
-| :--- | :---: | :---: | :---: | :---: |
-| **`Mont127` (`lcpc-sdig6`)** | $\log N = 16$ | 8.67 ms (8,670,863 ns) | **7.62 ms (7,615,182 ns)** | **+12.2% faster** |
-| | $\log N = 18$ | 26.45 ms (26,450,000 ns) | **23.17 ms (23,172,000 ns)** | **+12.4% faster** |
-| **`Mers127` (`lcpc-sdig6`)** | $\log N = 16$ | 8.66 ms (8,662,408 ns) | **7.60 ms (7,601,240 ns)** | **+12.3% faster** |
-| | $\log N = 18$ | 26.38 ms (26,380,000 ns) | **23.12 ms (23,124,000 ns)** | **+12.3% faster** |
-| **`Fp2M61` (`simd-spielman`)**| $\log N = 16$ | 3.47 ms (3,467,000 ns) | **3.38 ms (3,382,100 ns)** | **+2.5% faster** |
-| | $\log N = 18$ | 13.03 ms (13,028,156 ns) | **12.67 ms (12,668,231 ns)** | **+2.8% faster** |
-
----
-
-## 4. Portability Verification Across Target Architectures
-
-Scalar codegen is verified across all targets via `scripts/check_codegen.py`:
-
-```
-x86_64_native     : PASS (16 hot kernels checked, 0 vector arithmetic violations)
-x86_64_portability: PASS (16 hot kernels checked, 0 vector arithmetic violations)
-aarch64           : PASS (16 hot kernels checked, 0 vector arithmetic violations)
-riscv64           : PASS (16 hot kernels checked, 0 vector arithmetic violations)
-```
-
-- **Total hot instructions on x86-64 native:** reduced from 6,308 to 5,521 (**-12.5% instruction reduction**).
-- **Correctness test suite:** 100% of workspace tests (102 tests) passed cleanly under `--release`.
-- **Golden test vectors:** verified bit-exact match against upstream LCPC commit `f0e2116` and SIMD-Spielman golden vectors across all fields and dimensions.
+- All 16 hot kernels use purely scalar integer arithmetic (`0` vector arithmetic violations).
+- All workspace correctness tests and oracle checks pass under `--release`.

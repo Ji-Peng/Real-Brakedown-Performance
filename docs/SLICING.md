@@ -86,7 +86,7 @@ The recommended slice count $s^*$ is computed dynamically via `adaptive_slice_co
 
 The closed-form model produces the following slice counts across problem sizes for 16 MiB and 32 MiB LLCs:
 
-| $\log_2 N$ | $k = \sqrt{N}$ | $W_{\text{left}}(s=1)$ | $s^*$ for 16 MiB LLC (i7-11700K) | $s^*$ for 32 MiB LLC | Rows / Slice $R_s$ (16 MiB LLC) |
+| $\log_2 N$ | $k = \sqrt{N}$ | $W_{\text{left}}(s=1)$ | $s^*$ for 16 MiB LLC | $s^*$ for 32 MiB LLC | Rows / Slice $R_s$ (16 MiB LLC) |
 | :---: | :---: | :---: | :---: | :---: | :---: |
 | **16** | 256 | 1 MiB | **1** | **1** | 256 |
 | **18** | 512 | 4 MiB | **1** | **1** | 512 |

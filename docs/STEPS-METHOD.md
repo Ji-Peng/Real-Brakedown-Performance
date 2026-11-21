@@ -41,7 +41,7 @@ from the same fixed ChaCha20 seed before starting the timer. This makes each
 sample a fresh encoding of identical input data without timing input generation
 or buffer restoration. Caches are not flushed. T is fixed at 1; `RAYON_NUM_THREADS=1`
 is set and the entire test/build/check/timing process is constrained to the
-explicit `--cores` list. CPU 2 is rejected.
+`--cores` list (autodetected from CPU affinity if omitted).
 
 ## Evaluated configurations and unavailable cells
 
@@ -81,12 +81,12 @@ The standard per-step run uses defaults:
 ./reproduce/steps.sh --cores <explicit-core-list> --out results
 ```
 
-A local wiring check can use a small even size while avoiding reserved CPU 2:
+A quick check can use reduced sizes and repetitions (or run via `reproduce/run.sh --mode quick --claims C0,C4`):
 
 ```sh
-taskset -c 0,1,3-7 ./reproduce/steps.sh \
-  --smoke --logN 10 --warmup 0 --runs 1 \
-  --cores 0,1,3-7 --out "$PWD/target-eval-steps/smoke"
+./reproduce/steps.sh \
+  --quick --logN 16,20 --warmup 1 --runs 2 \
+  --cores <list> --out out/steps-quick
 ```
 
 The shell script loads the pinned rustup environment, gives every tag its own

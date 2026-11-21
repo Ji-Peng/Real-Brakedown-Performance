@@ -36,9 +36,9 @@ Build and run from this directory, after sourcing the pinned Rust environment:
 . "$HOME/.cargo/env"
 export CARGO_TARGET_DIR="../../target-lcpc-orig/manual"
 RUSTC_BOOTSTRAP=lcpc_brakedown_pc \
-  taskset -c 0,1,3-7 cargo run --locked --release -- \
+  taskset -c <core-list> cargo run --locked --release -- \
     --params lcpc-sdig6 --logN 16,18 --runs 5 --warmup 1 \
-    --threads 1 --cores 0
+    --threads 1 --cores <core-list>
 ```
 
 Supported options are:
@@ -105,8 +105,9 @@ Regenerate all vectors with:
 sh gen_golden.sh
 ```
 
-The script pins its target directory to `code/target-lcpc-orig/golden`, uses
-the portable-only BLAKE3 build, and runs on cores `0,1,3-7`. The vector file
+The script pins its target directory to `target-lcpc-orig/golden`, uses
+the portable-only BLAKE3 build, and autodetects a benchmark core from the
+process affinity mask (or uses `--cores <list>`). The vector file
 does not record the backend mode because the output is identical across the
 two BLAKE3 configurations.
 

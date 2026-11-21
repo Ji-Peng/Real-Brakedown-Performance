@@ -1,0 +1,10 @@
+target/
+target-*/
+external/*/target/
+out/
+deps/
+analysis/
+**/__pycache__/
+*.pyc
+*.pyo
+.DS_Store

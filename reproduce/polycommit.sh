@@ -4,9 +4,13 @@
 
 set -eu
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+# shellcheck disable=SC1091
 . "$SCRIPT_DIR/common.sh"
-. "${CARGO_HOME:-$HOME/.cargo}/env"
+if [ -f "${CARGO_HOME:-$HOME/.cargo}/env" ]; then
+    # shellcheck disable=SC1091
+    . "${CARGO_HOME:-$HOME/.cargo}/env"
+fi
 parse_args "$@"
 REFERENCE_FIELD=$FIELD
 FIELD="Mont127"
@@ -24,7 +28,7 @@ case "$OUT" in
     /*) OUT_ROOT="$OUT" ;;
     *) OUT_ROOT="$CODE_DIR/$OUT" ;;
 esac
-CODE_SHA=$(git -C "$CODE_DIR" rev-parse --short=12 HEAD)
+CODE_SHA=$(git -C "$CODE_DIR" rev-parse --short=12 HEAD 2>/dev/null || echo "detached")
 RUN_ID=$(date -u +%Y-%m-%d)-$CODE_SHA
 DEST="$OUT_ROOT/$HOST_NAME/$RUN_ID/polycommit"
 mkdir -p "$DEST"
@@ -69,16 +73,26 @@ export CARGO_TARGET_DIR="$TARGET_DIR"
 export TMPDIR="$TARGET_DIR/tmp"
 unset RUSTFLAGS CARGO_ENCODED_RUSTFLAGS
 
+DEPS_DIR="${RBD_DEPS_DIR:-$CODE_DIR/deps}"
 SOURCE_REPO=
-CARGO_GIT_ROOT="${CARGO_HOME:-$HOME/.cargo}/git/checkouts"
-for candidate in "$CARGO_GIT_ROOT"/poly-commit-*/1eaec50; do
-    [ -d "$candidate/.git" ] || continue
-    if [ "$(git -C "$candidate" rev-parse HEAD 2>/dev/null || true)" = "$POLYCOMMIT_COMMIT" ]; then
-        SOURCE_REPO=$candidate
-        break
-    fi
-done
+if [ -d "$DEPS_DIR/poly-commit/.git" ] && [ "$(git -C "$DEPS_DIR/poly-commit" rev-parse HEAD 2>/dev/null || true)" = "$POLYCOMMIT_COMMIT" ]; then
+    SOURCE_REPO="$DEPS_DIR/poly-commit"
+fi
 if [ -z "$SOURCE_REPO" ]; then
+    CARGO_GIT_ROOT="${CARGO_HOME:-$HOME/.cargo}/git/checkouts"
+    for candidate in "$CARGO_GIT_ROOT"/poly-commit-*/1eaec50; do
+        [ -d "$candidate/.git" ] || continue
+        if [ "$(git -C "$candidate" rev-parse HEAD 2>/dev/null || true)" = "$POLYCOMMIT_COMMIT" ]; then
+            SOURCE_REPO=$candidate
+            break
+        fi
+    done
+fi
+if [ -z "$SOURCE_REPO" ]; then
+    if [ "${RBD_OFFLINE:-0}" = "1" ] || [ -f "$DEPS_DIR/.offline" ]; then
+        log_error "Offline mode and pinned PolyCommit checkout unavailable (run reproduce/fetch_deps.sh online)"
+        exit 1
+    fi
     SOURCE_REPO="$TARGET_DIR/upstream-poly-commit"
     if [ ! -d "$SOURCE_REPO/.git" ]; then
         log_info "Pinned Cargo checkout unavailable; cloning arkworks PolyCommit"
@@ -139,12 +153,16 @@ PY
 # Build from / to avoid the fork's workspace config and codegen wrapper.
 log_info "Building patched arkworks PolyCommit driver with rustc $(rustc --version)"
 cd /
-# Populate the cargo cache from the committed lockfile when the network is
-# reachable (fresh VMs); the build itself stays --offline and --locked.
-cargo fetch --locked --manifest-path "$BUILD_DIR/Cargo.toml" >/dev/null 2>&1 || \
-    log_warn "cargo fetch failed (offline?); building from the existing cargo cache"
+OFFLINE_FLAG=""
+if [ "${RBD_OFFLINE:-0}" = "1" ] || [ -f "$DEPS_DIR/.offline" ]; then
+    OFFLINE_FLAG="--offline"
+else
+    cargo fetch --locked --manifest-path "$BUILD_DIR/Cargo.toml" >/dev/null 2>&1 || \
+        log_warn "cargo fetch failed (offline?); building from the existing cargo cache"
+fi
+# shellcheck disable=SC2086
 taskset -c "$CORES" env POLYCOMMIT_PATCH_SHA256="$PATCH_SHA256" \
-    cargo build --offline --manifest-path "$BUILD_DIR/Cargo.toml" --locked --release
+    cargo build $OFFLINE_FLAG --manifest-path "$BUILD_DIR/Cargo.toml" --locked --release
 DRIVER_BINARY="$TARGET_DIR/release/polycommit-bench-driver"
 [ -x "$DRIVER_BINARY" ] || {
     log_error "Expected benchmark binary not found: $DRIVER_BINARY"
@@ -233,12 +251,18 @@ with open(os.environ["POLY_EXTRA_FILE"], "w", encoding="utf-8") as output:
     output.write("\n")
 PY
 
+# shellcheck disable=SC2034 # Consumed by write_manifest in common.sh
 UPSTREAM_COMMIT="$POLYCOMMIT_COMMIT"
+# shellcheck disable=SC2034
 LCPC_COMMIT=""
+# shellcheck disable=SC2034
 PARAMS="polycommit-brakedown-square"
 FIELD="Mont127"
+# shellcheck disable=SC2034
 SLICES="not-applicable"
+# shellcheck disable=SC2089 # JSON payload passed via environment variable
 MANIFEST_RUST_OVERRIDES_JSON="{\"effective_rustflags\": $POLY_EFFECTIVE_RUSTFLAGS_JSON, \"rustflags_source\": \"Cargo fingerprint (built from /, code/.cargo/config.toml not applied)\", \"cargo_rustc_wrapper\": null}"
+# shellcheck disable=SC2090
 export MANIFEST_RUST_OVERRIDES_JSON
 write_manifest "$DEST/manifest.json" "$EXTRA_FILE"
 log_info "PolyCommit raw JSON and manifest written under $DEST"

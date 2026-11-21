@@ -50,6 +50,11 @@
       "kind": "omitted",
       "reason": "SIMD-Spielman Orion shape at 2^28: upstream generates the Orion graph single-threaded in every benchmark process, which exceeds 90 min per process at 2^28; all.sh runs it up to 2^26 (simd_spielman.sh --max-orion-logn 26)",
       "cells": ["T9|*,*,28|SIMD-Spielman Orion*", "T9|*,*,28|SIMD / This Work", "T9|*,*,28|SIMD best-of-T*", "T9|*,*,28|Gap vs SIMD best-of-T", "T9|*,*,28|SIMD MT slower than its T=1", "T9|*,*,28|SIMD params.patch"]
+    },
+    {
+      "kind": "omitted",
+      "reason": "SIMD-Spielman setup is derived from GNU time process wall time minus encode samples, so PCS setup, input generation, and verifier initialization cannot be separated",
+      "cells": ["T8|SIMD-Spielman,*|PCS setup (ms)", "T8|SIMD-Spielman,*|Input gen. (ms)", "T8|SIMD-Spielman,*|Verifier init (ms)", "T8|SIMD-Spielman,*|PCS setup / Encode"]
     }
   ],
   "expected_rows": {

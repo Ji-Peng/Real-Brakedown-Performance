@@ -965,10 +965,13 @@ class TableNoteTests(unittest.TestCase):
             a.generate_T8_setup_memory()
         headers, rows = TableTests._rows(self, "table_T8_setup_memory.csv")
         simd = {r[1]: dict(zip(headers, r)) for r in rows if r[0] == "SIMD-Spielman"}
-        self.assertEqual(simd["20"]["Setup (ms)"], "40.00 (below floor)")
-        self.assertEqual(simd["24"]["Setup (ms)"], "2000.00")
+        self.assertEqual(simd["20"]["Total setup (ms)"], "40.00 (below floor)")
+        self.assertEqual(simd["24"]["Total setup (ms)"], "2000.00")
         self.assertEqual(simd["24"]["Peak RSS (MB)"], "512.0")
-        self.assertTrue(simd["24"]["Setup / Encode"].startswith("40.00x"))
+        self.assertEqual(simd["24"]["PCS setup (ms)"], "N/A (process wall time only, see note)")
+        self.assertEqual(simd["24"]["Input gen. (ms)"], "N/A (process wall time only, see note)")
+        self.assertEqual(simd["24"]["Verifier init (ms)"], "N/A (process wall time only, see note)")
+        self.assertEqual(simd["24"]["PCS setup / Encode"], "N/A (process wall time only, see note)")
         with open(os.path.join(self.fx.out, "csv", "table_T8_setup_memory.csv")) as f:
             text = f.read()
         self.assertIn("steps of 10 ms", text)
@@ -1122,7 +1125,7 @@ class Review3Tests(unittest.TestCase):
                          peak_rss_bytes=2 ** 30) if sid == "s1" else {}
             self.fx.write(sid, "full_simd_spielman_mont127_t1_n28", "simd_spielman_bench.json",
                           [simd_record(sid, log_n=28, **extra)])
-        cells = ["T8|SIMD-Spielman,28|Setup (ms)", "T8|SIMD-Spielman,28|Setup / Encode", "T8|SIMD-Spielman,28|Peak RSS (MB)"]
+        cells = ["T8|SIMD-Spielman,28|Total setup (ms)", "T8|SIMD-Spielman,28|Peak RSS (MB)"]
         a = self.fx.analyzer(self.fx.selection())
         with contextlib.redirect_stdout(io.StringIO()):
             a.generate_T8_setup_memory()
@@ -1133,13 +1136,13 @@ class Review3Tests(unittest.TestCase):
         self.assertEqual(b.missing_cell_errors, [])
         headers, rows = TableTests._rows(self, "table_T8_setup_memory.csv")
         row = dict(zip(headers, [r for r in rows if r[0] == "SIMD-Spielman"][0]))
-        self.assertEqual(row["Setup (ms)"], "4000.00 [s1 only]")
+        self.assertEqual(row["Total setup (ms)"], "4000.00 [s1 only]")
         with open(os.path.join(self.fx.out, "csv", "table_T8_setup_memory.csv")) as f:
             self.assertIn("not recorded in s2 at 2^28", f.read())
 
     def test_t8_prewired_gap_omission_is_not_stale_before_the_data_lands(self):
         self.fx.write("s2", "full_simd_spielman_mont127_t1_n28", "simd_spielman_bench.json", [simd_record("s2", log_n=28)])
-        cells = ["T8|SIMD-Spielman,28|Setup (ms)", "T8|SIMD-Spielman,28|Setup / Encode", "T8|SIMD-Spielman,28|Peak RSS (MB)"]
+        cells = ["T8|SIMD-Spielman,28|Total setup (ms)", "T8|SIMD-Spielman,28|Peak RSS (MB)"]
         sel = self.fx.selection(omissions=[{"kind": "omitted", "reason": "s2 harness", "cells": cells},
                                            {"kind": "pending", "reason": "s1", "cells": ["T8|SIMD-Spielman,28|Encode (ms)"]}])
         a = self.fx.analyzer(sel)
@@ -1201,6 +1204,139 @@ class Review3Tests(unittest.TestCase):
         ft127 = [s for s in specs if "This Work Ft127" in s["Implementation"]]
         self.assertEqual(len(ft127), 1)
         self.assertEqual(ft127[0]["log2(N)"], list(analyze.FT127_SIZES))
+
+
+class ArtifactPortabilityTests(unittest.TestCase):
+    """T8 split columns, --mt-threads 4, not-run omissions, quick_ family, and manifest arch."""
+
+    def setUp(self):
+        self.fx = Fixture()
+
+    def tearDown(self):
+        self.fx.cleanup()
+
+    def test_t8_splits_pcs_setup_input_gen_and_verifier_init(self):
+        rec = tw_record("s1", log_n=20, threads=1, samples=(60,) * 5)
+        rec["setup_ns"] = {
+            "graph_sampling_and_encoding_init_ns": 3_000_000,
+            "input_generation_and_row_buffer_init_ns": 50_000_000,
+            "verifier_encoding_init_ns": 2_000_000,
+        }
+        rec["peak_rss_bytes"] = 300 * 1024 * 1024
+        self.fx.write("s1", "quick_this_work_mode_a_t1_n20", "tw/a.json", [rec])
+        a = self.fx.analyzer(self.fx.selection(sessions=("s1",), expected=("s1",)))
+        with contextlib.redirect_stdout(io.StringIO()):
+            a.generate_T8_setup_memory()
+        headers, rows = TableTests._rows(self, "table_T8_setup_memory.csv")
+        self.assertEqual(headers, [
+            "Implementation", "log2(N)", "PCS setup (ms)", "Input gen. (ms)", "Verifier init (ms)",
+            "Total setup (ms)", "Encode (ms)", "PCS setup / Encode", "Peak RSS (MB)",
+        ])
+        row = dict(zip(headers, rows[0]))
+        self.assertEqual(row["PCS setup (ms)"], "3.00")
+        self.assertEqual(row["Input gen. (ms)"], "50.00")
+        self.assertEqual(row["Verifier init (ms)"], "2.00")
+        self.assertEqual(row["Total setup (ms)"], "55.00")
+        self.assertEqual(row["PCS setup / Encode"], "0.05x")
+        self.assertEqual(row["Peak RSS (MB)"], "300.0")
+
+    def test_mt_threads_4_drives_t1_t2_t6_t9_and_f3(self):
+        for t in (1, 4):
+            self.fx.write("s1", f"quick_this_work_mode_a_t{t}_n20", "tw/a.json",
+                          [tw_record("s1", log_n=20, threads=t, samples=(100 // t,) * 5)])
+            self.fx.write("s1", f"quick_this_work_mode_b_mont127_t{t}_n20", "tw/b.json",
+                          [tw_record("s1", log_n=20, threads=t, params="simd-spielman", samples=(80 // t,) * 5),
+                           tw_record("s1", log_n=20, threads=t, params="simd-spielman", shape="orion", samples=(90 // t,) * 5)])
+        for t, ms in ((1, 50), (3, 30), (4, 35)):
+            self.fx.write("s1", f"quick_simd_spielman_mont127_t{t}_n20", "simd_spielman_bench.json",
+                          [simd_record("s1", threads=t, log_n=20, samples=(ms,) * 5),
+                           simd_record("s1", threads=t, log_n=20, shape="orion", samples=(ms,) * 5)])
+        for t in (1, 2, 4):
+            self.fx.write("s1", f"quick_this_work_threads_t{t}_n20", "tw/t.json",
+                          [tw_record("s1", log_n=20, threads=t, samples=(100 // t,) * 5)])
+        sel = self.fx.selection(sessions=("s1",), expected=("s1",))
+        with contextlib.redirect_stdout(io.StringIO()):
+            a = analyze.BenchmarkAnalyzer(self.fx.out, "/nonexistent/kdhr26.json", selection=sel, mt_threads=4)
+            a.load_results([self.fx.root])
+            a.generate_T1_headline_encoding()
+            a.generate_T2_simd_spielman()
+            a.generate_T9_orion_shape()
+            a.generate_F3_thread_scaling()
+        _, t1_rows = TableTests._rows(self, "table_T1_headline_encoding.csv")
+        self.assertEqual([r[1] for r in t1_rows], ["1", "4"])
+        t2_headers, t2_rows = TableTests._rows(self, "table_T2_simd_spielman.csv")
+        self.assertIn("SIMD-Spielman 3 workers + coordinator (ms)", t2_headers)
+        self.assertIn("SIMD Gap Recovered (4 cores)", t2_headers)
+        t2_mt = dict(zip(t2_headers, next(r for r in t2_rows if r[1] == "4")))
+        self.assertTrue(t2_mt["SIMD best-of-T incl. T=1 (ms)"].startswith("30.00 (3W+coord)"))
+        t9_headers, _ = TableTests._rows(self, "table_T9_orion_shape.csv")
+        self.assertIn("SIMD-Spielman Orion 3 workers + coordinator (ms)", t9_headers)
+
+    def test_not_run_omission_formats_cells_logs_todo_and_passes_check(self):
+        rec = tw_record("s1", log_n=20, threads=1)
+        rec["correctness"] = {"proof_verification_passed": True, "direct_encoder_root_matches_commit": True}
+        rec["measurements"]["verifier_encode_1"] = {"samples_ns": [10_000] * 5}
+        rec["measurements"]["verifier_encode_2"] = {"samples_ns": [15_000] * 5}
+        self.fx.write("s1", "quick_this_work_mode_a_t1_n20", "tw/a.json", [rec])
+        self.fx.write("s1", "quick_this_work_mode_a_t1_n20", "this_work/codegen/codegen_report.json",
+                      codegen_report("PASS"))
+        path = os.path.join(self.fx.root, "selection.json")
+        with open(path, "w") as f:
+            json.dump({
+                "schema_version": "rbd-selection-v1",
+                "mode": "quick",
+                "mt_threads": 1,
+                "machines": {MACHINE: {"expected_sessions": ["s1"], "kdhr26_reference_cpu": None,
+                                       "runs": [{"run_dir": RUN, "sessions": ["s1"]}]}},
+                "omissions": [
+                    {"kind": "not-run", "reason": "claim not selected", "cells": [
+                        "T0|Original LCPC PCS verification|Status",
+                        "T1|*|LCPC*", "T1|*|Speedup*", "T1|*|Significance*", "T1|*|PolyCommit*",
+                        "T2|*|*", "T3|*|*", "T4|*|*", "T5|*|*", "T6|*|*", "T8|*|*", "T9|*|*", "T10|*|*",
+                    ]},
+                    {"kind": "not-run", "reason": "needs aarch64", "cells": ["T12|*|*"]},
+                ],
+                "expected_rows": {"T1": {"log2(N)": [20], "T": [1]}},
+            }, f)
+        a = self.fx.analyzer(analyze.Selection(path))
+        a.compile_latex = False
+        with contextlib.redirect_stdout(io.StringIO()):
+            a.generate_all()
+            ok = a.check_all_artefacts([])
+        self.assertTrue(ok)
+        headers, rows = TableTests._rows(self, "table_T1_headline_encoding.csv")
+        row = dict(zip(headers, rows[0]))
+        self.assertEqual(row["LCPC as-published-as-is (ms)"], "not run (claim not selected)")
+        _, t12_rows = TableTests._rows(self, "table_T12_arm_portability.csv")
+        self.assertEqual(t12_rows[0][0], "not run (needs aarch64)")
+        _, todo_rows = TableTests._rows(self, "todo_cells.csv")
+        self.assertTrue(any(r[1].startswith("not-run:") for r in todo_rows))
+
+    def test_quick_block_families(self):
+        self.assertEqual(analyze.block_family("quick_this_work_mode_a_t1_n16-18-20"), "tw_a")
+        self.assertEqual(analyze.block_family("quick_this_work_mode_b_mont127_t4_n16-18-20"), "tw_b")
+        self.assertEqual(analyze.block_family("quick_lcpc_orig_mode_a_t4_n16-18-20"), "lcpc_a")
+        self.assertEqual(analyze.block_family("quick_simd_spielman_mont127_t1_n16-20"), "simd")
+        self.assertEqual(analyze.block_family("quick_slice_sweep_s4_t1_n20-22"), "slice_sweep")
+        self.assertEqual(analyze.block_family("quick_this_work_threads_t2_n20-22"), "tw_threads")
+        self.assertEqual(analyze.block_family("quick_steps_mode_a_n16-20"), "steps")
+        self.assertEqual(analyze.block_family("quick_arm_this_work_t1_n18-20"), "arm_this_work")
+        self.assertEqual(analyze.block_family("quick_arm_lcpc_orig_t4_n18-20"), "arm_lcpc_orig")
+
+    def test_arch_comes_from_manifest_not_machine_name(self):
+        # Record sorts before manifest.json alphabetically; machine name has no 'xcng', block has no 'arm_'.
+        self.fx.write("arm1", "quick_this_work_mode_a_t1_n18", "tw/a.json",
+                      [tw_record("arm1", log_n=18, threads=1)], machine="generic-arm-box")
+        self.fx.write("arm1", "quick_this_work_mode_a_t1_n18", "tw/manifest.json",
+                      {"os_and_kernel": {"machine": "aarch64"}}, machine="generic-arm-box")
+        path = os.path.join(self.fx.root, "selection.json")
+        with open(path, "w") as f:
+            json.dump({"schema_version": "rbd-selection-v1", "machines": {"generic-arm-box": {
+                "expected_sessions": ["arm1"], "runs": [{"run_dir": RUN, "sessions": ["arm1"]}]}}}, f)
+        a = self.fx.analyzer(analyze.Selection(path))
+        self.assertEqual(len(a.reports_arm), 1)
+        self.assertEqual(a.reports_arm[0]["_meta"]["arch"], "aarch64")
+        self.assertEqual(len(a.reports_this_work), 0)
 
 
 if __name__ == "__main__":
