@@ -122,29 +122,56 @@ fi
 if [ "$LIST_CLAIMS" -eq 1 ]; then
     if [ "$MARKDOWN" -eq 1 ]; then
         CODE_DIR_ENV="$CODE_DIR" python3 - <<'PY'
+import csv
 import os
+import pathlib
+import sys
 
-claims_path = os.path.join(os.environ["CODE_DIR_ENV"], "reproduce", "claims.tsv")
-rows = []
-with open(claims_path, "r", encoding="utf-8") as f:
-    header = None
-    for line in f:
-        line = line.rstrip("\n")
-        if not line or line.startswith("#"):
-            continue
-        parts = line.split("\t")
-        if header is None:
-            header = parts
-            continue
-        rows.append(dict(zip(header, parts)))
+code_dir = pathlib.Path(os.environ["CODE_DIR_ENV"])
+sys.path.insert(0, str(code_dir / "scripts"))
+import claim_times  # noqa: E402
 
-print("| Claim | Paper ref | Command | Output (CSV / paper table) | Requirements | Quick mode |")
-print("| :--- | :--- | :--- | :--- | :--- | :--- |")
+claims_path = code_dir / "reproduce" / "claims.tsv"
+rows = claim_times.load_tsv(claims_path)
+times_list, _totals = claim_times.compute_claim_times(
+    results_dir=code_dir / "results", code_dir=code_dir
+)
+times_by_id = {r["claim_id"]: r for r in times_list}
+
+ref_claims = {}
+ref_path = code_dir / "scripts" / "paper_reference" / "claims.csv"
+if ref_path.is_file():
+    with open(ref_path, "r", encoding="utf-8", newline="") as f:
+        for r in csv.DictReader(f):
+            if r.get("claim_id"):
+                ref_claims[r["claim_id"]] = r
+
+print("| ID | Paper location | Command | Output (CSV / paper table) | Full-mode time | Quick-mode time | Requirements | Expected result and tolerance |")
+print("| :--- | :--- | :--- | :--- | ---: | ---: | :--- | :--- |")
 for r in rows:
     cid = r["id"]
     cmd = f"`reproduce/run.sh --mode quick --claims C0,{cid}`" if cid != "C0" else "`reproduce/run.sh --mode quick --claims C0`"
-    reqs = r["requires"] if r["requires"] != "-" else "none"
-    print(f"| **{cid}**: {r['title']} | {r['paper_refs']} | {cmd} | {r['tables']} | {reqs} | {r['quick_note']} |")
+    reqs = r["requires"] if r["requires"] != "-" else "any Linux"
+    tinfo = times_by_id.get(cid, {})
+    full_t = tinfo.get("full_time", "n/a")
+    quick_t = tinfo.get("quick_time", "TODO(measure)")
+    rc = ref_claims.get(cid)
+    if rc:
+        exp_tol = f"{rc['expected']} ({rc['tolerance_rule']})"
+    else:
+        exp_tol = r["title"]
+    # Escape pipes so Markdown table structure never breaks.
+    cells = [
+        f"**{cid}**",
+        r["paper_refs"],
+        cmd,
+        r["tables"],
+        full_t,
+        quick_t,
+        reqs,
+        exp_tol,
+    ]
+    print("| " + " | ".join(c.replace("|", "\\|") for c in cells) + " |")
 PY
         exit 0
     fi
