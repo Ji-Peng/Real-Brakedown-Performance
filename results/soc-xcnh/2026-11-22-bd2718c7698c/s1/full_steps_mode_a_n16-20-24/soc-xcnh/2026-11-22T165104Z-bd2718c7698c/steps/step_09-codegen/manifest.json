@@ -1,0 +1,17 @@
+{
+  "schema_version": "steps-tag-manifest-v1",
+  "harness_version": "steps-driver-v1",
+  "tag": "step/09-codegen",
+  "commit": "9f15bc23a1ec903488554e12b5f53be66460c547",
+  "commit_subject": "Codegen tuning of hot kernels (portable Rust only)",
+  "step_index": 9,
+  "session_id": "2026-11-22T165104Z-bd2718c7698c",
+  "detected_api_stage": "runtime-adaptive",
+  "run_class": "campaign",
+  "watermark": null,
+  "workspace_tests": "/home/e/e1374509/rbd/code/results/soc-xcnh/2026-11-22-bd2718c7698c/s1/full_steps_mode_a_n16-20-24/soc-xcnh/2026-11-22T165104Z-bd2718c7698c/steps/step_09-codegen/workspace-tests.log",
+  "codegen_report": "/home/e/e1374509/rbd/code/results/soc-xcnh/2026-11-22-bd2718c7698c/s1/full_steps_mode_a_n16-20-24/soc-xcnh/2026-11-22T165104Z-bd2718c7698c/steps/step_09-codegen/codegen_report.json",
+  "codegen_note": null,
+  "modes_run": "a",
+  "mode_a_field": "Mont127"
+}

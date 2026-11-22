@@ -1,0 +1,4640 @@
+{
+  "manifest_schema_version": "1.0.0",
+  "created_at_utc": "2026-11-22T08:23:47.982745+00:00",
+  "host_name": "soc-xcng",
+  "host_profile": "/home/e/e1374509/rbd/cluster/hosts/soc-xcng.sh",
+  "machine_identity": {
+    "hostname": "xcng1",
+    "slurm_job_id": "1180598",
+    "slurm_partition": "long",
+    "slurm_nodelist": "xcng1",
+    "slurm_cpus_per_task": "20",
+    "slurm_cpu_freq_request": "Performance",
+    "slurm_cluster": "soc"
+  },
+  "cpu": {
+    "online_cpus": "0-127",
+    "offline_cpus": "",
+    "smt_control": "notimplemented",
+    "lscpu": "Architecture:                            aarch64\nCPU op-mode(s):                          32-bit, 64-bit\nByte Order:                              Little Endian\nCPU(s):                                  128\nOn-line CPU(s) list:                     0-127\nVendor ID:                               ARM\nModel name:                              Neoverse-N1\nModel:                                   1\nThread(s) per core:                      1\nCore(s) per socket:                      128\nSocket(s):                               1\nStepping:                                r3p1\nFrequency boost:                         disabled\nCPU(s) scaling MHz:                      44%\nCPU max MHz:                             3000.0000\nCPU min MHz:                             1000.0000\nBogoMIPS:                                50.00\nFlags:                                   fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm lrcpc dcpop asimddp ssbs\nL1d cache:                               8 MiB (128 instances)\nL1i cache:                               8 MiB (128 instances)\nL2 cache:                                128 MiB (128 instances)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-127\nVulnerability Gather data sampling:      Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Not affected\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; CSV2, BHB\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Not affected",
+    "thread_siblings": {
+      "cpu0": "0",
+      "cpu1": "1",
+      "cpu10": "10",
+      "cpu100": "100",
+      "cpu101": "101",
+      "cpu102": "102",
+      "cpu103": "103",
+      "cpu104": "104",
+      "cpu105": "105",
+      "cpu106": "106",
+      "cpu107": "107",
+      "cpu108": "108",
+      "cpu109": "109",
+      "cpu11": "11",
+      "cpu110": "110",
+      "cpu111": "111",
+      "cpu112": "112",
+      "cpu113": "113",
+      "cpu114": "114",
+      "cpu115": "115",
+      "cpu116": "116",
+      "cpu117": "117",
+      "cpu118": "118",
+      "cpu119": "119",
+      "cpu12": "12",
+      "cpu120": "120",
+      "cpu121": "121",
+      "cpu122": "122",
+      "cpu123": "123",
+      "cpu124": "124",
+      "cpu125": "125",
+      "cpu126": "126",
+      "cpu127": "127",
+      "cpu13": "13",
+      "cpu14": "14",
+      "cpu15": "15",
+      "cpu16": "16",
+      "cpu17": "17",
+      "cpu18": "18",
+      "cpu19": "19",
+      "cpu2": "2",
+      "cpu20": "20",
+      "cpu21": "21",
+      "cpu22": "22",
+      "cpu23": "23",
+      "cpu24": "24",
+      "cpu25": "25",
+      "cpu26": "26",
+      "cpu27": "27",
+      "cpu28": "28",
+      "cpu29": "29",
+      "cpu3": "3",
+      "cpu30": "30",
+      "cpu31": "31",
+      "cpu32": "32",
+      "cpu33": "33",
+      "cpu34": "34",
+      "cpu35": "35",
+      "cpu36": "36",
+      "cpu37": "37",
+      "cpu38": "38",
+      "cpu39": "39",
+      "cpu4": "4",
+      "cpu40": "40",
+      "cpu41": "41",
+      "cpu42": "42",
+      "cpu43": "43",
+      "cpu44": "44",
+      "cpu45": "45",
+      "cpu46": "46",
+      "cpu47": "47",
+      "cpu48": "48",
+      "cpu49": "49",
+      "cpu5": "5",
+      "cpu50": "50",
+      "cpu51": "51",
+      "cpu52": "52",
+      "cpu53": "53",
+      "cpu54": "54",
+      "cpu55": "55",
+      "cpu56": "56",
+      "cpu57": "57",
+      "cpu58": "58",
+      "cpu59": "59",
+      "cpu6": "6",
+      "cpu60": "60",
+      "cpu61": "61",
+      "cpu62": "62",
+      "cpu63": "63",
+      "cpu64": "64",
+      "cpu65": "65",
+      "cpu66": "66",
+      "cpu67": "67",
+      "cpu68": "68",
+      "cpu69": "69",
+      "cpu7": "7",
+      "cpu70": "70",
+      "cpu71": "71",
+      "cpu72": "72",
+      "cpu73": "73",
+      "cpu74": "74",
+      "cpu75": "75",
+      "cpu76": "76",
+      "cpu77": "77",
+      "cpu78": "78",
+      "cpu79": "79",
+      "cpu8": "8",
+      "cpu80": "80",
+      "cpu81": "81",
+      "cpu82": "82",
+      "cpu83": "83",
+      "cpu84": "84",
+      "cpu85": "85",
+      "cpu86": "86",
+      "cpu87": "87",
+      "cpu88": "88",
+      "cpu89": "89",
+      "cpu9": "9",
+      "cpu90": "90",
+      "cpu91": "91",
+      "cpu92": "92",
+      "cpu93": "93",
+      "cpu94": "94",
+      "cpu95": "95",
+      "cpu96": "96",
+      "cpu97": "97",
+      "cpu98": "98",
+      "cpu99": "99"
+    }
+  },
+  "cache_topology": [
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "0",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "0",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "0",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "1",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "1",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "1",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "10",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "10",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "10",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "100",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "100",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "100",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "101",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "101",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "101",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "102",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "102",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "102",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "103",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "103",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "103",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "104",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "104",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "104",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "105",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "105",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "105",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "106",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "106",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "106",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "107",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "107",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "107",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "108",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "108",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "108",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "109",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "109",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "109",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "11",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "11",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "11",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "110",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "110",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "110",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "111",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "111",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "111",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "112",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "112",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "112",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "113",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "113",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "113",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "114",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "114",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "114",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "115",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "115",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "115",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "116",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "116",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "116",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "117",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "117",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "117",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "118",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "118",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "118",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "119",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "119",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "119",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "12",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "12",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "12",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "120",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "120",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "120",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "121",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "121",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "121",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "122",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "122",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "122",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "123",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "123",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "123",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "124",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "124",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "124",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "125",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "125",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "125",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "126",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "126",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "126",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "127",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "127",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "127",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "13",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "13",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "13",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "14",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "14",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "14",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "15",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "15",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "15",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "16",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "16",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "16",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "17",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "17",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "17",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "18",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "18",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "18",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "19",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "19",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "19",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "2",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "2",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "2",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "20",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "20",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "20",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "21",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "21",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "21",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "22",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "22",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "22",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "23",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "23",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "23",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "24",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "24",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "24",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "25",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "25",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "25",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "26",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "26",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "26",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "27",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "27",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "27",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "28",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "28",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "28",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "29",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "29",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "29",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "3",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "3",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "3",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "30",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "30",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "30",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "31",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "31",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "31",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "32",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "32",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "32",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "33",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "33",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "33",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "34",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "34",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "34",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "35",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "35",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "35",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "36",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "36",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "36",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "37",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "37",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "37",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "38",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "38",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "38",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "39",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "39",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "39",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "4",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "4",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "4",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "40",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "40",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "40",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "41",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "41",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "41",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "42",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "42",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "42",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "43",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "43",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "43",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "44",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "44",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "44",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "45",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "45",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "45",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "46",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "46",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "46",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "47",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "47",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "47",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "48",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "48",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "48",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "49",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "49",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "49",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "5",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "5",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "5",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "50",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "50",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "50",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "51",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "51",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "51",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "52",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "52",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "52",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "53",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "53",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "53",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "54",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "54",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "54",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "55",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "55",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "55",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "56",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "56",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "56",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "57",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "57",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "57",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "58",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "58",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "58",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "59",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "59",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "59",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "6",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "6",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "6",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "60",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "60",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "60",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "61",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "61",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "61",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "62",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "62",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "62",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "63",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "63",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "63",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "64",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "64",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "64",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "65",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "65",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "65",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "66",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "66",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "66",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "67",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "67",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "67",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "68",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "68",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "68",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "69",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "69",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "69",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "7",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "7",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "7",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "70",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "70",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "70",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "71",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "71",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "71",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "72",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "72",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "72",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "73",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "73",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "73",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "74",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "74",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "74",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "75",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "75",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "75",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "76",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "76",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "76",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "77",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "77",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "77",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "78",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "78",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "78",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "79",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "79",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "79",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "8",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "8",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "8",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "80",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "80",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "80",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "81",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "81",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "81",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "82",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "82",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "82",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "83",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "83",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "83",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "84",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "84",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "84",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "85",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "85",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "85",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "86",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "86",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "86",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "87",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "87",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "87",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "88",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "88",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "88",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "89",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "89",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "89",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "9",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "9",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "9",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "90",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "90",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "90",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "91",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "91",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "91",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "92",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "92",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "92",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "93",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "93",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "93",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "94",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "94",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "94",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "95",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "95",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "95",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "96",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "96",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "96",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "97",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "97",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "97",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "98",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "98",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "98",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index0",
+      "level": "1",
+      "type": "Data",
+      "size": "64K",
+      "shared_cpu_list": "99",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index1",
+      "level": "1",
+      "type": "Instruction",
+      "size": "64K",
+      "shared_cpu_list": "99",
+      "ways_of_associativity": "4",
+      "coherency_line_size": "64"
+    },
+    {
+      "index": "index2",
+      "level": "2",
+      "type": "Unified",
+      "size": "1024K",
+      "shared_cpu_list": "99",
+      "ways_of_associativity": "8",
+      "coherency_line_size": "64"
+    }
+  ],
+  "frequency_turbo": {
+    "turbo_disabled": true,
+    "intel_no_turbo_raw": null,
+    "amd_boost_raw": "0",
+    "scaling_governor": "performance",
+    "scaling_governor_pinned_cores": {
+      "cpu0": "performance",
+      "cpu1": "performance",
+      "cpu2": "performance",
+      "cpu3": "performance",
+      "cpu4": "performance",
+      "cpu5": "performance",
+      "cpu6": "performance",
+      "cpu7": "performance"
+    },
+    "scaling_cur_freq_khz": {
+      "cpu0": "3000000",
+      "cpu1": "3000000",
+      "cpu2": "2800000",
+      "cpu3": "3000000",
+      "cpu4": "3000000",
+      "cpu5": "3000000",
+      "cpu6": "3000000",
+      "cpu7": "3000000"
+    }
+  },
+  "memory": {
+    "MemTotal": "1053868428 kB",
+    "MemFree": "494265532 kB",
+    "MemAvailable": "1041925496 kB",
+    "SwapTotal": "8388604 kB",
+    "SwapFree": "8388604 kB"
+  },
+  "os_and_kernel": {
+    "kernel_sysname": "Linux",
+    "kernel_release": "6.8.0-139-generic",
+    "kernel_version": "#139-Ubuntu SMP PREEMPT_DYNAMIC Sat Aug  1 03:32:48 UTC 2026",
+    "machine": "aarch64",
+    "glibc_version": "2.39",
+    "PRETTY_NAME": "Ubuntu 24.04.5 LTS",
+    "NAME": "Ubuntu",
+    "VERSION": "24.04.5 LTS (Noble Numbat)",
+    "ID": "ubuntu"
+  },
+  "rust_toolchain": {
+    "rustc_version": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "rustc_verbose": {
+      "binary": "rustc",
+      "commit-hash": "58cf8f9c35b355199727627d07ae34a4e2846d67",
+      "commit-date": "2026-10-13",
+      "host": "aarch64-unknown-linux-gnu",
+      "release": "1.99.1",
+      "LLVM version": "23.1.1"
+    },
+    "cargo_version": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "cargo_verbose": {
+      "release": "1.99.1",
+      "commit-hash": "5f94df4789f005f9a352888e8355ffc645b7ed0e",
+      "commit-date": "2026-08-27",
+      "host": "aarch64-unknown-linux-gnu",
+      "libgit2": "1.9.6 (sys:0.21.0 vendored)",
+      "libcurl": "8.21.0-DEV (sys:0.4.90+curl-8.21.0 vendored ssl:OpenSSL/3.6.3)",
+      "ssl": "OpenSSL 3.6.3 9 Jun 2026",
+      "os": "Ubuntu 24.4.0 (noble) [64-bit]"
+    },
+    "cargo_lock_sha256": "a1250cdc8e17b0fabd47dc586118dcbbb7292e1a23709b4b393e23a00b909de0",
+    "profile": "release",
+    "env_rustflags": null,
+    "env_cargo_encoded_rustflags": null,
+    "effective_rustflags": [
+      "-C",
+      "no-vectorize-loops",
+      "-C",
+      "no-vectorize-slp"
+    ],
+    "rustflags_source": "/home/e/e1374509/rbd/code/.cargo/config.toml target=aarch64-unknown-linux-gnu",
+    "cargo_rustc_wrapper": "tools/rustc-oracle-wrapper.sh",
+    "cargo_config_raw": "[target.x86_64-unknown-linux-gnu]\nrustflags = [\n    \"-C\", \"target-cpu=native\",\n    \"-C\", \"no-vectorize-loops\",\n    \"-C\", \"no-vectorize-slp\",\n]\n\n[build]\nrustc-wrapper = \"tools/rustc-oracle-wrapper.sh\"\nrustflags = [\n    \"-C\", \"no-vectorize-loops\",\n    \"-C\", \"no-vectorize-slp\",\n]"
+  },
+  "blake3": {
+    "locked_version": "1.8.7",
+    "manifest_declarations": {
+      "lcpc-brakedown-pc/Cargo.toml": {
+        "dev-dependencies": {
+          "version": "1.8.7",
+          "default-features": false,
+          "features": [
+            "std",
+            "pure",
+            "no_sse2",
+            "no_sse41",
+            "no_avx2",
+            "no_avx512"
+          ]
+        }
+      },
+      "lcpc-oracle-tests/Cargo.toml": {
+        "dev-dependencies": {
+          "version": "=1.8.7",
+          "default-features": false,
+          "features": [
+            "std",
+            "pure",
+            "no_sse2",
+            "no_sse41",
+            "no_avx2",
+            "no_avx512"
+          ]
+        }
+      },
+      "external/lcpc-orig/Cargo.toml": {
+        "dependencies": {
+          "version": "=1.8.7",
+          "default-features": false,
+          "features": [
+            "std",
+            "traits-preview"
+          ]
+        }
+      },
+      "bench/Cargo.toml": {
+        "dependencies": {
+          "version": "1.8.7",
+          "default-features": false,
+          "features": [
+            "std",
+            "pure",
+            "no_sse2",
+            "no_sse41",
+            "no_avx2",
+            "no_avx512"
+          ]
+        }
+      },
+      "lcpc-test-fields/Cargo.toml": {
+        "dependencies": {
+          "version": "1.8.7",
+          "default-features": false,
+          "features": [
+            "std",
+            "pure",
+            "no_sse2",
+            "no_sse41",
+            "no_avx2",
+            "no_avx512"
+          ]
+        }
+      }
+    }
+  },
+  "compilers_simd_spielman": {
+    "gxx_version": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+    "cmake_version": "cmake version 3.28.3",
+    "clangxx_version": "Ubuntu clang version 18.1.3 (1ubuntu1)"
+  },
+  "git": {
+    "code_repo_sha": "bd2718c7698ce46000e26672ee309daf40c9a991",
+    "code_repo_tags": "step/09-codegen-90-gbd2718c",
+    "code_repo_dirty": true,
+    "code_repo_changed_paths": [
+      "results/soc-xcng/first-run-xcng1.json",
+      "results/soc-xcnh/first-run-xcnh1.json",
+      "results/soc-xcnh/first-run-xcnh2.json"
+    ],
+    "pinned_lcpc_commit": "f0e2116001af5a1bbf39481535f837d6a25772e8",
+    "pinned_upstream_commit": "7b399dbfecc406c79349015f1e21accc4def1be7",
+    "simd_params_patch_sha256": "d9cf97f0347fbb6b41d96397f6be9e3d7b604381471ef901e5ba61e9d7806fb6"
+  },
+  "pinning": {
+    "cores": "0,1,2,3,4,5,6,7",
+    "threads": 8,
+    "affinity_cores_expanded": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ]
+  },
+  "benchmark_parameters": {
+    "params_mode": "lcpc-sdig6",
+    "field": "mont127",
+    "logN": [
+      18,
+      22,
+      26
+    ],
+    "slices": "adaptive",
+    "runs": 5,
+    "warmup": 1,
+    "host_profile": "/home/e/e1374509/rbd/cluster/hosts/soc-xcng.sh"
+  },
+  "mode": "arm",
+  "mt_threads": 8,
+  "core_selection": {
+    "usable_cpus_affinity": "0-19",
+    "usable_physical_cores": 20,
+    "l3_domains_on_node": 0,
+    "max_threads_requested": 8,
+    "selection_rule": "first usable physical cores (no level-3 cache entry in sysfs)",
+    "selected_l3_domain": null,
+    "cache_aware": false,
+    "l3_domain": "none",
+    "benchmark_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "single_thread_core": 1,
+    "mt_threads": 8,
+    "selected_physical_cores": [
+      {
+        "cpu": 0,
+        "physical_package_id": "56",
+        "core_id": "4608",
+        "thread_siblings": [
+          0
+        ],
+        "numa_node": 0
+      },
+      {
+        "cpu": 1,
+        "physical_package_id": "56",
+        "core_id": "4609",
+        "thread_siblings": [
+          1
+        ],
+        "numa_node": 0
+      },
+      {
+        "cpu": 2,
+        "physical_package_id": "56",
+        "core_id": "5120",
+        "thread_siblings": [
+          2
+        ],
+        "numa_node": 0
+      },
+      {
+        "cpu": 3,
+        "physical_package_id": "56",
+        "core_id": "5121",
+        "thread_siblings": [
+          3
+        ],
+        "numa_node": 0
+      },
+      {
+        "cpu": 4,
+        "physical_package_id": "56",
+        "core_id": "6656",
+        "thread_siblings": [
+          4
+        ],
+        "numa_node": 0
+      },
+      {
+        "cpu": 5,
+        "physical_package_id": "56",
+        "core_id": "6657",
+        "thread_siblings": [
+          5
+        ],
+        "numa_node": 0
+      },
+      {
+        "cpu": 6,
+        "physical_package_id": "56",
+        "core_id": "7168",
+        "thread_siblings": [
+          6
+        ],
+        "numa_node": 0
+      },
+      {
+        "cpu": 7,
+        "physical_package_id": "56",
+        "core_id": "7169",
+        "thread_siblings": [
+          7
+        ],
+        "numa_node": 0
+      }
+    ],
+    "spare_usable_cpus": "8-19",
+    "single": 1,
+    "multi": "0,1,2,3,4,5,6,7",
+    "allowed": "0-19"
+  },
+  "extra": [
+    {
+      "schema_version": "lcpc-bench-v1",
+      "implementation": "lcpc-fork",
+      "upstream_commit": "f0e2116001af5a1bbf39481535f837d6a25772e8",
+      "driver_version": "0.1.0",
+      "hash_algorithm": "BLAKE3-256",
+      "hash_crate_version": "1.8.7",
+      "hash_mode": "portable-only",
+      "field": "Mont127",
+      "params": "lcpc-sdig6",
+      "shape": "brakedown",
+      "log_n": 18,
+      "seed": 5495324220345960787,
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "slices": 1,
+      "slice_mode": "adaptive",
+      "adaptive_slices": 1,
+      "warmup": 1,
+      "runs": 5,
+      "dimensions": {
+        "coefficient_count": 262144,
+        "n_rows": 512,
+        "n_per_row": 512,
+        "n_cols": 881
+      },
+      "recursion_depth": 3,
+      "level_parameters": [
+        {
+          "n_i": 512,
+          "m_i": 122,
+          "c_n": 13,
+          "n_i_prime": 210,
+          "m_i_prime": 159,
+          "d_n": 30,
+          "precode_edges": 6656,
+          "postcode_edges": 6300,
+          "total_edges": 12956
+        },
+        {
+          "n_i": 122,
+          "m_i": 30,
+          "c_n": 19,
+          "n_i_prime": 52,
+          "m_i_prime": 36,
+          "d_n": 32,
+          "precode_edges": 2318,
+          "postcode_edges": 1664,
+          "total_edges": 3982
+        },
+        {
+          "n_i": 30,
+          "m_i": 8,
+          "c_n": 8,
+          "n_i_prime": 14,
+          "m_i_prime": 8,
+          "d_n": 8,
+          "precode_edges": 240,
+          "postcode_edges": 112,
+          "total_edges": 352
+        }
+      ],
+      "total_graph_edges": 17290,
+      "total_edge_row_macs": 8852480,
+      "ns_per_mac": 1.340150556680162,
+      "cycles_per_mac": null,
+      "cpu_mhz_before": null,
+      "cpu_mhz_after": null,
+      "cpu_mhz_source": null,
+      "cycles_per_mac_is_nominal": null,
+      "proof_size_bytes": 32347664,
+      "setup_ns": {
+        "graph_sampling_and_encoding_init_ns": 2412059,
+        "input_generation_and_row_buffer_init_ns": 7822384,
+        "verifier_encoding_init_ns": 1086449
+      },
+      "measurements": {
+        "encode_matrix": {
+          "samples_ns": [
+            11874736,
+            11938337,
+            11859656,
+            11863656,
+            11857776
+          ],
+          "summary": {
+            "min_ns": 11857776,
+            "q1_ns": 11859656,
+            "median_ns": 11863656.0,
+            "q3_ns": 11874736,
+            "iqr_ns": 15080,
+            "max_ns": 11938337,
+            "mean_ns": 11878832.2
+          }
+        },
+        "verifier_encode": {
+          "samples_ns": [
+            380363,
+            380283,
+            382603,
+            380003,
+            385123
+          ],
+          "summary": {
+            "min_ns": 380003,
+            "q1_ns": 380283,
+            "median_ns": 380363.0,
+            "q3_ns": 382603,
+            "iqr_ns": 2320,
+            "max_ns": 385123,
+            "mean_ns": 381675.0
+          }
+        },
+        "verifier_encode_1": {
+          "samples_ns": [
+            209682,
+            213522,
+            209321,
+            209322,
+            209442
+          ],
+          "summary": {
+            "min_ns": 209321,
+            "q1_ns": 209322,
+            "median_ns": 209442.0,
+            "q3_ns": 209682,
+            "iqr_ns": 360,
+            "max_ns": 213522,
+            "mean_ns": 210257.8
+          }
+        },
+        "verifier_encode_2": {
+          "samples_ns": [
+            380363,
+            380283,
+            382603,
+            380003,
+            385123
+          ],
+          "summary": {
+            "min_ns": 380003,
+            "q1_ns": 380283,
+            "median_ns": 380363.0,
+            "q3_ns": 382603,
+            "iqr_ns": 2320,
+            "max_ns": 385123,
+            "mean_ns": 381675.0
+          }
+        },
+        "hash_matrix_decomposition": {
+          "samples_ns": [
+            2842103,
+            2749382,
+            2705782,
+            2721822,
+            2720582
+          ],
+          "summary": {
+            "min_ns": 2705782,
+            "q1_ns": 2720582,
+            "median_ns": 2721822.0,
+            "q3_ns": 2749382,
+            "iqr_ns": 28800,
+            "max_ns": 2842103,
+            "mean_ns": 2747934.2
+          }
+        },
+        "commit_total": {
+          "samples_ns": [
+            15903809,
+            15744647,
+            14943282,
+            14910281,
+            14976841
+          ],
+          "summary": {
+            "min_ns": 14910281,
+            "q1_ns": 14943282,
+            "median_ns": 14976841.0,
+            "q3_ns": 15744647,
+            "iqr_ns": 801365,
+            "max_ns": 15903809,
+            "mean_ns": 15295772.0
+          }
+        },
+        "prove": {
+          "samples_ns": [
+            4726078,
+            9111354,
+            5202642,
+            5644086,
+            4774719
+          ],
+          "summary": {
+            "min_ns": 4726078,
+            "q1_ns": 4774719,
+            "median_ns": 5202642.0,
+            "q3_ns": 5644086,
+            "iqr_ns": 869367,
+            "max_ns": 9111354,
+            "mean_ns": 5891775.8
+          }
+        },
+        "verify": {
+          "samples_ns": [
+            6661854,
+            6083249,
+            6171210,
+            6144290,
+            6365171
+          ],
+          "summary": {
+            "min_ns": 6083249,
+            "q1_ns": 6144290,
+            "median_ns": 6171210.0,
+            "q3_ns": 6365171,
+            "iqr_ns": 220881,
+            "max_ns": 6661854,
+            "mean_ns": 6285154.8
+          }
+        }
+      },
+      "correctness": {
+        "direct_encoder_root_matches_commit": true,
+        "proof_verification_passed": true,
+        "verified_evaluation_hex": "5c060b1aed261c76404590b96232a552"
+      },
+      "peak_rss_bytes": 171368448,
+      "hash_decomposition_includes_scratch_allocation": true,
+      "status": "complete",
+      "error": null,
+      "perf_stat": null
+    },
+    {
+      "schema_version": "lcpc-bench-v1",
+      "implementation": "lcpc-fork",
+      "upstream_commit": "f0e2116001af5a1bbf39481535f837d6a25772e8",
+      "driver_version": "0.1.0",
+      "hash_algorithm": "BLAKE3-256",
+      "hash_crate_version": "1.8.7",
+      "hash_mode": "portable-only",
+      "field": "Mont127",
+      "params": "lcpc-sdig6",
+      "shape": "brakedown",
+      "log_n": 22,
+      "seed": 5495324220345960791,
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "slices": 8,
+      "slice_mode": "adaptive",
+      "adaptive_slices": 8,
+      "warmup": 1,
+      "runs": 5,
+      "dimensions": {
+        "coefficient_count": 4194304,
+        "n_rows": 2048,
+        "n_per_row": 2048,
+        "n_cols": 3523
+      },
+      "recursion_depth": 4,
+      "level_parameters": [
+        {
+          "n_i": 2048,
+          "m_i": 488,
+          "c_n": 11,
+          "n_i_prime": 840,
+          "m_i_prime": 635,
+          "d_n": 23,
+          "precode_edges": 22528,
+          "postcode_edges": 19320,
+          "total_edges": 41848
+        },
+        {
+          "n_i": 488,
+          "m_i": 117,
+          "c_n": 13,
+          "n_i_prime": 202,
+          "m_i_prime": 150,
+          "d_n": 30,
+          "precode_edges": 6344,
+          "postcode_edges": 6060,
+          "total_edges": 12404
+        },
+        {
+          "n_i": 117,
+          "m_i": 28,
+          "c_n": 19,
+          "n_i_prime": 49,
+          "m_i_prime": 36,
+          "d_n": 31,
+          "precode_edges": 2223,
+          "postcode_edges": 1519,
+          "total_edges": 3742
+        },
+        {
+          "n_i": 28,
+          "m_i": 7,
+          "c_n": 7,
+          "n_i_prime": 13,
+          "m_i_prime": 8,
+          "d_n": 8,
+          "precode_edges": 196,
+          "postcode_edges": 104,
+          "total_edges": 300
+        }
+      ],
+      "total_graph_edges": 58294,
+      "total_edge_row_macs": 119386112,
+      "ns_per_mac": 1.2959317663347645,
+      "cycles_per_mac": null,
+      "cpu_mhz_before": null,
+      "cpu_mhz_after": null,
+      "cpu_mhz_source": null,
+      "cycles_per_mac_is_nominal": null,
+      "proof_size_bytes": 125004672,
+      "setup_ns": {
+        "graph_sampling_and_encoding_init_ns": 5766607,
+        "input_generation_and_row_buffer_init_ns": 131599307,
+        "verifier_encoding_init_ns": 3637670
+      },
+      "measurements": {
+        "encode_matrix": {
+          "samples_ns": [
+            154274891,
+            154290611,
+            154716255,
+            155570781,
+            155665342
+          ],
+          "summary": {
+            "min_ns": 154274891,
+            "q1_ns": 154290611,
+            "median_ns": 154716255.0,
+            "q3_ns": 155570781,
+            "iqr_ns": 1280170,
+            "max_ns": 155665342,
+            "mean_ns": 154903576.0
+          }
+        },
+        "verifier_encode": {
+          "samples_ns": [
+            1287570,
+            1288971,
+            1286930,
+            1287411,
+            1289170
+          ],
+          "summary": {
+            "min_ns": 1286930,
+            "q1_ns": 1287411,
+            "median_ns": 1287570.0,
+            "q3_ns": 1288971,
+            "iqr_ns": 1560,
+            "max_ns": 1289170,
+            "mean_ns": 1288010.4
+          }
+        },
+        "verifier_encode_1": {
+          "samples_ns": [
+            714326,
+            712286,
+            708605,
+            711206,
+            711286
+          ],
+          "summary": {
+            "min_ns": 708605,
+            "q1_ns": 711206,
+            "median_ns": 711286.0,
+            "q3_ns": 712286,
+            "iqr_ns": 1080,
+            "max_ns": 714326,
+            "mean_ns": 711541.8
+          }
+        },
+        "verifier_encode_2": {
+          "samples_ns": [
+            1287570,
+            1288971,
+            1286930,
+            1287411,
+            1289170
+          ],
+          "summary": {
+            "min_ns": 1286930,
+            "q1_ns": 1287411,
+            "median_ns": 1287570.0,
+            "q3_ns": 1288971,
+            "iqr_ns": 1560,
+            "max_ns": 1289170,
+            "mean_ns": 1288010.4
+          }
+        },
+        "hash_matrix_decomposition": {
+          "samples_ns": [
+            38951475,
+            38909556,
+            38856835,
+            38888995,
+            38868475
+          ],
+          "summary": {
+            "min_ns": 38856835,
+            "q1_ns": 38868475,
+            "median_ns": 38888995.0,
+            "q3_ns": 38909556,
+            "iqr_ns": 41081,
+            "max_ns": 38951475,
+            "mean_ns": 38895067.2
+          }
+        },
+        "commit_total": {
+          "samples_ns": [
+            206118431,
+            217940926,
+            218688573,
+            219253497,
+            226611276
+          ],
+          "summary": {
+            "min_ns": 206118431,
+            "q1_ns": 217940926,
+            "median_ns": 218688573.0,
+            "q3_ns": 219253497,
+            "iqr_ns": 1312571,
+            "max_ns": 226611276,
+            "mean_ns": 217722540.6
+          }
+        },
+        "prove": {
+          "samples_ns": [
+            36408615,
+            44074598,
+            38213029,
+            35226966,
+            34502159
+          ],
+          "summary": {
+            "min_ns": 34502159,
+            "q1_ns": 35226966,
+            "median_ns": 36408615.0,
+            "q3_ns": 38213029,
+            "iqr_ns": 2986063,
+            "max_ns": 44074598,
+            "mean_ns": 37685073.4
+          }
+        },
+        "verify": {
+          "samples_ns": [
+            44035437,
+            49518681,
+            47927949,
+            43606993,
+            49310640
+          ],
+          "summary": {
+            "min_ns": 43606993,
+            "q1_ns": 44035437,
+            "median_ns": 47927949.0,
+            "q3_ns": 49310640,
+            "iqr_ns": 5275203,
+            "max_ns": 49518681,
+            "mean_ns": 46879940.0
+          }
+        }
+      },
+      "correctness": {
+        "direct_encoder_root_matches_commit": true,
+        "proof_verification_passed": true,
+        "verified_evaluation_hex": "bd2514e28191813889181f5d22756e4d"
+      },
+      "peak_rss_bytes": 896630784,
+      "hash_decomposition_includes_scratch_allocation": true,
+      "status": "complete",
+      "error": null,
+      "perf_stat": null
+    },
+    {
+      "schema_version": "lcpc-bench-v1",
+      "implementation": "lcpc-fork",
+      "upstream_commit": "f0e2116001af5a1bbf39481535f837d6a25772e8",
+      "driver_version": "0.1.0",
+      "hash_algorithm": "BLAKE3-256",
+      "hash_crate_version": "1.8.7",
+      "hash_mode": "portable-only",
+      "field": "Mont127",
+      "params": "lcpc-sdig6",
+      "shape": "brakedown",
+      "log_n": 26,
+      "seed": 5495324220345960795,
+      "threads": 8,
+      "cores": "0,1,2,3,4,5,6,7",
+      "slices": 128,
+      "slice_mode": "adaptive",
+      "adaptive_slices": 128,
+      "warmup": 1,
+      "runs": 5,
+      "dimensions": {
+        "coefficient_count": 67108864,
+        "n_rows": 8192,
+        "n_per_row": 8192,
+        "n_cols": 14091
+      },
+      "recursion_depth": 5,
+      "level_parameters": [
+        {
+          "n_i": 8192,
+          "m_i": 1950,
+          "c_n": 11,
+          "n_i_prime": 3354,
+          "m_i_prime": 2545,
+          "d_n": 21,
+          "precode_edges": 90112,
+          "postcode_edges": 70434,
+          "total_edges": 160546
+        },
+        {
+          "n_i": 1950,
+          "m_i": 465,
+          "c_n": 11,
+          "n_i_prime": 800,
+          "m_i_prime": 604,
+          "d_n": 23,
+          "precode_edges": 21450,
+          "postcode_edges": 18400,
+          "total_edges": 39850
+        },
+        {
+          "n_i": 465,
+          "m_i": 111,
+          "c_n": 14,
+          "n_i_prime": 191,
+          "m_i_prime": 144,
+          "d_n": 31,
+          "precode_edges": 6510,
+          "postcode_edges": 5921,
+          "total_edges": 12431
+        },
+        {
+          "n_i": 111,
+          "m_i": 27,
+          "c_n": 18,
+          "n_i_prime": 47,
+          "m_i_prime": 33,
+          "d_n": 29,
+          "precode_edges": 1998,
+          "postcode_edges": 1363,
+          "total_edges": 3361
+        },
+        {
+          "n_i": 27,
+          "m_i": 7,
+          "c_n": 7,
+          "n_i_prime": 13,
+          "m_i_prime": 7,
+          "d_n": 7,
+          "precode_edges": 189,
+          "postcode_edges": 91,
+          "total_edges": 280
+        }
+      ],
+      "total_graph_edges": 216468,
+      "total_edge_row_macs": 1773305856,
+      "ns_per_mac": 1.3105570638796786,
+      "cycles_per_mac": null,
+      "cpu_mhz_before": null,
+      "cpu_mhz_after": null,
+      "cpu_mhz_source": null,
+      "cycles_per_mac_is_nominal": null,
+      "proof_size_bytes": 494731504,
+      "setup_ns": {
+        "graph_sampling_and_encoding_init_ns": 17007218,
+        "input_generation_and_row_buffer_init_ns": 1997205979,
+        "verifier_encoding_init_ns": 13375667
+      },
+      "measurements": {
+        "encode_matrix": {
+          "samples_ns": [
+            2323610723,
+            2324018516,
+            2324554551,
+            2323792254,
+            2324585610
+          ],
+          "summary": {
+            "min_ns": 2323610723,
+            "q1_ns": 2323792254,
+            "median_ns": 2324018516.0,
+            "q3_ns": 2324554551,
+            "iqr_ns": 762297,
+            "max_ns": 2324585610,
+            "mean_ns": 2324112330.8
+          }
+        },
+        "verifier_encode": {
+          "samples_ns": [
+            4874720,
+            4868999,
+            4871079,
+            4871999,
+            4877320
+          ],
+          "summary": {
+            "min_ns": 4868999,
+            "q1_ns": 4871079,
+            "median_ns": 4871999.0,
+            "q3_ns": 4874720,
+            "iqr_ns": 3641,
+            "max_ns": 4877320,
+            "mean_ns": 4872823.4
+          }
+        },
+        "verifier_encode_1": {
+          "samples_ns": [
+            2680102,
+            2672141,
+            2673062,
+            2676742,
+            2674501
+          ],
+          "summary": {
+            "min_ns": 2672141,
+            "q1_ns": 2673062,
+            "median_ns": 2674501.0,
+            "q3_ns": 2676742,
+            "iqr_ns": 3680,
+            "max_ns": 2680102,
+            "mean_ns": 2675309.6
+          }
+        },
+        "verifier_encode_2": {
+          "samples_ns": [
+            4874720,
+            4868999,
+            4871079,
+            4871999,
+            4877320
+          ],
+          "summary": {
+            "min_ns": 4868999,
+            "q1_ns": 4871079,
+            "median_ns": 4871999.0,
+            "q3_ns": 4874720,
+            "iqr_ns": 3641,
+            "max_ns": 4877320,
+            "mean_ns": 4872823.4
+          }
+        },
+        "hash_matrix_decomposition": {
+          "samples_ns": [
+            638618352,
+            638015946,
+            637919104,
+            637747942,
+            638373467
+          ],
+          "summary": {
+            "min_ns": 637747942,
+            "q1_ns": 637919104,
+            "median_ns": 638015946.0,
+            "q3_ns": 638373467,
+            "iqr_ns": 454363,
+            "max_ns": 638618352,
+            "mean_ns": 638134962.2
+          }
+        },
+        "commit_total": {
+          "samples_ns": [
+            3153586579,
+            3315323420,
+            3323723788,
+            3309677136,
+            3343867710
+          ],
+          "summary": {
+            "min_ns": 3153586579,
+            "q1_ns": 3309677136,
+            "median_ns": 3315323420.0,
+            "q3_ns": 3323723788,
+            "iqr_ns": 14046652,
+            "max_ns": 3343867710,
+            "mean_ns": 3289235726.6
+          }
+        },
+        "prove": {
+          "samples_ns": [
+            328910318,
+            302084623,
+            292401185,
+            327430225,
+            376588980
+          ],
+          "summary": {
+            "min_ns": 292401185,
+            "q1_ns": 302084623,
+            "median_ns": 327430225.0,
+            "q3_ns": 328910318,
+            "iqr_ns": 26825695,
+            "max_ns": 376588980,
+            "mean_ns": 325483066.2
+          }
+        },
+        "verify": {
+          "samples_ns": [
+            235929572,
+            236194333,
+            235889931,
+            251839179,
+            236107652
+          ],
+          "summary": {
+            "min_ns": 235889931,
+            "q1_ns": 235929572,
+            "median_ns": 236107652.0,
+            "q3_ns": 236194333,
+            "iqr_ns": 264761,
+            "max_ns": 251839179,
+            "mean_ns": 239192133.4
+          }
+        }
+      },
+      "correctness": {
+        "direct_encoder_root_matches_commit": true,
+        "proof_verification_passed": true,
+        "verified_evaluation_hex": "6ea2683fdca6bba3c53d56b1a3f50663"
+      },
+      "peak_rss_bytes": 9151614976,
+      "hash_decomposition_includes_scratch_allocation": true,
+      "status": "complete",
+      "error": null,
+      "perf_stat": null
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": "steps-tag-manifest-v1",
+  "harness_version": "steps-driver-v1",
+  "tag": "step/07-slicing",
+  "commit": "8567b53f1337217e8692a1353b5460191f42ccca",
+  "commit_subject": "LLC slicing with adaptive cache detection and optional auto-tuner",
+  "step_index": 7,
+  "session_id": "2026-11-22T172746Z-bd2718c7698c",
+  "detected_api_stage": "runtime-adaptive",
+  "run_class": "campaign",
+  "watermark": null,
+  "workspace_tests": "/home/e/e1374509/rbd/code/results/soc-xcnh/2026-11-22-bd2718c7698c/s1/full_steps_mode_b_n16-20-24/soc-xcnh/2026-11-22T172746Z-bd2718c7698c/steps/step_07-slicing/workspace-tests.log",
+  "codegen_report": "/home/e/e1374509/rbd/code/results/soc-xcnh/2026-11-22-bd2718c7698c/s1/full_steps_mode_b_n16-20-24/soc-xcnh/2026-11-22T172746Z-bd2718c7698c/steps/step_07-slicing/codegen_report.json",
+  "codegen_note": null,
+  "modes_run": "b",
+  "mode_a_field": null
+}

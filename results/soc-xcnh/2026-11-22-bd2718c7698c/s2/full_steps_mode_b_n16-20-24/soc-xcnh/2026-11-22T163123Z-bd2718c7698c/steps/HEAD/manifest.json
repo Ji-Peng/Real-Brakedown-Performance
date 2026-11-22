@@ -1,0 +1,17 @@
+{
+  "schema_version": "steps-tag-manifest-v1",
+  "harness_version": "steps-driver-v1",
+  "tag": "HEAD",
+  "commit": "bd2718c7698ce46000e26672ee309daf40c9a991",
+  "commit_subject": "README, claim_times: measured quick-mode times and disk use",
+  "step_index": 10,
+  "session_id": "2026-11-22T163123Z-bd2718c7698c",
+  "detected_api_stage": "runtime-adaptive",
+  "run_class": "campaign",
+  "watermark": null,
+  "workspace_tests": "/home/e/e1374509/rbd/code/results/soc-xcnh/2026-11-22-bd2718c7698c/s2/full_steps_mode_b_n16-20-24/soc-xcnh/2026-11-22T163123Z-bd2718c7698c/steps/HEAD/workspace-tests.log",
+  "codegen_report": "/home/e/e1374509/rbd/code/results/soc-xcnh/2026-11-22-bd2718c7698c/s2/full_steps_mode_b_n16-20-24/soc-xcnh/2026-11-22T163123Z-bd2718c7698c/steps/HEAD/codegen_report.json",
+  "codegen_note": null,
+  "modes_run": "b",
+  "mode_a_field": null
+}

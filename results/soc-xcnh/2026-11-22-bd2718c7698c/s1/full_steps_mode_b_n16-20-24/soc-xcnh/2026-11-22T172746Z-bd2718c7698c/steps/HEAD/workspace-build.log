@@ -1,0 +1,7 @@
+   Compiling lcpc-2d v0.1.1 (/home/e/e1374509/rbd/target/xcnh-s1/worktrees/wt-HEAD-2gz9ml/lcpc-2d)
+   Compiling lcpc-fields v0.1.1 (/home/e/e1374509/rbd/target/xcnh-s1/worktrees/wt-HEAD-2gz9ml/lcpc-fields)
+   Compiling lcpc-test-fields v0.1.0 (/home/e/e1374509/rbd/target/xcnh-s1/worktrees/wt-HEAD-2gz9ml/lcpc-test-fields)
+   Compiling lcpc-ligero-pc v0.1.1 (/home/e/e1374509/rbd/target/xcnh-s1/worktrees/wt-HEAD-2gz9ml/lcpc-ligero-pc)
+   Compiling lcpc-brakedown-pc v0.1.1 (/home/e/e1374509/rbd/target/xcnh-s1/worktrees/wt-HEAD-2gz9ml/lcpc-brakedown-pc)
+   Compiling lcpc-bench v0.1.0 (/home/e/e1374509/rbd/target/xcnh-s1/worktrees/wt-HEAD-2gz9ml/bench)
+    Finished `release` profile [optimized] target(s) in 30.24s

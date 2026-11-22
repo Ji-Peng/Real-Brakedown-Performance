@@ -1,0 +1,34 @@
+{
+  "stage": "20261122T114132Z_T28",
+  "stage_label": "T28",
+  "stage_started_utc": "2026-11-22T11:41:32Z",
+  "profile": "full",
+  "mt_threads": 8,
+  "session_id": "s1",
+  "seed": 24055218,
+  "instance": "xcnh1",
+  "arguments": {
+    "blocks": "^full_(this_work|lcpc_orig)_threads_t[0-9]+$",
+    "logn": "28",
+    "warmup": "1",
+    "runs": null,
+    "lcpc_variants": "as-published-as-is,fork-flags-portable",
+    "tags": null,
+    "multi_cores": "0,1,2,3,4,5,6,7",
+    "single_core": "1",
+    "mt_threads": 8
+  },
+  "arguments_string": "profile=full blocks=^full_(this_work|lcpc_orig)_threads_t[0-9]+$ logn=28 warmup=1 runs= lcpc_variants=as-published-as-is,fork-flags-portable tags= max_threads=8 seed=24055218",
+  "block_ids": [
+    "full_this_work_threads_t2_n28",
+    "full_lcpc_orig_threads_t8_n28",
+    "full_lcpc_orig_threads_t4_n28",
+    "full_this_work_threads_t1_n28",
+    "full_this_work_threads_t8_n28",
+    "full_lcpc_orig_threads_t2_n28",
+    "full_lcpc_orig_threads_t1_n28",
+    "full_this_work_threads_t4_n28"
+  ],
+  "any_block_failed": false,
+  "note": "benchmark_parameters.logN/warmup/threads describe the stage filters; per-block values are in schedule.json and each block's manifest"
+}

@@ -1,0 +1,174 @@
+[
+  {
+    "block_id": "arm_this_work_t1_n18-22-26",
+    "out": "/home/e/e1374509/rbd/code/results/soc-xcng/2026-11-22-bd2718c7698c/arm1/arm_this_work_t1_n18-22-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-22T08:07:58Z",
+    "end_utc": "2026-11-22T08:22:40Z",
+    "duration_s": 882,
+    "core_for_frequency": "1",
+    "freq_before_mhz": "3000.000",
+    "freq_after_mhz": "3000.000",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "moved_previous_to": null,
+    "cmd": "'/home/e/e1374509/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 1 --runs 5 --warmup 1 --slices adaptive --cores '1' --host-label 'soc-xcng' --host-profile '/home/e/e1374509/rbd/cluster/hosts/soc-xcng.sh' --out '/home/e/e1374509/rbd/code/results/soc-xcng/2026-11-22-bd2718c7698c/arm1/arm_this_work_t1_n18-22-26'",
+    "noise_before": {
+      "utc": "2026-11-22T08:07:58Z",
+      "node": "xcng1",
+      "loadavg_1_5_15": [
+        0.15,
+        0.06,
+        0.02
+      ],
+      "node_cpu_alloc": 20,
+      "job_cpus_on_node": 20,
+      "node_cpu_total": 128,
+      "node_cpu_load": 0.0,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-22T08:22:40Z",
+      "node": "xcng1",
+      "loadavg_1_5_15": [
+        1.0,
+        0.98,
+        0.67
+      ],
+      "node_cpu_alloc": 20,
+      "job_cpus_on_node": 20,
+      "node_cpu_total": 128,
+      "node_cpu_load": 0.97,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "arm_this_work_t8_n18-22-26",
+    "out": "/home/e/e1374509/rbd/code/results/soc-xcng/2026-11-22-bd2718c7698c/arm1/arm_this_work_t8_n18-22-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-22T08:22:41Z",
+    "end_utc": "2026-11-22T08:23:48Z",
+    "duration_s": 67,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "3000.000",
+    "freq_after_mhz": "3000.000",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "moved_previous_to": null,
+    "cmd": "'/home/e/e1374509/rbd/code/reproduce/this_work.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 8 --runs 5 --warmup 1 --slices adaptive --cores '0,1,2,3,4,5,6,7' --host-label 'soc-xcng' --host-profile '/home/e/e1374509/rbd/cluster/hosts/soc-xcng.sh' --out '/home/e/e1374509/rbd/code/results/soc-xcng/2026-11-22-bd2718c7698c/arm1/arm_this_work_t8_n18-22-26'",
+    "noise_before": {
+      "utc": "2026-11-22T08:22:41Z",
+      "node": "xcng1",
+      "loadavg_1_5_15": [
+        1.0,
+        0.98,
+        0.67
+      ],
+      "node_cpu_alloc": 20,
+      "job_cpus_on_node": 20,
+      "node_cpu_total": 128,
+      "node_cpu_load": 0.97,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-22T08:23:48Z",
+      "node": "xcng1",
+      "loadavg_1_5_15": [
+        4.3,
+        1.96,
+        1.03
+      ],
+      "node_cpu_alloc": 20,
+      "job_cpus_on_node": 20,
+      "node_cpu_total": 128,
+      "node_cpu_load": 0.97,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "arm_lcpc_orig_t8_n18-22-26",
+    "out": "/home/e/e1374509/rbd/code/results/soc-xcng/2026-11-22-bd2718c7698c/arm1/arm_lcpc_orig_t8_n18-22-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-22T08:23:52Z",
+    "end_utc": "2026-11-22T08:30:55Z",
+    "duration_s": 423,
+    "core_for_frequency": "0",
+    "freq_before_mhz": "3000.000",
+    "freq_after_mhz": "3000.000",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 0",
+    "moved_previous_to": null,
+    "cmd": "'/home/e/e1374509/rbd/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 8 --runs 5 --warmup 1 --cores '0,1,2,3,4,5,6,7' --host-label 'soc-xcng' --host-profile '/home/e/e1374509/rbd/cluster/hosts/soc-xcng.sh' --out '/home/e/e1374509/rbd/code/results/soc-xcng/2026-11-22-bd2718c7698c/arm1/arm_lcpc_orig_t8_n18-22-26'",
+    "noise_before": {
+      "utc": "2026-11-22T08:23:52Z",
+      "node": "xcng1",
+      "loadavg_1_5_15": [
+        4.3,
+        1.96,
+        1.03
+      ],
+      "node_cpu_alloc": 20,
+      "job_cpus_on_node": 20,
+      "node_cpu_total": 128,
+      "node_cpu_load": 0.97,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-22T08:30:55Z",
+      "node": "xcng1",
+      "loadavg_1_5_15": [
+        6.42,
+        4.66,
+        2.61
+      ],
+      "node_cpu_alloc": 20,
+      "job_cpus_on_node": 20,
+      "node_cpu_total": 128,
+      "node_cpu_load": 3.89,
+      "node_running_jobs": 1
+    }
+  },
+  {
+    "block_id": "arm_lcpc_orig_t1_n18-22-26",
+    "out": "/home/e/e1374509/rbd/code/results/soc-xcng/2026-11-22-bd2718c7698c/arm1/arm_lcpc_orig_t1_n18-22-26",
+    "status": "ok",
+    "exit_code": 0,
+    "start_utc": "2026-11-22T08:30:55Z",
+    "end_utc": "2026-11-22T09:02:15Z",
+    "duration_s": 1880,
+    "core_for_frequency": "1",
+    "freq_before_mhz": "3000.000",
+    "freq_after_mhz": "3000.000",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "moved_previous_to": null,
+    "cmd": "'/home/e/e1374509/rbd/code/reproduce/lcpc_orig.sh' --params lcpc-sdig6 --field mont127 --logN 18,22,26 --threads 1 --runs 5 --warmup 1 --cores '1' --host-label 'soc-xcng' --host-profile '/home/e/e1374509/rbd/cluster/hosts/soc-xcng.sh' --out '/home/e/e1374509/rbd/code/results/soc-xcng/2026-11-22-bd2718c7698c/arm1/arm_lcpc_orig_t1_n18-22-26'",
+    "noise_before": {
+      "utc": "2026-11-22T08:30:55Z",
+      "node": "xcng1",
+      "loadavg_1_5_15": [
+        6.42,
+        4.66,
+        2.61
+      ],
+      "node_cpu_alloc": 20,
+      "job_cpus_on_node": 20,
+      "node_cpu_total": 128,
+      "node_cpu_load": 3.89,
+      "node_running_jobs": 1
+    },
+    "noise_after": {
+      "utc": "2026-11-22T09:02:15Z",
+      "node": "xcng1",
+      "loadavg_1_5_15": [
+        1.0,
+        1.0,
+        1.19
+      ],
+      "node_cpu_alloc": 20,
+      "job_cpus_on_node": 20,
+      "node_cpu_total": 128,
+      "node_cpu_load": 1.0,
+      "node_running_jobs": 1
+    }
+  }
+]

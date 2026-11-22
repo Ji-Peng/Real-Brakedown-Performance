@@ -1,0 +1,88 @@
+[
+  {
+    "block_id": "full_steps_mode_a_n16-20-24",
+    "out": "/home/e/e1374509/rbd/code/results/soc-xcnh/2026-11-22-bd2718c7698c/s1/full_steps_mode_a_n16-20-24",
+    "status": "failed",
+    "exit_code": 1,
+    "start_utc": "2026-11-22T13:28:34Z",
+    "end_utc": "2026-11-22T13:28:34Z",
+    "duration_s": 0,
+    "core_for_frequency": "1",
+    "freq_before_mhz": "4131.378",
+    "freq_after_mhz": "4122.435",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "moved_previous_to": null,
+    "cmd": "'/home/e/e1374509/rbd/code/reproduce/steps.sh' --mode a --logN 16,20,24 --threads 1 --runs 5 --warmup 1  --cores '1' --host-label 'soc-xcnh' --out '/home/e/e1374509/rbd/code/results/soc-xcnh/2026-11-22-bd2718c7698c/s1/full_steps_mode_a_n16-20-24'",
+    "noise_before": {
+      "utc": "2026-11-22T13:28:34Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        15.48,
+        16.59,
+        15.32
+      ],
+      "node_cpu_alloc": 168,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 16.66,
+      "node_running_jobs": 5
+    },
+    "noise_after": {
+      "utc": "2026-11-22T13:28:34Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        15.48,
+        16.59,
+        15.32
+      ],
+      "node_cpu_alloc": 168,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 16.66,
+      "node_running_jobs": 5
+    }
+  },
+  {
+    "block_id": "full_steps_mode_b_n16-20-24",
+    "out": "/home/e/e1374509/rbd/code/results/soc-xcnh/2026-11-22-bd2718c7698c/s1/full_steps_mode_b_n16-20-24",
+    "status": "failed",
+    "exit_code": 1,
+    "start_utc": "2026-11-22T13:28:34Z",
+    "end_utc": "2026-11-22T13:28:34Z",
+    "duration_s": 0,
+    "core_for_frequency": "1",
+    "freq_before_mhz": "4119.601",
+    "freq_after_mhz": "4127.062",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "moved_previous_to": null,
+    "cmd": "'/home/e/e1374509/rbd/code/reproduce/steps.sh' --mode b --logN 16,20,24 --threads 1 --runs 5 --warmup 1  --cores '1' --host-label 'soc-xcnh' --out '/home/e/e1374509/rbd/code/results/soc-xcnh/2026-11-22-bd2718c7698c/s1/full_steps_mode_b_n16-20-24'",
+    "noise_before": {
+      "utc": "2026-11-22T13:28:34Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        15.48,
+        16.59,
+        15.32
+      ],
+      "node_cpu_alloc": 168,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 16.66,
+      "node_running_jobs": 5
+    },
+    "noise_after": {
+      "utc": "2026-11-22T13:28:34Z",
+      "node": "xcnh1",
+      "loadavg_1_5_15": [
+        15.48,
+        16.59,
+        15.32
+      ],
+      "node_cpu_alloc": 168,
+      "job_cpus_on_node": 40,
+      "node_cpu_total": 512,
+      "node_cpu_load": 16.66,
+      "node_running_jobs": 5
+    }
+  }
+]

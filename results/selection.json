@@ -5,73 +5,299 @@
   "machines": {
     "soc-xcnh": {
       "role": "x86-64 headline campaign: SoC cluster node class xcnh (AMD EPYC 9755, Zen 5), 8 physical cores of one L3 domain owned by the job, one thread per core",
-      "expected_sessions": ["s1", "s2"],
+      "expected_sessions": [
+        "s1",
+        "s2"
+      ],
       "kdhr26_reference_cpu": "EPYC 9754",
       "kdhr26_reference_note": "Closest [KDHR26] CPU (AMD EPYC 9754, Zen 4c) to our Zen 5 EPYC 9755; used for every [KDHR26] lookup on this machine.",
       "runs": [
         {
-          "run_dir": "20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*",
-          "sessions": ["s1", "s2", "s3"],
-          "stage": "x86-64 full campaign stages A, H, S, C, T, T28, D, B (reproduce/stages.tsv via reproduce/all.sh); s1 and s2 on two different xcnh nodes"
+          "run_dir": "2026-11-22-bd2718c7698c",
+          "sessions": [
+            "s1",
+            "s2"
+          ],
+          "stage": "x86-64 full campaign stages A, H, S, C, T, T28, D, B (reproduce/stages.tsv via reproduce/all.sh); s1 and s2 on two different xcnh nodes (xcnh1, xcnh2); blocks that failed at session start were re-run in the same session (earlier attempts kept as *.prev-*)"
         }
       ]
     },
     "soc-xcng": {
       "role": "Arm portability session: SoC cluster node class xcng (Ampere, Arm Neoverse-N1), first 8 physical cores of the job",
-      "expected_sessions": ["arm1"],
+      "expected_sessions": [
+        "arm1"
+      ],
       "runs": [
         {
-          "run_dir": "20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]-*",
-          "sessions": ["arm1"],
+          "run_dir": "2026-11-22-bd2718c7698c",
+          "sessions": [
+            "arm1"
+          ],
           "stage": "AArch64 full campaign stage ARM (reproduce/stages.tsv via reproduce/all.sh)"
         }
       ]
     },
     "gcp-c4a-highmem-16": {
       "role": "Second Arm portability platform: archived Google Cloud c4a-highmem-16 virtual machine (Arm Neoverse V2, 16 vCPUs, one thread per core), cores 0-7 of the VM, fork commit 375a6e1, one session; not re-measured",
-      "expected_sessions": ["arm1"],
+      "expected_sessions": [
+        "arm1"
+      ],
       "runs": [
         {
           "run_dir": "2026-10-23-375a6e18355a",
-          "sessions": ["arm1"],
+          "sessions": [
+            "arm1"
+          ],
           "stage": "reproduce/all.sh --profile arm --blocks ^arm_ (logN 18,22,26) at fork commit 375a6e1"
         }
       ]
     }
   },
   "exclude": [
-    {"path": "local-i7-*", "reason": "local development output: never published"},
-    {"path": "*/analysis", "reason": "per-session analyze.py output (derived, not raw data)"},
-    {"path": "*.prev-*", "reason": "earlier attempt of a re-run block, moved aside by reproduce/all.sh as <block>.prev-<UTC> (never mixed with the re-run)"},
-    {"path": "*", "match": {"implementation": "lcpc-original-upstream", "build_variant": "as-published-*", "build_variant_recorded": "false"}, "reason": "original-LCPC record without a recorded build variant: its build flags cannot be established"}
+    {
+      "path": "soc-xcnh/2026-11-13-*",
+      "reason": "superseded: measured at fork commit 9685076, before the prove/verify/setup, Merkle hashing and encoder thread-scaling optimizations; the paper uses the 2026-11-22 run at bd2718c"
+    },
+    {
+      "path": "soc-xcng/2026-11-13-*",
+      "reason": "superseded: measured at fork commit 9685076, before the prove/verify/setup optimizations; the paper uses the 2026-11-22 run at bd2718c"
+    },
+    {
+      "path": "local-i7-*",
+      "reason": "local development output: never published"
+    },
+    {
+      "path": "*/analysis",
+      "reason": "per-session analyze.py output (derived, not raw data)"
+    },
+    {
+      "path": "*.prev-*",
+      "reason": "earlier attempt of a re-run block, moved aside by reproduce/all.sh as <block>.prev-<UTC> (never mixed with the re-run)"
+    },
+    {
+      "path": "*",
+      "match": {
+        "implementation": "lcpc-original-upstream",
+        "build_variant": "as-published-*",
+        "build_variant_recorded": "false"
+      },
+      "reason": "original-LCPC record without a recorded build variant: its build flags cannot be established"
+    }
   ],
   "omissions": [
     {
       "kind": "omitted",
       "reason": "SIMD-Spielman Orion shape at 2^28: upstream generates the Orion graph single-threaded in every benchmark process, which exceeds 90 min per process at 2^28; all.sh runs it up to 2^26 (simd_spielman.sh --max-orion-logn 26)",
-      "cells": ["T9|*,*,28|SIMD-Spielman Orion*", "T9|*,*,28|SIMD / This Work", "T9|*,*,28|SIMD best-of-T*", "T9|*,*,28|Gap vs SIMD best-of-T", "T9|*,*,28|SIMD MT slower than its T=1", "T9|*,*,28|SIMD params.patch"]
+      "cells": [
+        "T9|*,*,28|SIMD-Spielman Orion*",
+        "T9|*,*,28|SIMD / This Work",
+        "T9|*,*,28|SIMD best-of-T*",
+        "T9|*,*,28|Gap vs SIMD best-of-T",
+        "T9|*,*,28|SIMD MT slower than its T=1",
+        "T9|*,*,28|SIMD params.patch"
+      ]
     },
     {
       "kind": "omitted",
       "reason": "SIMD-Spielman setup is derived from GNU time process wall time minus encode samples, so PCS setup, input generation, and verifier initialization cannot be separated",
-      "cells": ["T8|SIMD-Spielman,*|PCS setup (ms)", "T8|SIMD-Spielman,*|Input gen. (ms)", "T8|SIMD-Spielman,*|Verifier init (ms)", "T8|SIMD-Spielman,*|PCS setup / Encode"]
+      "cells": [
+        "T8|SIMD-Spielman,*|PCS setup (ms)",
+        "T8|SIMD-Spielman,*|Input gen. (ms)",
+        "T8|SIMD-Spielman,*|Verifier init (ms)",
+        "T8|SIMD-Spielman,*|PCS setup / Encode"
+      ]
     }
   ],
   "expected_rows": {
-    "T1": {"log2(N)": [16, 18, 20, 22, 24, 26, 28], "T": [1, 8]},
-    "T2": {"Field": ["Fp2M61", "Mers127", "Mont127"], "T": [1, 8], "log2(N)": [16, 18, 20, 22, 24, 26, 28]},
-    "T3": {"Mode": ["a", "b"], "Step Tag": ["step/01-modernize", "step/02-fields", "step/03-column-major", "step/04-r2l", "step/05-lazy", "step/06-blocking", "step/07-slicing", "step/08-threads", "step/09-codegen", "HEAD"]},
-    "T4": {"log2(N)": [20, 24, 26], "T": [1, 8]},
-    "T5": {"Field": ["Mont127", "Mers127", "Fp2M61", "Ft127"]},
+    "T1": {
+      "log2(N)": [
+        16,
+        18,
+        20,
+        22,
+        24,
+        26,
+        28
+      ],
+      "T": [
+        1,
+        8
+      ]
+    },
+    "T2": {
+      "Field": [
+        "Fp2M61",
+        "Mers127",
+        "Mont127"
+      ],
+      "T": [
+        1,
+        8
+      ],
+      "log2(N)": [
+        16,
+        18,
+        20,
+        22,
+        24,
+        26,
+        28
+      ]
+    },
+    "T3": {
+      "Mode": [
+        "a",
+        "b"
+      ],
+      "Step Tag": [
+        "step/01-modernize",
+        "step/02-fields",
+        "step/03-column-major",
+        "step/04-r2l",
+        "step/05-lazy",
+        "step/06-blocking",
+        "step/07-slicing",
+        "step/08-threads",
+        "step/09-codegen",
+        "HEAD"
+      ]
+    },
+    "T4": {
+      "log2(N)": [
+        20,
+        24,
+        26
+      ],
+      "T": [
+        1,
+        8
+      ]
+    },
+    "T5": {
+      "Field": [
+        "Mont127",
+        "Mers127",
+        "Fp2M61",
+        "Ft127"
+      ]
+    },
     "T6": [
-      {"Implementation": ["This Work", "Original LCPC as-published-as-is", "Original LCPC fork-flags-portable"], "T": [1, 8], "log2(N)": [20, 24, 28]},
-      {"Implementation": ["Original LCPC as-published-portable", "Original LCPC fork-flags-as-is"], "T": [1, 8], "log2(N)": [20, 24]},
-      {"Implementation": ["This Work Ft127"], "T": [1, 8], "log2(N)": [20, 24]}
+      {
+        "Implementation": [
+          "This Work",
+          "Original LCPC as-published-as-is",
+          "Original LCPC fork-flags-portable"
+        ],
+        "T": [
+          1,
+          8
+        ],
+        "log2(N)": [
+          20,
+          24,
+          28
+        ]
+      },
+      {
+        "Implementation": [
+          "Original LCPC as-published-portable",
+          "Original LCPC fork-flags-as-is"
+        ],
+        "T": [
+          1,
+          8
+        ],
+        "log2(N)": [
+          20,
+          24
+        ]
+      },
+      {
+        "Implementation": [
+          "This Work Ft127"
+        ],
+        "T": [
+          1,
+          8
+        ],
+        "log2(N)": [
+          20,
+          24
+        ]
+      }
     ],
-    "T7": {"Mode": ["a", "b"], "Field": ["Mont127"], "log2(N)": [16, 18, 20, 22, 24, 26, 28]},
-    "T8": {"Implementation": ["This Work", "Original LCPC as-published-as-is", "Original LCPC fork-flags-portable", "SIMD-Spielman"], "log2(N)": [20, 24, 28]},
-    "T9": {"Field": ["Fp2M61", "Mers127", "Mont127"], "T": [1, 8], "log2(N)": [16, 18, 20, 22, 24, 26, 28]},
-    "T10": {"log2(N)": [20, 22, 24]},
-    "T12": {"Host": ["soc-xcng", "gcp-c4a-highmem-16"], "log2(N)": [18, 22, 26], "Threads": [1, 8]}
+    "T7": {
+      "Mode": [
+        "a",
+        "b"
+      ],
+      "Field": [
+        "Mont127"
+      ],
+      "log2(N)": [
+        16,
+        18,
+        20,
+        22,
+        24,
+        26,
+        28
+      ]
+    },
+    "T8": {
+      "Implementation": [
+        "This Work",
+        "Original LCPC as-published-as-is",
+        "Original LCPC fork-flags-portable",
+        "SIMD-Spielman"
+      ],
+      "log2(N)": [
+        20,
+        24,
+        28
+      ]
+    },
+    "T9": {
+      "Field": [
+        "Fp2M61",
+        "Mers127",
+        "Mont127"
+      ],
+      "T": [
+        1,
+        8
+      ],
+      "log2(N)": [
+        16,
+        18,
+        20,
+        22,
+        24,
+        26,
+        28
+      ]
+    },
+    "T10": {
+      "log2(N)": [
+        20,
+        22,
+        24
+      ]
+    },
+    "T12": {
+      "Host": [
+        "soc-xcng",
+        "gcp-c4a-highmem-16"
+      ],
+      "log2(N)": [
+        18,
+        22,
+        26
+      ],
+      "Threads": [
+        1,
+        8
+      ]
+    }
   }
 }

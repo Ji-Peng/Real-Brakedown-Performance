@@ -1,0 +1,30 @@
+{
+  "stage": "20261122T080758Z_ARM",
+  "stage_label": "ARM",
+  "stage_started_utc": "2026-11-22T08:07:58Z",
+  "profile": "arm",
+  "mt_threads": 8,
+  "session_id": "arm1",
+  "seed": 31381298,
+  "instance": "xcng1",
+  "arguments": {
+    "blocks": "^arm_",
+    "logn": "18,22,26",
+    "warmup": "1",
+    "runs": null,
+    "lcpc_variants": "as-published-as-is,fork-flags-portable",
+    "tags": null,
+    "multi_cores": "0,1,2,3,4,5,6,7",
+    "single_core": "1",
+    "mt_threads": 8
+  },
+  "arguments_string": "profile=arm blocks=^arm_ logn=18,22,26 warmup=1 runs= lcpc_variants=as-published-as-is,fork-flags-portable tags= max_threads=8 seed=31381298",
+  "block_ids": [
+    "arm_this_work_t1_n18-22-26",
+    "arm_this_work_t8_n18-22-26",
+    "arm_lcpc_orig_t8_n18-22-26",
+    "arm_lcpc_orig_t1_n18-22-26"
+  ],
+  "any_block_failed": false,
+  "note": "benchmark_parameters.logN/warmup/threads describe the stage filters; per-block values are in schedule.json and each block's manifest"
+}

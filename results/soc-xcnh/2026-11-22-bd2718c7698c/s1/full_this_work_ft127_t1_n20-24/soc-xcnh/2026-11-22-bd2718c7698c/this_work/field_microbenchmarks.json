@@ -1,0 +1,122 @@
+[
+  {
+    "field": "Mont127",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 543928,
+      "ns_per_op": 10.87856
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 99730,
+      "ns_per_op": 1.9946
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 205349,
+      "ns_per_op": 4.10698
+    },
+    "session_id": "s1",
+    "session_seed": "264488327",
+    "stage": "20261122T080757Z_A",
+    "block_id": "full_this_work_ft127_t1_n20-24",
+    "block_status": "ok",
+    "freq_before_mhz": "4117.923",
+    "freq_after_mhz": "4118.472",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "freq_is_nominal": false
+  },
+  {
+    "field": "Mers127",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 246330,
+      "ns_per_op": 4.9266
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 108883,
+      "ns_per_op": 2.17766
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 34723,
+      "ns_per_op": 0.69446
+    },
+    "session_id": "s1",
+    "session_seed": "264488327",
+    "stage": "20261122T080757Z_A",
+    "block_id": "full_this_work_ft127_t1_n20-24",
+    "block_status": "ok",
+    "freq_before_mhz": "4117.923",
+    "freq_after_mhz": "4118.472",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "freq_is_nominal": false
+  },
+  {
+    "field": "Fp2M61",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 232700,
+      "ns_per_op": 4.654
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 77406,
+      "ns_per_op": 1.54812
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 27071,
+      "ns_per_op": 0.54142
+    },
+    "session_id": "s1",
+    "session_seed": "264488327",
+    "stage": "20261122T080757Z_A",
+    "block_id": "full_this_work_ft127_t1_n20-24",
+    "block_status": "ok",
+    "freq_before_mhz": "4117.923",
+    "freq_after_mhz": "4118.472",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "freq_is_nominal": false
+  },
+  {
+    "field": "Ft127",
+    "mul": {
+      "op": "mul",
+      "iterations": 50000,
+      "total_ns": 386721,
+      "ns_per_op": 7.73442
+    },
+    "mac": {
+      "op": "mac",
+      "iterations": 50000,
+      "total_ns": 97176,
+      "ns_per_op": 1.94352
+    },
+    "reduce": {
+      "op": "reduce",
+      "iterations": 50000,
+      "total_ns": 197687,
+      "ns_per_op": 3.95374
+    },
+    "session_id": "s1",
+    "session_seed": "264488327",
+    "stage": "20261122T080757Z_A",
+    "block_id": "full_this_work_ft127_t1_n20-24",
+    "block_status": "ok",
+    "freq_before_mhz": "4117.923",
+    "freq_after_mhz": "4118.472",
+    "freq_source": "observed: cpufreq scaling_cur_freq of CPU 1",
+    "freq_is_nominal": false
+  }
+]

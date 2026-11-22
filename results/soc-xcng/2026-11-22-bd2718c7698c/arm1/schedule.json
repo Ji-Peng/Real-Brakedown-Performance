@@ -1,0 +1,89 @@
+{
+  "format": "rbd-session-schedule-v1",
+  "session_id": "arm1",
+  "profile": "arm",
+  "mt_threads": 8,
+  "host": "soc-xcng",
+  "run_id": "2026-11-22-bd2718c7698c",
+  "note": "Append-only: one entry per all.sh invocation (stage) of this session; each stage's full schedule, manifest and execution log are under its stage_dir. Output dirs named <block>.prev-<UTC> hold an earlier stage's run of that block and are not analysed.",
+  "stages": [
+    {
+      "stage": "20261122T080758Z_ARM",
+      "stage_label": "ARM",
+      "stage_dir": "stages/20261122T080758Z_ARM",
+      "started_utc": "2026-11-22T08:07:58Z",
+      "finished_utc": "2026-11-22T09:02:16Z",
+      "profile": "arm",
+      "mt_threads": 8,
+      "seed": 31381298,
+      "code_sha": "bd2718c7698c",
+      "instance": "xcng1",
+      "arguments": {
+        "blocks": "^arm_",
+        "logn": "18,22,26",
+        "warmup": "1",
+        "runs": null,
+        "lcpc_variants": "as-published-as-is,fork-flags-portable",
+        "tags": null,
+        "multi_cores": "0,1,2,3,4,5,6,7",
+        "single_core": "1",
+        "mt_threads": 8
+      },
+      "block_ids": [
+        "arm_this_work_t1_n18-22-26",
+        "arm_this_work_t8_n18-22-26",
+        "arm_lcpc_orig_t8_n18-22-26",
+        "arm_lcpc_orig_t1_n18-22-26"
+      ],
+      "blocks": [
+        {
+          "id": "arm_this_work_t1_n18-22-26",
+          "out": "arm_this_work_t1_n18-22-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 882
+        },
+        {
+          "id": "arm_this_work_t8_n18-22-26",
+          "out": "arm_this_work_t8_n18-22-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 67
+        },
+        {
+          "id": "arm_lcpc_orig_t8_n18-22-26",
+          "out": "arm_lcpc_orig_t8_n18-22-26",
+          "threads": 8,
+          "cores": "0,1,2,3,4,5,6,7",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 423
+        },
+        {
+          "id": "arm_lcpc_orig_t1_n18-22-26",
+          "out": "arm_lcpc_orig_t1_n18-22-26",
+          "threads": 1,
+          "cores": "1",
+          "siblings": [],
+          "status": "ok",
+          "exit_code": 0,
+          "duration_s": 1880
+        }
+      ],
+      "exit_status": 0,
+      "state": "finished",
+      "failed_blocks": [],
+      "skipped_blocks": []
+    }
+  ],
+  "profiles": [
+    "arm"
+  ]
+}
