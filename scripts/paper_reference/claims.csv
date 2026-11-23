@@ -1,13 +1,13 @@
 claim_id,check,scope,expected,observed,status,tolerance_rule
 C0,T0 correctness checks,table,all PASS,9/9 rows PASS,PASS,hard: every row must PASS
-C1,T11 zero vector arithmetic in hot kernels,table,"0 vec arith, PASS","0 vec arith, PASS (aarch64 soc-xcng @ 9685076 (2 reports), aarch64 gcp-c4a-highmem-16 @ 375a6e1+dirty (2 reports), x86_64 @ 9685076 (96 reports))",PASS,hard: 0 vector arithmetic and PASS
-C2,"T1 speedup > 1 over LCPC-default, LCPC-tuned, PolyCommit",table,">1x (ref T=1 pub 7.06-8.87x, ff 5.92-7.39x, pc 3.10-5.80x)","pub 6.14-8.87x; ff 5.18-7.39x; pc 2.72-5.80x (14 rows, all_faster=True)",PASS,directional: all measured speedups > 1 (strict: all faster)
-C3,T2 SIMD-Spielman faster at T=1 (N<=2^26) & MT scaling,table,>1x (ref 1.57-4.36x); Brakedown MT not slower than T=1,T=1 le26 1.57-4.36x (18 cells); MT_slower=False,PASS,directional: SIMD faster at T=1 (N<=2^26) and MT <= T=1
-C4,T3 per-technique cumulative speedup > 1,table,">1x (ref a=5.69x, b=2.07x)","mode a=5.69x, mode b=2.07x",PASS,directional: cumulative speedup > 1 at HEAD
-C5,T4 slicing speedup >= 1 and adaptive slice accuracy,table,">=1x (ref T=1 1.01-1.15x, T=8 1.10-2.26x)",speedup 1.01-2.26x; adaptive gap 0.0-9.8%,PASS,directional: s=1/best >= 1 and adaptive close to best
-C6,F3 RBP-LCPC multithread speedup > 1 at T=8,table,">1x (ref T=8 6.57-7.17x, eff 0.82-0.90)","T=8 speedup 6.57-7.17x, eff 0.82-0.90",PASS,directional: S(Tmt) > 1
-C7,T5 Fp2M61 faster than Mont127 encoding,table,>1x (ref 2^20 1.24x),2^20 Mont127/Fp2M61 = 1.24x,PASS,directional: Mont127 / Fp2M61 > 1
-C8,T6 commit speedup > 1 and higher hash share vs LCPC-default,table,">1x (ref T=1 4.74-4.97x, T=8 2.91-3.04x)",commit speedup 2.91-4.97x; hash share higher=True,PASS,directional: commit speedup > 1 and hash share rises
-C9,T8 PCS setup separated from input generation,table,"PCS setup < Input gen. (ref PCS/enc 0.00-0.05x, ratio 1.18-1.39x)",PCS setup / Encode 0.00-0.05x; PCS < Input gen.=True,PASS,directional: PCS setup < Input gen.
-C10,T10 Brakedown faster than same-library Ligero RS,table,>1x,RS / Brakedown 3.76-5.02x (3 sizes),PASS,directional: RS / Brakedown > 1
-C11,T12 AArch64 speedup > 1 vs LCPC,table,">1x (ref T=1 pub 3.03-3.17x, ff 2.73-2.86x)",pub 2.89-6.22x; ff 2.61-5.26x,PASS,directional: Arm speedup > 1
+C1,T11 zero vector arithmetic in hot kernels,table,"0 vec arith, PASS","0 vec arith, PASS (aarch64 soc-xcng @ bd2718c+dirty (2 reports), aarch64 gcp-c4a-highmem-16 @ 375a6e1+dirty (2 reports), x86_64 @ bd2718c/bd2718c+dirty (90 reports))",PASS,hard: 0 vector arithmetic and PASS
+C2,"T1 speedup > 1 over LCPC-default, LCPC-tuned, PolyCommit",table,">1x (ref T=1 pub 8.14-9.06x, ff 6.89-7.63x, pc 3.95-5.80x)","pub 7.17-9.06x; ff 6.10-7.63x; pc 3.88-5.80x (14 rows, all_faster=True)",PASS,directional: all measured speedups > 1 (strict: all faster)
+C3,T2 SIMD-Spielman faster at T=1 (N<=2^26) & MT scaling,table,>1x (ref 1.59-4.44x); Brakedown MT not slower than T=1,T=1 le26 1.59-4.44x (18 cells); MT_slower=False,PASS,directional: SIMD faster at T=1 (N<=2^26) and MT <= T=1
+C4,T3 per-technique cumulative speedup > 1,table,">1x (ref a=6.21x, b=2.12x)","mode a=6.21x, mode b=2.12x",PASS,directional: cumulative speedup > 1 at HEAD
+C5,T4 slicing speedup >= 1 and adaptive slice accuracy,table,">=1x (ref T=1 1.02-1.04x, T=8 1.07-1.43x)",speedup 1.02-1.43x; adaptive gap 0.0-7.3%,PASS,directional: s=1/best >= 1 and adaptive close to best
+C6,F3 RBP-LCPC multithread speedup > 1 at T=8,table,">1x (ref T=8 7.09-7.57x, eff 0.89-0.95)","T=8 speedup 7.09-7.57x, eff 0.89-0.95",PASS,directional: S(Tmt) > 1
+C7,T5 Fp2M61 faster than Mont127 encoding,table,>1x (ref 2^20 1.25x),2^20 Mont127/Fp2M61 = 1.25x,PASS,directional: Mont127 / Fp2M61 > 1
+C8,T6 commit speedup > 1 and higher hash share vs LCPC-default,table,">1x (ref T=1 5.21-5.95x, T=8 4.63-5.09x)",commit speedup 4.63-5.95x; hash share higher=True,PASS,directional: commit speedup > 1 and hash share rises
+C9,T8 PCS setup separated from input generation,table,"PCS setup < Input gen. (ref PCS/enc 0.00-0.03x, ratio 0.69-0.76x)",PCS setup / Encode 0.00-0.03x; PCS < Input gen.=True,PASS,directional: PCS setup < Input gen.
+C10,T10 Brakedown faster than same-library Ligero RS,table,>1x,RS / Brakedown 4.03-5.01x (3 sizes),PASS,directional: RS / Brakedown > 1
+C11,T12 AArch64 speedup > 1 vs LCPC,table,">1x (ref T=1 pub 3.14-3.24x, ff 2.84-2.93x)",pub 3.08-6.22x; ff 2.74-5.26x,PASS,directional: Arm speedup > 1
