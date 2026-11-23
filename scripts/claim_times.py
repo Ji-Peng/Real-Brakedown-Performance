@@ -22,6 +22,7 @@ wall time on the authors' archived hosts (Markdown or CSV).
 
 import argparse
 import csv
+import fnmatch
 import glob
 import json
 import os
@@ -76,15 +77,33 @@ def fmt_duration(seconds):
     return f"{seconds / 3600.0:.1f} h"
 
 
+def selected_runs(results_dir):
+    """{host: [(run_dir glob, sessions)]} from results_dir/selection.json, or None without one."""
+    sel_path = pathlib.Path(results_dir) / "selection.json"
+    if not sel_path.is_file():
+        return None
+    machines = json.loads(sel_path.read_text(encoding="utf-8")).get("machines", {})
+    return {h: [(r["run_dir"], set(r.get("sessions", []))) for r in m.get("runs", [])]
+            for h, m in machines.items()}
+
+
 def collect_stage_durations(results_dir):
-    """Returns {(host, session): {stage_name: total_seconds}}."""
+    """Returns {(host, session): {stage_name: total_seconds}}.
+
+    With a selection.json, only the run directories and sessions it selects count, so
+    superseded runs of the same host and session name are not added to the selected one.
+    """
     by_session = {}
+    selected = selected_runs(results_dir)
     pattern = str(pathlib.Path(results_dir) / "*" / "*" / "*" / "stages" / "*" / "execution_log.json")
     for p in sorted(glob.glob(pattern)):
         parts = pathlib.Path(p).relative_to(results_dir).parts
         if len(parts) < 6:
             continue
-        host, _run, session, _stages_lit, stage_dir = parts[:5]
+        host, run, session, _stages_lit, stage_dir = parts[:5]
+        if selected is not None and not any(
+                fnmatch.fnmatch(run, pat) and session in sess for pat, sess in selected.get(host, [])):
+            continue
         stage_name = stage_dir.split("_", 1)[1] if "_" in stage_dir else stage_dir
         try:
             entries = json.loads(pathlib.Path(p).read_text(encoding="utf-8"))

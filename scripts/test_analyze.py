@@ -769,29 +769,35 @@ class SupersedeTests(unittest.TestCase):
         self.assertTrue(any("duplicate" in m for _, m in a.cell_errors))
 
     def test_real_selection_covers_the_cluster_campaign(self):
+        RUN_CAMPAIGN = "2026-11-22-bd2718c7698c"
         real = analyze.Selection(analyze.DEFAULT_SELECTION)
         for machine, session in (("soc-xcnh", "s1"), ("soc-xcnh", "s2"), ("soc-xcng", "arm1")):
-            entry = real.run_entry(machine, "2026-11-14-0123456789ab")
+            entry = real.run_entry(machine, RUN_CAMPAIGN)
             self.assertIsNotNone(entry, machine)
             self.assertIn(session, entry["sessions"])
         self.assertIsNone(real.run_entry("soc-xcnh", "host-profile-xcnh1.json"))
         self.assertEqual(real.supersede, [])
         self.assertFalse(any(om["kind"] == "pending" for om in real.omissions))
         self.assertEqual(real.expected_sessions("soc-xcnh"), ["s1", "s2"])
-        self.assertIn("s3", real.run_entry("soc-xcnh", "2026-11-14-0123456789ab")["sessions"])
+        self.assertNotIn("s3", real.run_entry("soc-xcnh", RUN_CAMPAIGN)["sessions"])
+        # The earlier series is excluded as superseded, not silently dropped.
+        status, reason = real.classify("soc-xcnh/2026-11-13-96850764e1ac/s1/full_this_work_mode_a_t1_n20",
+                                       "x.json", {})
+        self.assertEqual(status, "exclude")
+        self.assertIn("superseded", reason)
         self.assertEqual(real.expected_sessions("soc-xcng"), ["arm1"])
         # The second Arm host is one archived run: no other run directory of that host is selected.
         self.assertEqual(real.expected_sessions("gcp-c4a-highmem-16"), ["arm1"])
         self.assertIn("arm1", real.run_entry("gcp-c4a-highmem-16", "2026-10-23-375a6e18355a")["sessions"])
         self.assertIsNone(real.run_entry("gcp-c4a-highmem-16", "2026-10-23-acfac2349c11"))
-        status, _ = real.classify("soc-xcnh/2026-11-14-0123456789ab/s1/full_this_work_mode_a_t1_n28.prev-20261114T000000Z",
+        status, _ = real.classify(f"soc-xcnh/{RUN_CAMPAIGN}/s1/full_this_work_mode_a_t1_n28.prev-20261122T000000Z",
                                   "x.json", {})
         self.assertEqual(status, "exclude")
         status, _ = real.classify("local-i7-dev/2026-11-14-0123456789ab/s1/full_this_work_mode_a_t1", "x.json", {})
         self.assertEqual(status, "exclude")
         fields = {"implementation": "lcpc-original-upstream", "build_variant": "as-published-as-is",
                   "build_variant_recorded": "true"}
-        status, _ = real.classify("soc-xcnh/2026-11-14-0123456789ab/s1/full_lcpc_orig_mode_a_t1_n28", "x.json", fields)
+        status, _ = real.classify(f"soc-xcnh/{RUN_CAMPAIGN}/s1/full_lcpc_orig_mode_a_t1_n28", "x.json", fields)
         self.assertEqual(status, "include")
 
     def test_ft127_blocks_have_their_own_family(self):

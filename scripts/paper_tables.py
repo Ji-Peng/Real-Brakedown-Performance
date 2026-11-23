@@ -413,8 +413,12 @@ def arm_hosts():
     if not STRICT:
         return tuple(hs)
     xh = x86_hosts()
-    main_fork = T["T1"].forks(xh[0]) if xh else set()
-    same = [h for h in hs if T["T12"].forks(h) == main_fork]
+    # "+dirty" marks a working tree with local changes; the manifests record the
+    # changed paths (only the per-node first-run records), so compare base commits.
+    def base(forks):
+        return {f.split("+")[0] for f in forks}
+    main_fork = base(T["T1"].forks(xh[0])) if xh else set()
+    same = [h for h in hs if base(T["T12"].forks(h)) == main_fork]
     other = [h for h in hs if h not in same]
     if len(same) != 1 or len(other) != 1:
         sys.exit(f"T12: expected one AArch64 host at the T1 fork commit {main_fork} and one other, "
@@ -647,6 +651,7 @@ def derive_steps():
         for tag, name, col in (
             ("step/05-lazy", f"step-lazy-{mode}-2e20", "Step Speedup (N=2^20)"),
             ("step/09-codegen", f"step-codegen-{mode}-2e20", "Step Speedup (N=2^20)"),
+            ("HEAD", f"step-head-{mode}-2e20", "Step Speedup (N=2^20)"),
             ("HEAD", f"step-cum-{mode}-2e20", "Cumulative Speedup (N=2^20)"),
         ):
             v = step_opt(mode, tag, col)
@@ -964,15 +969,20 @@ def derive_pcs():
                 if items:
                     put_range(f"hash-over-commit-{key}-T{t}", items, f1,
                               f"100 x Hash (ms) / Commit (ms) over log2N in {{{','.join(avail_logs)}}} (T6)")
-        h_items = []
+        h_items, hs_items = [], []
         for l in avail_logs:
             r_tw, r_ff = row_opt(TW, "1", l), row_opt(FF, "1", l)
             if r_tw and r_ff and num_opt(r_tw.get("Hash (ms)", "")) and num_opt(r_ff.get("Hash (ms)", "")):
                 h_items.append((num(r_tw["Hash (ms)"]) / num(r_ff["Hash (ms)"]),
                                 f"T6[This Work,1,{l}]/T6[{FF},1,{l}]:Hash (ms)"))
+                hs_items.append((num(r_ff["Hash (ms)"]) / num(r_tw["Hash (ms)"]),
+                                 f"T6[{FF},1,{l}]:Hash (ms)={lead(r_ff['Hash (ms)'])} / "
+                                 f"T6[This Work,1,{l}]:Hash (ms)={lead(r_tw['Hash (ms)'])}"))
         if h_items:
             put_range("hash-tw-over-ff-T1", h_items, f2,
                       "RBP-LCPC hash time / LCPC-tuned hash time (same portable BLAKE3), T=1 (T6)")
+            put_range("hash-speedup-ff-T1", hs_items, f2,
+                      "LCPC-tuned hash time / RBP-LCPC hash time (same portable BLAKE3), T=1 (T6)")
 
         for op, col in (("hash", "Hash (ms)"), ("commit", "Commit (ms)")):
             items = []
@@ -990,24 +1000,31 @@ def derive_pcs():
                           f"{col} with portable BLAKE3 / with default-feature BLAKE3, same build "
                           "configuration (T6)")
 
+        # Prove and verify speedups: LCPC time / RBP-LCPC time (values > 1 favor RBP-LCPC).
         for op, col in (("prove", "Prove (ms)"), ("verify", "Verify (ms)")):
             allv = {"pub": [], "ff": []}
             for v in ("pub", "ff"):
                 for t in t_vals:
+                    pert = []
                     for l in avail_logs:
                         d, b = row_opt(TW, t, l), row_opt(impls[v], t, l)
                         if not (d and b) or not num_opt(d.get(col, "")) or not num_opt(b.get(col, "")):
                             continue
-                        r = num(d[col]) / num(b[col])
-                        src = f"T6[This Work,{t},{l}]:{col}={lead(d[col])} / T6[{impls[v]}]:{col}={lead(b[col])}"
+                        r = num(b[col]) / num(d[col])
+                        src = (f"T6[{impls[v]},{t},{l}]:{col}={lead(b[col])} / "
+                               f"T6[This Work,{t},{l}]:{col}={lead(d[col])}")
                         allv[v].append((r, src))
-                        put(f"{op}-slowdown-{v}-T{t}-{l}", f2(r), f"RBP-LCPC / LCPC {op} time (T6)", src)
+                        pert.append((r, src))
+                        put(f"{op}-speedup-{v}-T{t}-{l}", f2(r), f"LCPC / RBP-LCPC {op} time (T6)", src)
+                    if pert:
+                        put_range(f"{op}-speedup-{v}-T{t}", pert, f2,
+                                  f"LCPC-{v} / RBP-LCPC {op} time at T={t} over log2N (T6)")
                 if allv[v]:
-                    put_range(f"{op}-slowdown-{v}", allv[v], f2,
-                              f"RBP-LCPC / LCPC-{v} {op} time over T and log2N (T6)")
+                    put_range(f"{op}-speedup-{v}", allv[v], f2,
+                              f"LCPC-{v} / RBP-LCPC {op} time over T and log2N (T6)")
             if allv["pub"] + allv["ff"]:
-                put_range(f"{op}-slowdown-pubff", allv["pub"] + allv["ff"], f2,
-                          f"RBP-LCPC / LCPC {op} time over both builds, T and log2N (T6)")
+                put_range(f"{op}-speedup-pubff", allv["pub"] + allv["ff"], f2,
+                          f"LCPC / RBP-LCPC {op} time over both builds, T and log2N (T6)")
 
         ft = {(d["T"], d["log2(N)"]): d for d in t6.dicts() if d["Implementation"] == TW + " Ft127"}
         if STRICT and not ft:
@@ -1029,42 +1046,34 @@ def derive_pcs():
                             f"Commit (ms)={d['Commit (ms)']}")
                     put(f"hash-over-commit-ft127-T{t}-{l}", f1(vh),
                         "100 x Hash (ms) / Commit (ms) for This Work Ft127 (T6)", srch)
-            div_ft = []
             for op, col in (("prove", "Prove (ms)"), ("verify", "Verify (ms)")):
                 per = {"pub": [], "ff": [], "mont": []}
                 for (t, l), d in sorted(ft.items()):
                     c = split_div(d[col])
                     if num_opt(c[0]) is None:
                         continue
-                    if c[1] is not None:
-                        div_ft.append((op, t, l, c[1]))
                     for v, other in (("pub", row_opt(PUB, t, l)), ("ff", row_opt(FF, t, l)),
                                      ("mont", row_opt(TW, t, l))):
                         if not other or num_opt(split_div(other[col])[0]) is None:
                             continue
                         o = num(split_div(other[col])[0])
-                        r = (num(c[0]) / o) if v != "mont" else (o / num(c[0]))
-                        src = (f"T6[This Work Ft127,{t},{l}]:{col}={d[col]} vs "
-                               f"T6[{other['Implementation']},{t},{l}]:{col}={lead(other[col])}")
-                        per[v].append((r, src, c[1] is not None))
+                        # pub/ff: speedup = LCPC / RBP-LCPC Ft127; mont: RBP-LCPC Ft127 / RBP-LCPC Mont127.
+                        r = (o / num(c[0])) if v != "mont" else (num(c[0]) / o)
+                        src = (f"T6[{other['Implementation']},{t},{l}]:{col}={lead(other[col])} vs "
+                               f"T6[This Work Ft127,{t},{l}]:{col}={lead(d[col])}")
+                        per[v].append((r, src))
                         if v == "pub":
-                            put(f"ft127-{op}-pub-T{t}-{l}", f2(r),
-                                f"RBP-LCPC Ft127 / LCPC-default {op} time (T6)", src)
-                for v, desc in (("pub", "RBP-LCPC Ft127 / LCPC-default"), ("ff", "RBP-LCPC Ft127 / LCPC-tuned"),
-                                ("mont", "RBP-LCPC Mont127 / RBP-LCPC Ft127")):
+                            put(f"ft127-{op}-speedup-pub-T{t}-{l}", f2(r),
+                                f"LCPC-default / RBP-LCPC Ft127 {op} time (T6)", src)
+                for v, key_part, desc in (("pub", "speedup-pub", "LCPC-default / RBP-LCPC Ft127"),
+                                          ("ff", "speedup-ff", "LCPC-tuned / RBP-LCPC Ft127"),
+                                          ("mont", "over-mont", "RBP-LCPC Ft127 / RBP-LCPC Mont127")):
                     if per[v]:
-                        put_range(f"ft127-{op}-{v}", [(r, s_) for r, s_, _ in per[v]], f2,
+                        put_range(f"ft127-{op}-{key_part}", per[v], f2,
                                   f"{desc} {op} time over T in {{1,{mt_t}}} and log2N in {{20,24}} (T6)")
-                    clean = [(r, s_) for r, s_, dv in per[v] if not dv]
-                    if v == "ff" and clean and len(clean) < len(per[v]):
-                        put_range(f"ft127-{op}-{v}-nodiv", clean, f2,
-                                  f"{desc} {op} time over the cells without session divergence (T6)")
                 if per["pub"] + per["ff"]:
-                    put_range(f"ft127-{op}-pubff", [(r, s_) for r, s_, _ in per["pub"] + per["ff"]], f2,
-                              f"RBP-LCPC Ft127 / LCPC {op} time over both builds, T and log2N (T6)")
-            for op, t, l, pct in div_ft:
-                put(f"ft127-{op}-div-T{t}-2e{l}", pct, "session rel. diff (%) of a divergent cell",
-                    f"session_divergence.csv:T6|This Work Ft127,{t},{l}")
+                    put_range(f"ft127-{op}-speedup-pubff", per["pub"] + per["ff"], f2,
+                              f"LCPC / RBP-LCPC Ft127 {op} time over both builds, T and log2N (T6)")
 
         items = []
         for l in avail_logs:
@@ -1088,19 +1097,41 @@ def derive_pcs():
                       "T8 RBP-LCPC PCS setup / Encode")
         put_csv_range("pcs-setup-over-encode-lcpc", lcpc8, "PCS setup / Encode",
                       "T8 LCPC (both builds) PCS setup / Encode")
-        pcs_r, igen_r, rss = [], [], []
+        pcs_r, pcs_sp_pub, pcs_sp_ff, vinit_sp_pub, igen_r, tot_r, rss = [], [], [], [], [], [], []
         t8_logs = PCS_LOGS if STRICT else tuple(
             sorted({d["log2(N)"] for d in tw8 if d.get("log2(N)", "").isdigit()}, key=int)
         )
         for l in t8_logs:
             a = t8.find_opt(Implementation=TW, **{"log2(N)": l})
             b = t8.find_opt(Implementation=PUB, **{"log2(N)": l})
+            f = t8.find_opt(Implementation=FF, **{"log2(N)": l})
             if not (a and b):
                 continue
             if num_opt(a.get("PCS setup (ms)", "")) and num_opt(b.get("PCS setup (ms)", "")):
                 pcs_r.append((
                     num(a["PCS setup (ms)"]) / num(b["PCS setup (ms)"]),
                     f"T8[This Work,{l}]:PCS setup={a['PCS setup (ms)']} / T8[{PUB},{l}]:PCS setup={b['PCS setup (ms)']}",
+                ))
+                pcs_sp_pub.append((
+                    num(b["PCS setup (ms)"]) / num(a["PCS setup (ms)"]),
+                    f"T8[{PUB},{l}]:PCS setup={b['PCS setup (ms)']} / T8[This Work,{l}]:PCS setup={a['PCS setup (ms)']}",
+                ))
+            if f and num_opt(a.get("PCS setup (ms)", "")) and num_opt(f.get("PCS setup (ms)", "")):
+                pcs_sp_ff.append((
+                    num(f["PCS setup (ms)"]) / num(a["PCS setup (ms)"]),
+                    f"T8[{FF},{l}]:PCS setup={f['PCS setup (ms)']} / T8[This Work,{l}]:PCS setup={a['PCS setup (ms)']}",
+                ))
+            if num_opt(a.get("Verifier init (ms)", "")) and num_opt(b.get("Verifier init (ms)", "")):
+                vinit_sp_pub.append((
+                    num(b["Verifier init (ms)"]) / num(a["Verifier init (ms)"]),
+                    f"T8[{PUB},{l}]:Verifier init={b['Verifier init (ms)']} / "
+                    f"T8[This Work,{l}]:Verifier init={a['Verifier init (ms)']}",
+                ))
+            if num_opt(a.get("Total setup (ms)", "")) and num_opt(b.get("Total setup (ms)", "")):
+                tot_r.append((
+                    num(a["Total setup (ms)"]) / num(b["Total setup (ms)"]),
+                    f"T8[This Work,{l}]:Total setup={a['Total setup (ms)']} / "
+                    f"T8[{PUB},{l}]:Total setup={b['Total setup (ms)']}",
                 ))
             if num_opt(a.get("Input gen. (ms)", "")) and num_opt(b.get("Input gen. (ms)", "")):
                 igen_r.append((
@@ -1113,7 +1144,14 @@ def derive_pcs():
                     f"T8[This Work,{l}] / T8[{PUB},{l}]:Peak RSS (MB)",
                 ))
         put_range("pcs-setup-ratio-pub", pcs_r, f2, "RBP-LCPC PCS setup / LCPC-default PCS setup (T8, T=1)")
+        put_range("pcs-setup-speedup-pub", pcs_sp_pub, f2,
+                  "LCPC-default PCS setup / RBP-LCPC PCS setup (T8, T=1)")
+        put_range("pcs-setup-speedup-ff", pcs_sp_ff, f2, "LCPC-tuned PCS setup / RBP-LCPC PCS setup (T8, T=1)")
+        put_range("verifier-init-speedup-pub", vinit_sp_pub, f2,
+                  "LCPC-default Verifier init / RBP-LCPC Verifier init (T8, T=1)")
         put_range("inputgen-ratio-pub", igen_r, f2, "RBP-LCPC Input gen. / LCPC-default Input gen. (T8, T=1)")
+        put_range("total-setup-ratio-pub", tot_r, f2,
+                  "RBP-LCPC Total setup / LCPC-default Total setup (T8, T=1)")
         put_range("rss-diff-pct", rss, f1,
                   "100 x |RBP-LCPC - LCPC-default| / LCPC-default peak RSS (T8, T=1)")
 
@@ -1832,14 +1870,14 @@ def tab_pcs(D):
     groups = [
         (TW, "Mont127", r"\emph{{\thiswork} over {\Mont}}", tw_logs,
          lambda th, l: (D.get(f"commit-speedup-pub-T{th}-{l}", "--"), D.get(f"commit-speedup-ff-T{th}-{l}", "--"),
-                        D.get(f"hash-over-commit-tw-T{th}-{l}", "--"), D.get(f"prove-slowdown-pub-T{th}-{l}", "--"),
-                        D.get(f"verify-slowdown-pub-T{th}-{l}", "--"))),
+                        D.get(f"hash-over-commit-tw-T{th}-{l}", "--"), D.get(f"prove-speedup-pub-T{th}-{l}", "--"),
+                        D.get(f"verify-speedup-pub-T{th}-{l}", "--"))),
         (TW + " Ft127", "Ft127", r"\emph{{\thiswork} over {\Ftlcpc}}", ft_logs,
          lambda th, l: (D.get(f"commit-speedup-ft127-pub-T{th}-{l}", "--"),
                         D.get(f"commit-speedup-ft127-ff-T{th}-{l}", "--"),
                         D.get(f"hash-over-commit-ft127-T{th}-{l}", "--"),
-                        D.get(f"ft127-prove-pub-T{th}-{l}", "--"),
-                        D.get(f"ft127-verify-pub-T{th}-{l}", "--"))),
+                        D.get(f"ft127-prove-speedup-pub-T{th}-{l}", "--"),
+                        D.get(f"ft127-verify-speedup-pub-T{th}-{l}", "--"))),
     ]
     for impl, fld, title, logs, get_d in groups:
         if not logs:
@@ -1872,17 +1910,16 @@ def tab_pcs(D):
     write_csv("tab_pcs.csv", ["Field", "T", "log2(N)", "Commit This Work (ms)",
                               "Commit x LCPC-default", "Commit x LCPC-tuned",
                               "Hash/commit % This Work", "Hash/commit % LCPC-default",
-                              "Prove This Work/LCPC-default", "Verify This Work/LCPC-default"],
+                              "Prove x LCPC-default", "Verify x LCPC-default"],
               rows_csv, "table_T6_pcs_breakdown.csv, derived.csv")
     head = [["", "", r"{\thiswork}"] + span(2, "Commit speedup")
-            + span(2, r"Hash share (\%)") + span(2, r"Time ratio"),
+            + span(2, r"Hash share (\%)") + span(2, "Speedup"),
             r"\cmidrule[lr]{4-5}\cmidrule[lr]{6-7}\cmidrule[lr]{8-9}",
             ["$T$", r"$\log_2 N$", "commit (ms)", r"{\lcpcpub}", r"{\lcpcff}",
              r"{\thiswork}", r"{\lcpcpub}", "Prove", "Verify"]]
-    note = (r"\lcpccode; \lcpc runs \Ftlcpc. Speedup = \lcpc commit time / \thiswork commit time. "
-            r"Hash share = hash time / commit time. Time ratio = \thiswork time / \lcpcpub time; "
-            r"above 1, \thiswork is slower.")
-    remarks = [(DAGGER, r"a prove time differs by more than 5\% between sessions.")]
+    note = (r"\lcpccode; \lcpc runs \Ftlcpc. Speedup = \lcpc time / \thiswork time; Prove and "
+            r"Verify compare against \lcpcpub. Hash share = hash time / commit time.")
+    remarks = [(DAGGER, r"a prove or verify time differs by more than 5\% between sessions.")]
     write("tab_pcs.tex",
           tblr("tab:p-pcs", r"PCS operations on \xmach", "r" * 9, head, rows, note=note,
                remarks=remarks, size=r"\footnotesize", colsep="3pt", src=source_comment([t])),
@@ -1963,39 +2000,46 @@ def tab_codegen():
         record_status("tab_codegen", "skipped", t.not_run_reason())
         return
     cols = ["Reports", "Total Insns", "mul / mulx", "adc / adcx", "Vector Arith", "Vector Moves"]
-    kernels = [f"encode_column_block::<{f}>" for f in FIELDS]
+    # Lenient mode lists whichever of the current and earlier kernel names the build has.
+    kernels = ([f"encode_column_block_prepared::<{f}>" for f in FIELDS]
+               + ["collapse_rows_lazy::<Mont127>", "dot_lazy::<Mont127>"]
+               + [f"encode_column_block::<{f}>" for f in FIELDS])
     rows, rows_csv = [], []
 
     if STRICT:
-        arm = [d for d in agg if d["Architecture"].startswith("aarch64 ")]
-        same_arm = len({tuple(d[c] for c in cols[1:]) for d in arm}) == 1 and all(
-            len({tuple(t.find(Architecture=d["Architecture"], **{"Hot Kernel / Symbol": k})[c]
-                       for c in cols[1:]) for d in arm}) == 1 for k in kernels)
-        if not same_arm:
-            sys.exit("T11: the AArch64 hosts' hot kernels differ; give each host its own section")
+        # Each AArch64 host gets its own section: the second one measured an earlier
+        # fork commit whose encoder kernel had a different name and no lazy PCS kernels.
         a_host, v_host = arm_hosts()
-        arch_specs = [
-            ("x86_64", r"x86-64 (\xmach)"),
-            ("aarch64", r"AArch64 (\amach and \vmach, identical counts)"),
+        cur_kernels = ([f"encode_column_block_prepared::<{f}>" for f in FIELDS]
+                       + ["collapse_rows_lazy::<Mont127>", "dot_lazy::<Mont127>"])
+        old_kernels = [f"encode_column_block::<{f}>" for f in FIELDS]
+
+        def find_builds(pred, desc):
+            bs = [d for d in agg if pred(d["Architecture"])]
+            if not bs:
+                sys.exit(f"T11: no {desc} build")
+            return bs
+
+        sections = [
+            ("x86_64", r"x86-64 (\xmach)", find_builds(lambda a: a.startswith("x86_64 "), "x86_64"),
+             cur_kernels),
+            (f"aarch64-{a_host}", r"AArch64 (\amach)",
+             find_builds(lambda a: a.startswith("aarch64 ") and a_host in a, a_host), cur_kernels),
+            (f"aarch64-{v_host}", r"AArch64 (\vmach, \gitref{" + arm2_fork() + "})",
+             find_builds(lambda a: a.startswith("aarch64 ") and v_host in a, v_host), old_kernels),
         ]
-        for arch, label in arch_specs:
-            builds = [d for d in agg if d["Architecture"].startswith(arch + " ")]
-            if not builds:
-                sys.exit(f"T11: no {arch} build")
-            if arch == "aarch64" and not all(any(h in d["Architecture"] for d in builds)
-                                             for h in (a_host, v_host)):
-                sys.exit(f"T11: expected builds of {a_host} and {v_host}")
+        for tag, label, builds, kerns in sections:
             b = max(builds, key=lambda d: int(d["Reports"]))
             total = sum(int(d["Reports"]) for d in builds)
             if rows:
                 rows.append(r"\midrule")
             rows.append(span(7, r"\emph{" + label + "}", "l"))
             rows.append(["All hot kernels", str(total)] + [esc(b[c]) for c in cols[1:]])
-            rows_csv.append([arch, "hot_kernels (aggregate)", str(total)] + [b[c] for c in cols[1:]])
-            for k in kernels:
+            rows_csv.append([tag, "hot_kernels (aggregate)", str(total)] + [b[c] for c in cols[1:]])
+            for k in kerns:
                 d = t.find(Architecture=b["Architecture"], **{"Hot Kernel / Symbol": k})
                 rows.append([r"\code{" + esc(k) + "}"] + [esc(d[c]) for c in cols])
-                rows_csv.append([arch, k] + [d[c] for c in cols])
+                rows_csv.append([tag, k] + [d[c] for c in cols])
     else:
         for arch, label in (("x86_64", r"x86-64 (\xmach)"), ("aarch64", r"AArch64 (\amach)")):
             builds = [d for d in agg if d["Architecture"].startswith(arch + " ")]
@@ -2178,9 +2222,10 @@ def tab_setup():
         [r"$\log_2 N$", "ms", "/ encode", "ms", "/ encode",
          r"{\thiswork}", r"{\lcpcpub}", r"{\thiswork}", r"{\lcpcpub}"],
     ]
-    note = (r"$T=1$, \lcpccode. PCS setup = graph sampling and encoder initialization. "
-            r"Input generation = benchmark coefficients and row buffer, excluded from PCS setup. "
-            r"Peak resident set size (RSS) = \code{VmHWM}, maximum over sessions.")
+    note = (r"$T=1$, \lcpccode. PCS setup = graph sampling and encoder initialization; verifier "
+            r"initialization (\csvt{T8}) is comparable. Input gen.\ = benchmark coefficient "
+            r"sampling and row-buffer initialization, excluded from PCS setup. Peak resident set "
+            r"size (RSS) = \code{VmHWM}, maximum over sessions.")
     write("tab_setup.tex",
           tblr("tab:p-setup", r"One-time setup and peak memory on \xmach", "r" * 9, head, rows,
                note=note, size=r"\scriptsize", placement="!t", colsep="3pt", src=source_comment([t])),
