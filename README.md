@@ -1,7 +1,5 @@
 # Real Brakedown Performance (`RBP-LCPC`)
 
-> Artifact Evaluation | Badges: Available / Functional / Reproduced | DOI: `TODO(DOI)`
-
 This repository is a fork of [LCPC](https://github.com/conroi/lcpc) by Riad S. Wahby
 (Apache-2.0, see [`LICENSE`](LICENSE)), imported with its full git history at upstream commit
 `f0e2116001af5a1bbf39481535f837d6a25772e8`. The original upstream README is preserved unchanged in
